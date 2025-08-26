@@ -1,0 +1,4 @@
+﻿csv_id,customer_email,billing_first_name,billing_last_name,billing_phone,billing_address_1,billing_postcode,billing_city,billing_state,billing_country,customer_membership,customer_sector,affilate_user_id
+4,davonne.crayson@deercreeks.org,davonne,crayson,9841834500,Bagdole,44700,Lalitpur,Alabama,USA,megavoter,budget,320
+5,akshay.xzayvier@deercreeks.org,akshay,xzayvier,9841834500,Bagdole,44700,Lalitpur,Alabama,USA,patron,distribution,320
+6,zaydon.dheeraj@deercreeks.org,zaydon,dheeraj,9841834500,Bagdole,44700,Lalitpur,Alabama,USA,megavoter,membership,320

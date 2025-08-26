@@ -1,0 +1,121 @@
+/* twillo styling */
+.twilio-otp-form {
+  max-width: 600px;
+  margin: auto;
+  
+  margin-top: 30px;
+  margin-bottom: 30px;
+  padding: 60px;
+}
+.twilio-otp-box-shadow {
+  box-shadow: rgb(100 100 100 / 25%) 0px 6px 12px -2px,
+    rgb(255 255 255 / 30%) 0px 3px 7px -3px;
+}
+.twilio-otp-form .cpm_otp_field_group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cpm_otp_field_group label {
+  text-align: center;
+  color: inherit;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.cpm_otp_field_group #phone_numberr {
+  /* width: 50%; */
+  justify-content: center;
+}
+.cpm_otp_field_group input {
+  padding: 18px 45px;
+  border-radius: 0;
+  border: 1px solid #a1a1a1a1;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  width: auto !important;
+  padding-left: 50px !important;
+  font-size: 16px;
+}
+.cpm_otp_field_group button {
+  width: fit-content;
+  color: inherit;
+  padding: 12px 40px;
+  border: 1px solid;
+  cursor: pointer;
+  margin: auto;
+}
+.twilio-otp-form .form-err {
+  color: #d71717;
+  font-weight: 500;
+  margin-bottom: 30px;
+  border: 1px solid;
+  text-align: center;
+  padding: 5px 30px;
+  font-size: 14px;
+}
+.twilio-otp-form .form-success {
+  color: green;
+  font-weight: 500;
+  margin-bottom: 30px;
+  border: 1px solid;
+  text-align: center;
+  padding: 5px 30px;
+  font-size: 14px;
+}
+.twilio-otp-form .form-msg i {
+  margin-right: 10px;
+}
+#phone_numberr {
+  display: flex;
+  position: relative;
+}
+#phone_numberr i {
+  position: absolute;
+  left: 10px;
+  top: 24px;
+  color: inherit;
+}
+input:focus-visible {
+  outline: 0;
+}
+.cpm_otp_group input {
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  text-align: center;
+  border-radius: 5px;
+}
+
+.verify_otp_btn_container {
+  display: flex;
+  gap: 15px;
+}
+.verify_otp_btn_container button {
+  margin: 0;
+}
+.verify_otp_btn_container #validate_otp_retry {
+  background-color: #c42a2a;
+  color: #fff;
+  border: inherit;
+}
+.verify_otp_btn_container #validate_otp_retry i {
+  margin-left: 10px;
+}
+.verify_otp_btn_container #validate_otp {
+  background-color: inherit;
+  color: inherit;
+}
+.cpm_otp_field_group img {
+  height: 60px;
+  width: 60px;
+  margin-bottom: 30px;
+}
+#otp{
+  display: flex;
+  gap: 10px;
+}
+#otp input{
+  width: 40px !important;
+  padding-left: 0 !important;
+  padding-right: 0;
+}

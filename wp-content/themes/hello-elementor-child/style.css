@@ -1,0 +1,687 @@
+/*
+ Theme Name:   hello-elementor-child
+ description:  A child theme of the hello-elementor default WordPress theme
+ Author:       CPM
+ Template:     hello-elementor
+ Version:      1.0.0
+*/
+
+/* =================== IMPORTING FONTS ============================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Acme&family=Ubuntu&display=swap");
+
+/* =================== GLOBAL DECLARATION ============================== */
+:root {
+  --dt-heading-font-family: "Acme", sans-serif;
+  --dt-text-font-family: "Ubuntu", sans-serif;
+  --white: #ffff;
+  --primary: #6f42c1;
+  --text: #0b0c13;
+  --secondary: #ffbc00;
+  --tertiary: #005bbb;
+  --red: #b0231c;
+  --dt-text-font-size: 16px;
+  --background: #d9d9d9;
+}
+
+body {
+  font-family: var(--dt-text-font-family) !important;
+  font-weight: 300;
+  font-size: var(--dt-text-font-size);
+
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: var(--dt-heading-font-family) !important;
+  font-weight: 400 !important;
+}
+
+label,
+input,
+p,
+.elementor-default.elementor-page a {
+  font-family: var(--dt-text-font-family) !important;
+  /* font-size: var(--dt-text-font-size); */
+}
+
+/* ================== WOOCOMMERCE CHECKOUT ====================== */
+.woocommerce-checkout .wp-block-preformatted {
+  white-space: inherit;
+}
+
+/* ================== WOOCOMMERCE NAVIGATION ====================== */
+.woocommerce-MyAccount-navigation ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 40px;
+}
+.woocommerce-MyAccount-navigation ul li a {
+  display: block;
+  text-transform: capitalize;
+}
+.dong-dash-QR {
+  display: none;
+}
+.woocommerce-MyAccount-navigation ul li.is-active a {
+  background: var(--primary);
+  color: var(--white);
+}
+
+/* -------------------------
+    LOGIN AND CHECKOUT
+ -------------------------- */
+.pmpro-login .dong-mobile-price,
+.woocommerce-checkout .dong-mobile-price {
+  display: none;
+}
+.woocommerce-account .dong-mobile-price {
+  display: none;
+}
+
+@media only screen and (min-width: 768px) {
+  .woocommerce-MyAccount-navigation ul li a {
+    background: #eee;
+    border-bottom: 1px solid var(--white);
+    color: var(--text);
+    padding: 15px 20px;
+  }
+  .woocommerce-MyAccount-navigation ul li:hover a {
+    background: var(--background);
+  }
+  .woocommerce-MyAccount-navigation ul li.is-active:hover a {
+    background: var(--primary);
+  }
+  /* -----My-account-------- */
+  .pmpro-account .v-card {
+    display: none;
+  }
+}
+
+/* ================== WOOCOMMERCE SHOP ====================== */
+.woocommerce-shop .elementor-section.elementor-element.detente-prev-header {
+  margin-bottom: 0;
+}
+.woocommerce-shop
+  .elementor
+  .detente-prev-header
+  .elementor-widget-image
+  a
+  img {
+  filter: brightness(0);
+}
+.woocommerce-shop
+  .elementor
+  section.elementor-element.detente-prev-header
+  .jeg-elementor-kit
+  ul.jkit-menu
+  li.menu-item
+  a {
+  color: var(--text);
+}
+.woocommerce-shop
+  .elementor
+  section.elementor-element.detente-prev-header
+  .jeg-elementor-kit
+  ul.jkit-menu
+  li.menu-item:hover
+  a {
+  color: var(--primary);
+}
+.woocommerce ul.products li.product a.button {
+  border: 1px solid var(--primary);
+  background-color: var(--primary);
+  border-radius: 0;
+  color: var(--white);
+}
+.woocommerce ul.products li.product a.button:hover,
+.woocommerce div.product form.cart .button:hover {
+  background-color: transparent;
+  color: var(--primary);
+}
+.woocommerce ul.products li.product a.button:focus,
+.woocommerce div.product form.cart .button:focus {
+  background-color: transparent;
+  outline: 0;
+}
+/* ---single-product--- */
+.woocommerce div.product form.cart .button {
+  border-radius: 0;
+  border: 1px solid var(--primary);
+}
+.woocommerce a.added_to_cart {
+  padding-left: 0.5em;
+}
+
+/* ----BUTTON EXPORT-- */
+.dongtraders_order_export .cpm-btn.submit,
+.woocommerce-EditAccountForm button.woocommerce-Button {
+  margin-top: 20px;
+}
+/* ------ ADDRESS ------ */
+.woocommerce .woocommerce-Addresses.addresses .woocommerce-Address {
+  width: 100%;
+}
+
+@media only screen and (min-width: 768px) {
+  .woocommerce-shop .site-main {
+    padding: 30px 0;
+  }
+  .woocommerce-shop.woocommerce .woocommerce-ordering {
+    margin: 0 0 3em;
+  }
+  .woocommerce-shop.woocommerce
+    ul.products
+    li.product
+    .woocommerce-loop-product__title {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .woocommerce div.product form.cart .variations td,
+  .woocommerce div.product form.cart .variations th {
+    line-height: 1.5;
+    padding-bottom: 5px;
+  }
+  /* ---ADDRESS ----- */
+  .woocommerce-account .addresses .title .edit {
+    margin-top: 20px;
+  }
+  .woocommerce-account .addresses .title h3 {
+    margin-bottom: 5px;
+  }
+  .woocommerce .woocommerce-Addresses.addresses .woocommerce-Address {
+    margin-bottom: 20px;
+  }
+
+  /* ----- WOOCOMMERCE V-CARD ---------- */
+  .woocommerce .vcards_buttons a {
+    padding: 11px 20px;
+    border: 1px solid var(--primary);
+  }
+  .woocommerce .vcards_buttons {
+    width: 50%;
+    text-align: center;
+    padding: 10px 0 0;
+  }
+  .woocommerce .vcards_buttons a.copy_qr_image_url:hover,
+  .woocommerce .vcards_buttons a.update_card:hover {
+    background: var(--primary);
+    color: var(--white);
+  }
+  /* --------------------
+        BUTTON
+    -------------------- */
+  .dongtraders_order_export .cpm-btn.submit,
+  .woocommerce-EditAccountForm button.woocommerce-Button,
+  .woocommerce #payment #place_order,
+  .woocommerce-page #payment #place_order {
+    background: var(--primary);
+    color: var(--white);
+    border: 1px solid var(--primary);
+    border-radius: 0;
+  }
+  .dongtraders_order_export .cpm-btn.submit:hover,
+  .woocommerce-EditAccountForm button.woocommerce-Button:hover,
+  .dongtraders_order_export .cpm-btn.submit:focus,
+  .woocommerce-EditAccountForm button.woocommerce-Button:focus,
+  table#my-account-affilate-order td form button.cpm-btn:hover,
+  table#my-account-affilate-order td form button.cpm-btn:focus,
+  .woocommerce #payment #place_order:hover,
+  .woocommerce-page #payment #place_order:hover,
+  .woocommerce #payment #place_order:focus,
+  .woocommerce-page #payment #place_order:focus {
+    background: transparent;
+    color: var(--primary);
+    outline: 0;
+  }
+  form#export-csv-order button.button {
+    border: 1px solid #eee;
+  }
+  form#export-csv-order button.button:focus {
+    outline: 0;
+  }
+}
+
+/* ==================== HEADER ======================= */
+.mobile-dong-menu {
+  display: none;
+}
+
+.elementor .dong-menu-Jkit img,
+.elementor .mobile-dong-menu img {
+  filter: brightness(0);
+}
+
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-hamburger-menu
+  svg {
+  width: 28px;
+  fill: var(--white);
+}
+
+/* SINGLE HEADER */
+.single .elementor .dong-menu-Jkit img,
+.woocommerce-page .elementor .dong-menu-Jkit img {
+  filter: brightness(1);
+}
+
+.single .elementor .dong-menu-Jkit ul#menu-dong-desktop-menu li.menu-item a,
+.woocommerce-page
+  .elementor
+  .dong-menu-Jkit
+  ul#menu-dong-desktop-menu
+  li.menu-item
+  a {
+  color: var(--white);
+}
+
+.single
+  .elementor
+  .dong-menu-Jkit
+  ul#menu-dong-desktop-menu
+  li.menu-item:hover
+  a {
+  color: var(--primary);
+}
+
+.single.single-elementor_library
+  .elementor
+  .dong-menu-Jkit
+  ul#menu-dong-desktop-menu
+  li.menu-item
+  a {
+  color: var(--text);
+}
+
+.single.single-elementor_library .elementor .dong-menu-Jkit img {
+  filter: brightness(0);
+}
+
+.elementor .dong-menu-Jkit ul#menu-dong-desktop-menu li.menu-item a {
+  display: block;
+}
+
+.elementor .dong-menu-Jkit ul#menu-dong-desktop-menu li.menu-item a::after {
+  content: "";
+  border-bottom: 1px solid var(--primary);
+  width: 60px;
+  height: 1px;
+  margin: 10px auto 0;
+  transition: 400ms ease all;
+  z-index: -1;
+  transform: scaleX(0);
+  display: block;
+}
+.elementor
+  .dong-menu-Jkit
+  ul#menu-dong-desktop-menu
+  li.menu-item:hover
+  a::after {
+  transform: scaleX(1);
+  z-index: 1;
+}
+
+.elementor-kit-289 input[type="submit"]:hover,
+.elementor-kit-289 input[type="submit"]:focus {
+  background: transparent;
+  outline: none;
+}
+
+/* ========================   FOOTER   ========================== */
+.dong-newsletter .elementor-message {
+  border: 1px solid var(--primary);
+  padding: 10px;
+  color: var(--primary);
+}
+
+/* ======================== WORLD PEACE ========================== */
+
+.dong-world-peace .e-con-inner {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-top: 31px solid var(--primary);
+  padding: 70px 120px;
+}
+
+.dong-YAM-QR .e-con-inner {
+  background-image: url(./images/background.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 84px 70px;
+  filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.25));
+}
+
+@media only screen and (max-width: 767.98px) {
+  .dong-world-peace .e-con-inner,
+  .dong-YAM-QR .e-con-inner {
+    padding: 50px 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .woocommerce table.shop_table_responsive tr td,
+  .woocommerce-page table.shop_table_responsive tr td {
+    display: block !important;
+    text-align: right !important;
+    width: 100%;
+  }
+
+  .woocommerce table.shop_table_responsive thead,
+  .woocommerce-page table.shop_table_responsive thead {
+    display: none;
+  }
+
+  .woocommerce table.shop_table_responsive tr td::before,
+  .woocommerce-page table.shop_table_responsive tr td::before {
+    content: attr(data-title) ": ";
+    font-weight: 700;
+    float: left;
+  }
+}
+
+/* ======================== PEACE UNIFORM ========================== */
+.dt-dong-peaceUniform {
+  display: flex;
+  align-items: center;
+}
+.dt-dong-peaceUniform .dt-dong-colu,
+.dt-dong-peaceUniform form {
+  flex: 0 0 50%;
+  padding: 10px;
+  width: 50%;
+}
+.dt-dong-switch {
+  display: flex;
+  align-items: center;
+  margin: 0 0 19px 0;
+}
+.dt-dong-switch span {
+  cursor: pointer;
+}
+.dt-dong-select h4 span {
+  color: var(--red);
+}
+.dt-dong-form h3 {
+  margin-bottom: 20px;
+}
+/* SWITCH */
+.elementor form .dt-dong-switch input[type="checkbox"] {
+  position: relative;
+  width: 80px;
+  height: 36px;
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+  background: var(--primary);
+  box-shadow: inset 0px 6px 8px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 50px;
+  margin: 0 13px;
+}
+.elementor form .dt-dong-switch input[type="checkbox"]::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #e8eaea 100%);
+  position: absolute;
+  top: 50%;
+  left: 6%;
+  transform: translate(0, -50%);
+  transition: 0.5s;
+  filter: drop-shadow(2px 1px 6px rgba(0, 0, 0, 0.25));
+}
+.elementor form .dt-dong-switch input[type="checkbox"]:checked::before {
+  transform: translate(155%, -50%);
+}
+.elementor form .dt-dong-switch input[type="checkbox"]:checked {
+  background: var(--secondary);
+  box-shadow: inset 0px 6px 8px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* MEN/WOMEN SIZE */
+.dt-dong-size {
+  display: flex;
+  width: 300px;
+  flex-wrap: wrap;
+}
+.dt-dong-size input::after {
+  content: attr(id);
+  font-size: 18px;
+  line-height: 21px;
+  text-align: center;
+  border: 1px solid #eee;
+  width: 53px;
+  border-radius: 10px;
+  display: block;
+  text-align: center;
+  padding: 10px 0;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.dt-dong-size input {
+  margin: 0 10px 10px 0;
+  appearance: none;
+  border: 0 !important;
+}
+.dt-dong-size input:checked::after {
+  background-color: #eee;
+}
+.dt-dong-size input:hover::after {
+  background-color: #eee;
+}
+.dt-dong-select select {
+  width: 260px;
+  height: 44px;
+  background: var(--white);
+  border: 1.3px solid #b8bbc2;
+  border-radius: 8px;
+  padding: 12px 18px;
+  appearance: none;
+  background-image: url(./images/down.svg);
+  background-repeat: no-repeat;
+  background-position: 95% 50%;
+  font-size: 16px;
+  line-height: 18px;
+}
+.dt-dong-select {
+  margin: 30px 0;
+}
+.dt-dong-select p {
+  font-size: 14px;
+  line-height: 18px;
+  width: 270px;
+  margin-top: 10px;
+}
+/* ======= quantity ========= */
+.dt-dong-quantity {
+  display: flex;
+  margin-bottom: 5px;
+}
+.elementor .dt-dong-quantity button {
+  background: #eee;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 50px;
+  border-color: #eee;
+}
+.elementor .dt-dong-quantity input {
+  width: 34px;
+  border: 0 !important;
+  color: var(--text);
+  padding: 0;
+  margin: 0 0 0 18px;
+  text-align: center;
+}
+p.dt-para-uniform {
+  font-size: 18px;
+  line-height: 30px;
+  padding-right: 145px;
+}
+
+/* SUBMIT BUTTON */
+.elementor form input[type="submit"]:hover,
+.elementor-kit-289 input[type="button"]:hover,
+.elementor-kit-289 input[type="button"]:focus {
+  background-color: transparent;
+}
+.elementor form.dt-dong-form input[type="submit"] {
+  margin-top: 15px;
+}
+@media only screen and (max-width: 767.98px) {
+  .dt-dong-peaceUniform {
+    flex-wrap: wrap;
+    text-align: center;
+    flex-direction: column-reverse;
+  }
+  .dt-dong-peaceUniform .dt-dong-colu,
+  .dt-dong-peaceUniform form {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+  .dt-dong-size {
+    justify-content: center;
+    margin: 0 auto;
+  }
+  .dt-dong-switch,
+  .dt-dong-quantity {
+    justify-content: center;
+  }
+  .dt-dong-select select,
+  .dt-dong-select p {
+    margin: 0 auto;
+  }
+  .dt-dong-peaceUniform h4 {
+    font-size: 19px;
+  }
+  .elementor .dt-dong-quantity input {
+    margin: 0;
+  }
+  .dt-dong-select p {
+    margin-top: 10px;
+  }
+  p.dt-para-uniform {
+    padding-right: 0;
+  }
+}
+
+/* =========  TOOL-TIP ====================*/
+.dong-tooltip {
+  cursor: pointer;
+  position: relative;
+  color: var(--primary);
+}
+.dong-tooltip::before,
+.dong-tooltip::after {
+  left: 50%;
+  opacity: 0;
+  position: absolute;
+  z-index: -100;
+}
+.dong-tooltip:hover::before,
+.dong-tooltip:focus::before,
+.dong-tooltip:hover::after,
+.dong-tooltip:focus::after {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  z-index: 100;
+}
+/*== pointer tip ==*/
+.dong-tooltip::before {
+  border-style: solid;
+  border-width: 0 0.75em 1em 0.75em;
+  border-color: transparent transparent #eee transparent;
+  top: 22px;
+  content: "";
+  margin-left: -0.5em;
+  transition: all 0.65s cubic-bezier(0.84, -0.18, 0.31, 1.26),
+    opacity 0.65s 0.5s;
+  transform: scale(0.6) translateY(-90%);
+}
+.dong-tooltip:hover::before,
+.dong-tooltip:focus::before {
+  transition: all 0.65s cubic-bezier(0.84, -0.18, 0.31, 1.26) 0.2s;
+}
+/*== speech bubble ==*/
+.dong-tooltip::after {
+  background: #eee;
+  border-radius: 0.25em;
+  top: 35px;
+  color: var(--text);
+  content: attr(data-tip);
+  margin-left: -8.75em;
+  padding: 1em;
+  transition: all 0.65s cubic-bezier(0.84, -0.18, 0.31, 1.26) 0.2s;
+  transform: scale(0.6) translateY(50%);
+  width: 17.5em;
+}
+.tool:hover::after,
+.tool:focus::after {
+  transition: all 0.65s cubic-bezier(0.84, -0.18, 0.31, 1.26);
+}
+
+@media (max-width: 767px) {
+  .dong-tooltip::after {
+    font-size: 13px;
+    margin-left: -6em;
+    width: 12em;
+  }
+}
+/* ---orders-hidden ----- */
+.woocommerce ul li.woocommerce-MyAccount-navigation-link--orders {
+  display: none;
+}
+
+/* --------------------
+    MY ORDERS
+ -------------------- */
+
+.cpm-table-wrap #posts-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cpm-table-wrap #posts-filter input,
+.cpm-table-wrap #posts-filter select {
+  margin: 0 5px;
+  min-height: 30px;
+  padding: 0 8px;
+  line-height: 2;
+  font-size: 1em;
+  width: 16em;
+}
+.cpm-table-wrap #posts-filter input.button {
+  font-size: 100%;
+  margin: 0;
+  line-height: 1;
+  padding: 0.618em 1em;
+  font-weight: 700;
+  border-radius: 3px;
+  color: #515151;
+  background-color: #ebe9eb;
+  border: 1px solid #eee;
+}
+
+/* -----------------------------
+PATRON REGISTER
+------------------------------*/
+.detente-trigger .premium-modal-trigger-btn:focus {
+  background: transparent !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--primary) !important;
+  outline: none;
+}
+
+/* trading history css */
+#dong-trading-history-table thead th{
+text-align: center;
+}
+#dong-trading-history-table tbody h5{
+margin: 2px;
+text-align: center;
+}

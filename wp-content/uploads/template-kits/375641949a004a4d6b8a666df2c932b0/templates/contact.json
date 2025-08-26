@@ -1,0 +1,365 @@
+{
+    "version": "0.4",
+    "title": "Contact",
+    "type": "page",
+    "metadata": {
+        "template_type": "single-page",
+        "include_in_zip": "1",
+        "elementor_pro_required": null,
+        "wp_page_template": "elementor_header_footer"
+    },
+    "content": [
+        {
+            "id": "15b3ffa4",
+            "settings": {
+                "gap": "wider",
+                "structure": "20",
+                "background_background": "classic",
+                "background_color": "#F4FBFF",
+                "padding": {
+                    "unit": "px",
+                    "top": "48",
+                    "right": "0",
+                    "bottom": "48",
+                    "left": "0",
+                    "isLinked": false
+                }
+            },
+            "elements": [
+                {
+                    "id": "46b96ae2",
+                    "settings": {
+                        "_column_size": 50,
+                        "_inline_size": null,
+                        "padding_mobile": {
+                            "unit": "px",
+                            "top": "30",
+                            "right": "30",
+                            "bottom": "0",
+                            "left": "30",
+                            "isLinked": false
+                        },
+                        "content_position": "center"
+                    },
+                    "elements": [
+                        {
+                            "id": "5768c7f7",
+                            "settings": {
+                                "title": "Let's Talk",
+                                "header_size": "h1",
+                                "typography_typography": "custom",
+                                "typography_font_size_tablet": {
+                                    "unit": "px",
+                                    "size": 50,
+                                    "sizes": []
+                                }
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "heading",
+                            "elType": "widget"
+                        }
+                    ],
+                    "isInner": false,
+                    "elType": "column"
+                },
+                {
+                    "id": "2963269",
+                    "settings": {
+                        "_column_size": 50,
+                        "_inline_size": null
+                    },
+                    "elements": [
+                        {
+                            "id": "23742eee",
+                            "settings": {
+                                "editor": "Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Etiam egestas laoreet tortor sit amet accumsan. Ut nec porta sapien.<a href=\"#\">hello@encore.com<\/a>",
+                                "text_color": "#999999",
+                                "typography_typography": "custom",
+                                "typography_font_size": {
+                                    "unit": "px",
+                                    "size": 21,
+                                    "sizes": []
+                                },
+                                "typography_line_height": {
+                                    "unit": "em",
+                                    "size": 1.4,
+                                    "sizes": []
+                                }
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "text-editor",
+                            "elType": "widget"
+                        }
+                    ],
+                    "isInner": false,
+                    "elType": "column"
+                }
+            ],
+            "isInner": false,
+            "elType": "section"
+        },
+        {
+            "id": "3dce6a79",
+            "settings": {
+                "layout": "full_width",
+                "gap": "wider"
+            },
+            "elements": [
+                {
+                    "id": "73c11c62",
+                    "settings": {
+                        "_column_size": 100,
+                        "_inline_size": null
+                    },
+                    "elements": [
+                        {
+                            "id": "3f286490",
+                            "settings": {
+                                "premium_map_location_finder": "yes",
+                                "premium_maps_center_lat": "-6.2257826",
+                                "premium_maps_center_long": "106.8026057",
+                                "premium_maps_map_pins": [
+                                    {
+                                        "map_latitude": "-6.2257826",
+                                        "map_longitude": "106.8026057",
+                                        "pin_title": "Jakarta",
+                                        "pin_desc": "<p>Etiam porta sem malesuada magna mollis euismod. Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum.<\/p>",
+                                        "_id": "0462184",
+                                        "premium_map_pin_location_finder": "yes",
+                                        "pin_icon": {
+                                            "url": "",
+                                            "id": ""
+                                        },
+                                        "pin_icon_size": {
+                                            "unit": "px",
+                                            "size": "",
+                                            "sizes": []
+                                        }
+                                    }
+                                ],
+                                "premium_maps_map_option_map_type_control": "yes",
+                                "premium_maps_map_option_zoom_controls": "yes",
+                                "premium_maps_map_zoom": {
+                                    "unit": "px",
+                                    "size": 15,
+                                    "sizes": []
+                                },
+                                "premium_maps_custom_styling": "[\n    {\n        \"stylers\": [\n            {\n                \"saturation\": -100\n            }\n        ]\n    },\n    {\n        \"featureType\": \"water\",\n        \"elementType\": \"geometry.fill\",\n        \"stylers\": [\n            {\n                \"color\": \"#0099dd\"\n            }\n        ]\n    },\n    {\n        \"elementType\": \"labels\",\n        \"stylers\": [\n            {\n                \"visibility\": \"off\"\n            }\n        ]\n    },\n    {\n        \"featureType\": \"poi.park\",\n        \"elementType\": \"geometry.fill\",\n        \"stylers\": [\n            {\n                \"color\": \"#aadd55\"\n            }\n        ]\n    },\n    {\n        \"featureType\": \"road.highway\",\n        \"elementType\": \"labels\",\n        \"stylers\": [\n            {\n                \"visibility\": \"on\"\n            }\n        ]\n    },\n    {\n        \"featureType\": \"road.arterial\",\n        \"elementType\": \"labels.text\",\n        \"stylers\": [\n            {\n                \"visibility\": \"on\"\n            }\n        ]\n    },\n    {\n        \"featureType\": \"road.local\",\n        \"elementType\": \"labels.text\",\n        \"stylers\": [\n            {\n                \"visibility\": \"on\"\n            }\n        ]\n    },\n    {}\n]",
+                                "premium_maps_map_height": {
+                                    "unit": "px",
+                                    "size": 930,
+                                    "sizes": []
+                                },
+                                "premium_maps_map_height_tablet": {
+                                    "unit": "px",
+                                    "size": 400,
+                                    "sizes": []
+                                },
+                                "_z_index": 0,
+                                "_element_width": "initial",
+                                "_element_custom_width": {
+                                    "unit": "vw",
+                                    "size": 74,
+                                    "sizes": []
+                                },
+                                "_position": "absolute",
+                                "_offset_orientation_h": "end",
+                                "_offset_x": {
+                                    "size": -237,
+                                    "unit": "px"
+                                },
+                                "_offset_x_end": {
+                                    "size": 36,
+                                    "unit": "vw"
+                                },
+                                "_offset_y": {
+                                    "size": -30,
+                                    "unit": "px"
+                                },
+                                "hide_mobile": "hidden-phone"
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "premium-addon-maps",
+                            "elType": "widget"
+                        },
+                        {
+                            "id": "7844bf10",
+                            "settings": {
+                                "structure": "20",
+                                "margin": {
+                                    "unit": "px",
+                                    "top": "96",
+                                    "right": 0,
+                                    "bottom": "0",
+                                    "left": 0,
+                                    "isLinked": false
+                                },
+                                "margin_tablet": {
+                                    "unit": "px",
+                                    "top": "0",
+                                    "right": 0,
+                                    "bottom": "0",
+                                    "left": 0,
+                                    "isLinked": false
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "2b8c2aad",
+                                    "settings": {
+                                        "_column_size": 50,
+                                        "_inline_size": 37.982
+                                    },
+                                    "elements": [],
+                                    "isInner": true,
+                                    "elType": "column"
+                                },
+                                {
+                                    "id": "2e6f2559",
+                                    "settings": {
+                                        "_column_size": 50,
+                                        "_inline_size": 62.018,
+                                        "background_background": "classic",
+                                        "background_color": "#FFFFFF",
+                                        "padding": {
+                                            "unit": "px",
+                                            "top": "48",
+                                            "right": "48",
+                                            "bottom": "40",
+                                            "left": "48",
+                                            "isLinked": false
+                                        },
+                                        "padding_mobile": {
+                                            "unit": "px",
+                                            "top": "0",
+                                            "right": "0",
+                                            "bottom": "0",
+                                            "left": "0",
+                                            "isLinked": false
+                                        }
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "180e84b3",
+                                            "settings": {
+                                                "premium_dual_header_first_header_text": "Hello",
+                                                "premium_dual_header_second_header_text": "let's get in touch",
+                                                "premium_dual_header_text_align": "left",
+                                                "second_header_typography_typography": "custom",
+                                                "premium_dual_header_second_background_color": "rgba(27, 176, 228, 0)",
+                                                "premium_dual_header_second_background_color_stop": {
+                                                    "unit": "%",
+                                                    "size": 61,
+                                                    "sizes": []
+                                                },
+                                                "premium_dual_header_second_background_color_b": "#C9F1FF",
+                                                "premium_dual_header_second_background_color_b_stop": {
+                                                    "unit": "%",
+                                                    "size": 48,
+                                                    "sizes": []
+                                                },
+                                                "second_header_border_width": {
+                                                    "unit": "px",
+                                                    "top": "0",
+                                                    "right": "0",
+                                                    "bottom": "07",
+                                                    "left": "0",
+                                                    "isLinked": false
+                                                },
+                                                "second_header_border_color": "#1BB0E4",
+                                                "premium_dual_header_second_margin": {
+                                                    "unit": "px",
+                                                    "top": "0",
+                                                    "right": "0",
+                                                    "bottom": "0",
+                                                    "left": "0",
+                                                    "isLinked": false
+                                                },
+                                                "_margin": {
+                                                    "unit": "px",
+                                                    "top": "0",
+                                                    "right": "0",
+                                                    "bottom": "32",
+                                                    "left": "0",
+                                                    "isLinked": false
+                                                },
+                                                "first_header_typography_typography": "custom",
+                                                "first_header_typography_font_size_tablet": {
+                                                    "unit": "px",
+                                                    "size": 38,
+                                                    "sizes": []
+                                                },
+                                                "second_header_typography_font_size_tablet": {
+                                                    "unit": "px",
+                                                    "size": 38,
+                                                    "sizes": []
+                                                },
+                                                "premium_dual_header_text_align_tablet": "left",
+                                                "premium_dual_header_first_background_background": "gradient",
+                                                "premium_dual_header_first_background_color": "rgba(2, 1, 1, 0)",
+                                                "premium_dual_header_first_background_color_stop": {
+                                                    "unit": "%",
+                                                    "size": 61,
+                                                    "sizes": []
+                                                },
+                                                "premium_dual_header_first_background_color_b": "#C9F1FF",
+                                                "premium_dual_header_first_background_color_b_stop": {
+                                                    "unit": "%",
+                                                    "size": 48,
+                                                    "sizes": []
+                                                }
+                                            },
+                                            "elements": [],
+                                            "isInner": false,
+                                            "widgetType": "premium-addon-dual-header",
+                                            "elType": "widget"
+                                        },
+                                        {
+                                            "id": "7c58c765",
+                                            "settings": {
+                                                "editor": "<p>Etiam porta sem malesuada magna mollis euismod. Nullam quis risus eget urna mollis ornare vel eu leo. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.\u00a0<\/p>",
+                                                "_margin": {
+                                                    "unit": "px",
+                                                    "top": "0",
+                                                    "right": "0",
+                                                    "bottom": "48",
+                                                    "left": "0",
+                                                    "isLinked": false
+                                                }
+                                            },
+                                            "elements": [],
+                                            "isInner": false,
+                                            "widgetType": "text-editor",
+                                            "elType": "widget"
+                                        },
+                                        {
+                                            "id": "1546f3e4",
+                                            "settings": {
+                                                "mf_form_id": "{\"id\":\"593***1586328103288\",\"data\":[\"[{\\\"id\\\":\\\"713f3a3f\\\",\\\"elType\\\":\\\"section\\\",\\\"settings\\\":[],\\\"elements\\\":[{\\\"id\\\":\\\"533267a1\\\",\\\"elType\\\":\\\"column\\\",\\\"settings\\\":{\\\"_column_size\\\":100,\\\"_inline_size\\\":null,\\\"padding\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[{\\\"id\\\":\\\"2aa0d086\\\",\\\"elType\\\":\\\"section\\\",\\\"settings\\\":{\\\"structure\\\":\\\"20\\\",\\\"margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":0,\\\"bottom\\\":\\\"20\\\",\\\"left\\\":0,\\\"isLinked\\\":false}},\\\"elements\\\":[{\\\"id\\\":\\\"47473536\\\",\\\"elType\\\":\\\"column\\\",\\\"settings\\\":{\\\"_column_size\\\":50,\\\"_inline_size\\\":null,\\\"padding\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"10\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"padding_mobile\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[{\\\"id\\\":\\\"4e6e0523\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Text\\\",\\\"mf_input_name\\\":\\\"First\\\",\\\"mf_input_placeholder\\\":\\\"First Name\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"mf_input_placeholder_color\\\":\\\"#777777\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-text\\\"}],\\\"isInner\\\":true},{\\\"id\\\":\\\"4d629338\\\",\\\"elType\\\":\\\"column\\\",\\\"settings\\\":{\\\"_column_size\\\":50,\\\"_inline_size\\\":null,\\\"padding\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"10\\\",\\\"isLinked\\\":false},\\\"margin_mobile\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"18\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"padding_mobile\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[{\\\"id\\\":\\\"4872789\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Text\\\",\\\"mf_input_name\\\":\\\"Last\\\",\\\"mf_input_placeholder\\\":\\\"Last Name\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"mf_input_placeholder_color\\\":\\\"#777777\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-text\\\"}],\\\"isInner\\\":true}],\\\"isInner\\\":true},{\\\"id\\\":\\\"148a544d\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Email\\\",\\\"mf_input_name\\\":\\\"mf-email\\\",\\\"mf_input_placeholder\\\":\\\"Email\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"16\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"mf_input_placeholder_color\\\":\\\"#777777\\\"},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-email\\\"},{\\\"id\\\":\\\"3c09c215\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Telephone\\\",\\\"mf_input_name\\\":\\\"mf-telephone\\\",\\\"mf_input_placeholder\\\":\\\"Telephone\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"16\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"mf_input_placeholder_color\\\":\\\"#777777\\\"},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-telephone\\\"},{\\\"id\\\":\\\"72e51866\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Text\\\",\\\"mf_input_name\\\":\\\"Company\\\",\\\"mf_input_placeholder\\\":\\\"Company\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"mf_input_placeholder_color\\\":\\\"#777777\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"16\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-text\\\"},{\\\"id\\\":\\\"17548397\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Select\\\",\\\"mf_input_name\\\":\\\"Interest\\\",\\\"mf_input_list\\\":[{\\\"mf_input_option_text\\\":\\\"Product Interest\\\",\\\"mf_input_option_value\\\":\\\"Interest\\\",\\\"mf_input_option_status\\\":\\\"\\\",\\\"_id\\\":\\\"0b5b2cd\\\",\\\"mf_input_option_selected\\\":\\\"\\\"},{\\\"mf_input_option_text\\\":\\\"Customer service, support, & help desk\\\",\\\"mf_input_option_value\\\":\\\"CS\\\",\\\"mf_input_option_status\\\":\\\"\\\",\\\"_id\\\":\\\"73a17d6\\\",\\\"mf_input_option_selected\\\":\\\"\\\"},{\\\"mf_input_option_text\\\":\\\"Marketing\\\",\\\"mf_input_option_value\\\":\\\"Marketing\\\",\\\"mf_input_option_status\\\":\\\"\\\",\\\"_id\\\":\\\"5c502e4\\\",\\\"mf_input_option_selected\\\":\\\"\\\"},{\\\"mf_input_option_text\\\":\\\"Cloud application development\\\",\\\"mf_input_option_value\\\":\\\"Cloud\\\",\\\"mf_input_option_status\\\":\\\"\\\",\\\"mf_input_option_selected\\\":\\\"\\\",\\\"_id\\\":\\\"3ecfbe2\\\"}],\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"20\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-select\\\"},{\\\"id\\\":\\\"3d11f790\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"\\\",\\\"mf_input_name\\\":\\\"Submit Message\\\",\\\"mf_input_placeholder\\\":\\\"Your Message\\\",\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"16\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"mf_input_placeholder_color\\\":\\\"#777777\\\"},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-textarea\\\"},{\\\"id\\\":\\\"83aa507\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_input_label_status\\\":\\\"\\\",\\\"mf_input_label\\\":\\\"Checkbox\\\",\\\"mf_input_name\\\":\\\"mf-checkbox\\\",\\\"mf_input_list\\\":[{\\\"mf_input_option_text\\\":\\\"\\\",\\\"mf_input_option_value\\\":\\\"Agree\\\",\\\"mf_input_option_status\\\":\\\"\\\",\\\"_id\\\":\\\"6321b69\\\"}],\\\"mf_input_validation_warning_message\\\":\\\"Something went wrong.\\\",\\\"mf_input_option_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"mf_input_option_space_after_icon\\\":{\\\"unit\\\":\\\"px\\\",\\\"size\\\":10,\\\"sizes\\\":[]},\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"_padding\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"0\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"_element_width\\\":\\\"auto\\\",\\\"mf_input_required\\\":\\\"yes\\\"},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-checkbox\\\"},{\\\"id\\\":\\\"bdf4754\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"editor\\\":\\\"I have read and agree to the <a href=\\\\\\\"#\\\\\\\">Term of Service<\\\\\/a> and <a href=\\\\\\\"#\\\\\\\">Privacy Policy<\\\\\/a>\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"2\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false},\\\"_element_width\\\":\\\"auto\\\"},\\\"elements\\\":[],\\\"widgetType\\\":\\\"text-editor\\\"},{\\\"id\\\":\\\"7bfce8f3\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"mf_btn_text\\\":\\\"Submit Message\\\",\\\"mf_btn_align\\\":\\\"left\\\",\\\"mf_btn_text_padding\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"16\\\",\\\"right\\\":\\\"48\\\",\\\"bottom\\\":\\\"16\\\",\\\"left\\\":\\\"48\\\",\\\"isLinked\\\":false},\\\"mf_btn_typography_typography\\\":\\\"custom\\\",\\\"mf_btn_typography_font_size\\\":{\\\"unit\\\":\\\"px\\\",\\\"size\\\":11,\\\"sizes\\\":[]},\\\"mf_btn_typography_font_weight\\\":\\\"600\\\",\\\"mf_btn_typography_text_transform\\\":\\\"uppercase\\\",\\\"mf_btn_typography_letter_spacing\\\":{\\\"unit\\\":\\\"px\\\",\\\"size\\\":2,\\\"sizes\\\":[]},\\\"mf_btn_bg_color_background\\\":\\\"classic\\\",\\\"mf_btn_bg_color_color\\\":\\\"#4AD0FF\\\",\\\"mf_btn_border_radius\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"30\\\",\\\"right\\\":\\\"30\\\",\\\"bottom\\\":\\\"30\\\",\\\"left\\\":\\\"30\\\",\\\"isLinked\\\":true},\\\"mf_btn_box_shadow_group_box_shadow_type\\\":\\\"yes\\\",\\\"mf_btn_box_shadow_group_box_shadow\\\":{\\\"horizontal\\\":0,\\\"vertical\\\":0,\\\"blur\\\":10,\\\"spread\\\":0,\\\"color\\\":\\\"rgba(0, 0, 0, 0)\\\"},\\\"mf_btn_text_color\\\":\\\"#333333\\\",\\\"mf_btn_bg_hover_color_background\\\":\\\"classic\\\",\\\"mf_btn_bg_hover_color_color\\\":\\\"#1BB0E4\\\",\\\"mf_btn_typography_font_family\\\":\\\"Montserrat\\\",\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"32\\\",\\\"right\\\":\\\"0\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"0\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-button\\\"},{\\\"id\\\":\\\"628c105\\\",\\\"elType\\\":\\\"widget\\\",\\\"settings\\\":{\\\"_margin\\\":{\\\"unit\\\":\\\"px\\\",\\\"top\\\":\\\"24\\\",\\\"right\\\":\\\"16\\\",\\\"bottom\\\":\\\"0\\\",\\\"left\\\":\\\"16\\\",\\\"isLinked\\\":false}},\\\"elements\\\":[],\\\"widgetType\\\":\\\"mf-response\\\"}],\\\"isInner\\\":false}],\\\"isInner\\\":false}]\"]}"
+                                            },
+                                            "elements": [],
+                                            "isInner": false,
+                                            "widgetType": "metform",
+                                            "elType": "widget"
+                                        }
+                                    ],
+                                    "isInner": true,
+                                    "elType": "column"
+                                }
+                            ],
+                            "isInner": true,
+                            "elType": "section"
+                        }
+                    ],
+                    "isInner": false,
+                    "elType": "column"
+                }
+            ],
+            "isInner": false,
+            "elType": "section"
+        }
+    ]
+}

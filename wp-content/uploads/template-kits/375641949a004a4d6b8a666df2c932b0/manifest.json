@@ -1,0 +1,1811 @@
+{
+    "manifest_version": "1.0.14",
+    "title": "Encore",
+    "page_builder": "elementor",
+    "kit_version": "1.0.1",
+    "templates": [
+        {
+            "name": "Global Kit Styles",
+            "screenshot": "screenshots\/global-kit-styles.jpg",
+            "source": "templates\/global.json",
+            "preview_url": "https:\/\/demo.detheme.com",
+            "type": "section",
+            "category": "page",
+            "metadata": {
+                "template_type": "global-styles",
+                "include_in_zip": "1",
+                "elementor_pro_required": null,
+                "additional_template_information": [
+                    "These are the global theme styles configured through the Elementor Theme Styles area."
+                ]
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Single Post",
+            "screenshot": "screenshots\/single-post.jpg",
+            "source": "templates\/single-post.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/single-post\/",
+            "type": "section",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-post",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Homepage",
+            "screenshot": "screenshots\/homepage.jpg",
+            "source": "templates\/homepage.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/homepage\/",
+            "type": "section",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-home",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Inquiry Metform",
+            "screenshot": "screenshots\/inquiry-metform.jpg",
+            "source": "templates\/inquiry-metform.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/inquiry-form\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-other",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "CTA Metform",
+            "screenshot": "screenshots\/cta-metform.png",
+            "source": "templates\/cta-metform.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/cta-form\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-other",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Application Form",
+            "screenshot": "screenshots\/application-form.png",
+            "source": "templates\/application-form.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/application-form\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-other",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Footer Block",
+            "screenshot": "screenshots\/footer-block.png",
+            "source": "templates\/footer-block.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/footer\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-footer",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Header Block",
+            "screenshot": "screenshots\/header-block.jpg",
+            "source": "templates\/header-block.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/header\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-header",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Signup Modal Block",
+            "screenshot": "screenshots\/signup-modal-block.png",
+            "source": "templates\/signup-modal-block.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/signup-modal\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-popup",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Signup Metform",
+            "screenshot": "screenshots\/signup-metform.png",
+            "source": "templates\/signup-metform.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/signup-form\/",
+            "type": "section",
+            "category": "section",
+            "metadata": {
+                "template_type": "section-other",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Blog",
+            "screenshot": "screenshots\/blog.jpg",
+            "source": "templates\/blog.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/blog\/",
+            "type": "section",
+            "category": "page",
+            "metadata": {
+                "template_type": "archive-blog",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "404",
+            "screenshot": "screenshots\/404.jpg",
+            "source": "templates\/404.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/404\/",
+            "type": "section",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-404",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Career Detail",
+            "screenshot": "screenshots\/career-detail.jpg",
+            "source": "templates\/career-detail.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/career-detail\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Career",
+            "screenshot": "screenshots\/career.jpg",
+            "source": "templates\/career.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/career\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Single Portfolio",
+            "screenshot": "screenshots\/single-portfolio.jpg",
+            "source": "templates\/single-portfolio.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/single-portfolio\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Contact",
+            "screenshot": "screenshots\/contact.jpg",
+            "source": "templates\/contact.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/contact\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Services",
+            "screenshot": "screenshots\/services.jpg",
+            "source": "templates\/services.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/services\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "Portfolio",
+            "screenshot": "screenshots\/portfolio.jpg",
+            "source": "templates\/portfolio.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/portfolio\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        },
+        {
+            "name": "About",
+            "screenshot": "screenshots\/about.jpg",
+            "source": "templates\/about.json",
+            "preview_url": "https:\/\/demo.detheme.com\/encore\/template-kit\/about\/",
+            "type": "page",
+            "category": "page",
+            "metadata": {
+                "template_type": "single-page",
+                "include_in_zip": "1",
+                "elementor_pro_required": null
+            },
+            "elementor_pro_required": false
+        }
+    ],
+    "required_plugins": [
+        {
+            "name": "Elementor",
+            "version": "2.9.9",
+            "file": "elementor\/elementor.php",
+            "author": "Elementor.com"
+        },
+        {
+            "name": "ElementsKit Lite",
+            "version": "1.5.6",
+            "file": "elementskit-lite\/elementskit-lite.php",
+            "author": "Wpmet"
+        },
+        {
+            "name": "JetSticky For Elementor",
+            "version": "1.0.1",
+            "file": "jetsticky-for-elementor\/jetsticky-for-elementor.php",
+            "author": "Crocoblock"
+        },
+        {
+            "name": "MetForm",
+            "version": "1.2.3",
+            "file": "metform\/metform.php",
+            "author": "Wpmet"
+        },
+        {
+            "name": "Premium Addons for Elementor",
+            "version": "3.20.6",
+            "file": "premium-addons-for-elementor\/premium-addons-for-elementor.php",
+            "author": "Leap13"
+        },
+        {
+            "name": "Press Elements - Widgets for Elementor",
+            "version": "1.7.2",
+            "file": "press-elements\/press-elements.php",
+            "author": "Press Elements"
+        }
+    ],
+    "images": [
+        {
+            "filename": "gallery1-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery1-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 77137,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/loving-family-enjoying-new-apartment-GRCW2AF"
+        },
+        {
+            "filename": "gallery2-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery2-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 47983,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/young-married-couple-at-the-construction-site-P4D6NWV"
+        },
+        {
+            "filename": "gallery3-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery3-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 41412,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/father-at-home-with-tablet-video-chatting-with-PF9UQ7B"
+        },
+        {
+            "filename": "gallery4-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery4-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 68828,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/mature-businessman-with-smartphone-on-a-train-P9YY67Q"
+        },
+        {
+            "filename": "gallery5-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery5-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 51899,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/a-smartphone-using-face-id-recognition-system-P5UYHKC"
+        },
+        {
+            "filename": "gallery6-1.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/gallery6-1-600x450.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-post.json",
+                    "name": "Single Post"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 74206,
+            "dimensions": [
+                1000,
+                750
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/senior-man-in-town-sitting-on-bench-working-on-PFUQ2RJ"
+        },
+        {
+            "filename": "shape5.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/shape5-600x533.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 35395,
+            "dimensions": [
+                1695,
+                1507
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/memphis-abstract-colorful-vector-backgrounds-MZWYFXU"
+        },
+        {
+            "filename": "shape4.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/shape4-600x345.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 184614,
+            "dimensions": [
+                6907,
+                3976
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/memphis-abstract-colorful-vector-backgrounds-MZWYFXU"
+        },
+        {
+            "filename": "laughing-young-male-entrepreneur-standing-against-ZALJK39-min.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/laughing-young-male-entrepreneur-standing-against-ZALJK39-min-600x900.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 290765,
+            "dimensions": [
+                800,
+                1200
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/laughing-young-male-entrepreneur-standing-against--ZALJK39"
+        },
+        {
+            "filename": "Arrow1-1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/Arrow1-1.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 27307,
+            "dimensions": [
+                400,
+                1825
+            ],
+            "image_source": "self_created",
+            "person_or_place": "no",
+            "image_urls": ""
+        },
+        {
+            "filename": "Arrow2-1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/Arrow2-1.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 10208,
+            "dimensions": [
+                100,
+                1825
+            ],
+            "image_source": "self_created",
+            "person_or_place": "no",
+            "image_urls": ""
+        },
+        {
+            "filename": "Arrow3-1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/Arrow3-1.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 26905,
+            "dimensions": [
+                400,
+                1825
+            ],
+            "image_source": "self_created",
+            "person_or_place": "no",
+            "image_urls": ""
+        },
+        {
+            "filename": "sub2.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sub2.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/signup-modal-block.json",
+                    "name": "Signup Modal Block"
+                }
+            ],
+            "filesize": 135389,
+            "dimensions": [
+                468,
+                902
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/dentist-appointment-mobile-app-light-sketch-67RG6UD"
+        },
+        {
+            "filename": "sub1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sub1.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/signup-modal-block.json",
+                    "name": "Signup Modal Block"
+                }
+            ],
+            "filesize": 150134,
+            "dimensions": [
+                468,
+                902
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/dentist-appointment-mobile-app-light-sketch-67RG6UD"
+        },
+        {
+            "filename": "home.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/home.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/signup-modal-block.json",
+                    "name": "Signup Modal Block"
+                }
+            ],
+            "filesize": 188079,
+            "dimensions": [
+                468,
+                902
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/dentist-appointment-mobile-app-light-sketch-67RG6UD"
+        },
+        {
+            "filename": "modern-business-office-HWMUDS8.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/modern-business-office-HWMUDS8-600x297.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 148745,
+            "dimensions": [
+                2000,
+                991
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/modern-business-office-HWMUDS8"
+        },
+        {
+            "filename": "logo1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo1.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 6331,
+            "dimensions": [
+                172,
+                94
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo2.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo2.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 4818,
+            "dimensions": [
+                139,
+                82
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo3.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo3.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 2965,
+            "dimensions": [
+                141,
+                69
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo8.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo8.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 4244,
+            "dimensions": [
+                135,
+                82
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo4.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo4.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 5100,
+            "dimensions": [
+                131,
+                92
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo5.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo5.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 5120,
+            "dimensions": [
+                137,
+                85
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo6.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo6.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 5765,
+            "dimensions": [
+                134,
+                103
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo7.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo7.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 6184,
+            "dimensions": [
+                108,
+                116
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo9.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo9.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 7805,
+            "dimensions": [
+                135,
+                118
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo10.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo10.png",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 5193,
+            "dimensions": [
+                167,
+                118
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "innovative-technology-for-business-solution-TZUCQH3.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/innovative-technology-for-business-solution-TZUCQH3.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/single-portfolio.json",
+                    "name": "Single Portfolio"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 23496,
+            "dimensions": [
+                600,
+                578
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/innovative-technology-for-business-solution-TZUCQH3"
+        },
+        {
+            "filename": "young-business-people-in-corporate-company-5MK3Q55.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/young-business-people-in-corporate-company-5MK3Q55.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                }
+            ],
+            "filesize": 24937,
+            "dimensions": [
+                600,
+                651
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/young-business-people-in-corporate-company-5MK3Q55"
+        },
+        {
+            "filename": "happy-young-startup-owner-standing-in-office-PAUPQE3.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/happy-young-startup-owner-standing-in-office-PAUPQE3-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 382474,
+            "dimensions": [
+                1500,
+                1500
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/happy-young-startup-owner-standing-in-office-PAUPQE3"
+        },
+        {
+            "filename": "confident-male-designer-working-on-a-digital-table-P5RH4X5.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/confident-male-designer-working-on-a-digital-table-P5RH4X5-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 262396,
+            "dimensions": [
+                1500,
+                1500
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/confident-male-designer-working-on-a-digital-table-P5RH4X5"
+        },
+        {
+            "filename": "confident-male-designer-working-on-a-digital-table-PWM66ZT.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/confident-male-designer-working-on-a-digital-table-PWM66ZT-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 241766,
+            "dimensions": [
+                1499,
+                1499
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/confident-male-designer-working-on-a-digital-table-PWM66ZT"
+        },
+        {
+            "filename": "adult-businessman-posing-in-office-BFYEZH2.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/adult-businessman-posing-in-office-BFYEZH2-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/homepage.json",
+                    "name": "Homepage"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 321234,
+            "dimensions": [
+                1501,
+                1500
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/adult-businessman-posing-in-office-BFYEZH2"
+        },
+        {
+            "filename": "enc\u00f8re.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/enc\u00f8re.png",
+            "templates": [
+                {
+                    "source": "templates\/footer-block.json",
+                    "name": "Footer Block"
+                },
+                {
+                    "source": "templates\/header-block.json",
+                    "name": "Header Block"
+                },
+                {
+                    "source": "templates\/signup-modal-block.json",
+                    "name": "Signup Modal Block"
+                }
+            ],
+            "filesize": 2884,
+            "dimensions": [
+                177,
+                32
+            ],
+            "image_source": "self_created",
+            "person_or_place": "no",
+            "image_urls": ""
+        },
+        {
+            "filename": "sh8ape.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sh8ape-600x573.png",
+            "templates": [
+                {
+                    "source": "templates\/signup-modal-block.json",
+                    "name": "Signup Modal Block"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                },
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 98340,
+            "dimensions": [
+                4695,
+                4482
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/memphis-abstract-colorful-vector-backgrounds-MZWYFXU"
+        },
+        {
+            "filename": "404-Error-Page.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/404-Error-Page-600x534.png",
+            "templates": [
+                {
+                    "source": "templates\/404.json",
+                    "name": "404"
+                }
+            ],
+            "filesize": 338964,
+            "dimensions": [
+                966,
+                859
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/404-error-page-landing-page-3SXNC9T"
+        },
+        {
+            "filename": "creative-business-people-working-on-business-proje-SPJKUNM.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/creative-business-people-working-on-business-proje-SPJKUNM-600x409.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career-detail.json",
+                    "name": "Career Detail"
+                },
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 424190,
+            "dimensions": [
+                2000,
+                1363
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/creative-business-people-working-on-business-proje-SPJKUNM"
+        },
+        {
+            "filename": "busy-business-people-PZ8YQTR.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/busy-business-people-PZ8YQTR-600x200.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 127393,
+            "dimensions": [
+                2000,
+                667
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/busy-business-people-PZ8YQTR"
+        },
+        {
+            "filename": "happy-business-people-celebrating-success-at-compa-SXQJZNS.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/happy-business-people-celebrating-success-at-compa-SXQJZNS-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 449835,
+            "dimensions": [
+                2000,
+                1334
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/happy-business-people-celebrating-success-at-compa-SXQJZNS"
+        },
+        {
+            "filename": "shape9-2.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/shape9-2-600x359.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 64470,
+            "dimensions": [
+                2000,
+                1198
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/memphis-abstract-colorful-vector-backgrounds-MZWYFXU"
+        },
+        {
+            "filename": "creative-brainstorming-happy-business-people-desig-5KMLTT7.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/creative-brainstorming-happy-business-people-desig-5KMLTT7-600x401.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 556622,
+            "dimensions": [
+                2000,
+                1335
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/creative-brainstorming-happy-business-people-desig-5KMLTT7"
+        },
+        {
+            "filename": "happy-creative-designers-business-people-brainstor-3RVU4CZ.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/happy-creative-designers-business-people-brainstor-3RVU4CZ-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 525767,
+            "dimensions": [
+                2001,
+                1333
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/happy-creative-designers-business-people-brainstor-3RVU4CZ"
+        },
+        {
+            "filename": "creative-business-people-working-on-business-proje-F345EH7-e1586154350558.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/creative-business-people-working-on-business-proje-F345EH7-e1586154350558-600x399.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 280084,
+            "dimensions": [
+                1749,
+                1164
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/creative-business-people-working-on-business-proje-F345EH7"
+        },
+        {
+            "filename": "creative-business-people-working-on-business-proje-3CJVL2K.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/creative-business-people-working-on-business-proje-3CJVL2K-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 316168,
+            "dimensions": [
+                2001,
+                1333
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/creative-business-people-working-on-business-proje-3CJVL2K"
+        },
+        {
+            "filename": "creative-business-people-working-on-business-proje-V73YGWK.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/creative-business-people-working-on-business-proje-V73YGWK-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                },
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 346757,
+            "dimensions": [
+                2001,
+                1333
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/creative-business-people-working-on-business-proje-V73YGWK"
+        },
+        {
+            "filename": "logo11.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo11.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 6218,
+            "dimensions": [
+                146,
+                95
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo12.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo12.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 4961,
+            "dimensions": [
+                113,
+                105
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo13.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo13.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 3910,
+            "dimensions": [
+                131,
+                83
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo14.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo14.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 6282,
+            "dimensions": [
+                122,
+                100
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo15.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo15.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 5013,
+            "dimensions": [
+                111,
+                106
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo16.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo16.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 4027,
+            "dimensions": [
+                110,
+                106
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo17.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo17.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 4336,
+            "dimensions": [
+                139,
+                94
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "logo18.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/logo18.png",
+            "templates": [
+                {
+                    "source": "templates\/career.json",
+                    "name": "Career"
+                }
+            ],
+            "filesize": 4029,
+            "dimensions": [
+                125,
+                119
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/cyber-security-logos-and-icons-set-QRH2CF"
+        },
+        {
+            "filename": "water-bottle-XMG2UBE.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/water-bottle-XMG2UBE-600x900.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-portfolio.json",
+                    "name": "Single Portfolio"
+                }
+            ],
+            "filesize": 140175,
+            "dimensions": [
+                1200,
+                1800
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/water-bottle-XMG2UBE"
+        },
+        {
+            "filename": "vhs-cassette-disassembled-MTJQL4F.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/vhs-cassette-disassembled-MTJQL4F-600x374.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-portfolio.json",
+                    "name": "Single Portfolio"
+                }
+            ],
+            "filesize": 172391,
+            "dimensions": [
+                1200,
+                748
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/vhs-cassette-disassembled-MTJQL4F"
+        },
+        {
+            "filename": "red-laundry-clips-P4Q8YGT.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/red-laundry-clips-P4Q8YGT-600x398.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-portfolio.json",
+                    "name": "Single Portfolio"
+                }
+            ],
+            "filesize": 103094,
+            "dimensions": [
+                1200,
+                795
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/red-laundry-clips-P4Q8YGT"
+        },
+        {
+            "filename": "multiple-vintage-cameras-28SKZAB.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/multiple-vintage-cameras-28SKZAB-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/single-portfolio.json",
+                    "name": "Single Portfolio"
+                }
+            ],
+            "filesize": 116345,
+            "dimensions": [
+                1200,
+                800
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/vhs-cassette-disassembled-MTJQL4F"
+        },
+        {
+            "filename": "slice21.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice21.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 17767,
+            "dimensions": [
+                292,
+                292
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice17.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice17.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 17975,
+            "dimensions": [
+                287,
+                287
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice8.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice8.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 14801,
+            "dimensions": [
+                281,
+                281
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice14.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice14.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 22295,
+            "dimensions": [
+                281,
+                281
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice1.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice1.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 17282,
+            "dimensions": [
+                280,
+                300
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice3.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice3.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 10464,
+            "dimensions": [
+                300,
+                300
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice18.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice18.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 19865,
+            "dimensions": [
+                292,
+                292
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "slice23.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/slice23.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 9207,
+            "dimensions": [
+                292,
+                292
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-KHGYAF"
+        },
+        {
+            "filename": "shape10.png",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/shape10-600x579.png",
+            "templates": [
+                {
+                    "source": "templates\/services.json",
+                    "name": "Services"
+                }
+            ],
+            "filesize": 76725,
+            "dimensions": [
+                2412,
+                2328
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/memphis-abstract-colorful-vector-backgrounds-MZWYFXU"
+        },
+        {
+            "filename": "touching-virtual-objects-LTV2E3A.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/touching-virtual-objects-LTV2E3A-600x400.jpg",
+            "templates": [
+                {
+                    "source": "templates\/portfolio.json",
+                    "name": "Portfolio"
+                }
+            ],
+            "filesize": 21686,
+            "dimensions": [
+                700,
+                467
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/touching-virtual-objects-LTV2E3A"
+        },
+        {
+            "filename": "business-people-discussing-virtual-reality-technol-PAC9TRQ.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/business-people-discussing-virtual-reality-technol-PAC9TRQ-600x402.jpg",
+            "templates": [
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 323560,
+            "dimensions": [
+                2001,
+                1342
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "no",
+            "image_urls": "https:\/\/elements.envato.com\/business-people-discussing-virtual-reality-technol-PAC9TRQ"
+        },
+        {
+            "filename": "happy-young-man-working-at-creative-office-77KCKZZ.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/happy-young-man-working-at-creative-office-77KCKZZ-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 301406,
+            "dimensions": [
+                1500,
+                1501
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/happy-young-man-working-at-creative-office-77KCKZZ"
+        },
+        {
+            "filename": "cheerful-businessman-working-in-cafe-WH3SRCK.jpg",
+            "thumbnail_url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/cheerful-businessman-working-in-cafe-WH3SRCK-600x600.jpg",
+            "templates": [
+                {
+                    "source": "templates\/about.json",
+                    "name": "About"
+                }
+            ],
+            "filesize": 250092,
+            "dimensions": [
+                1500,
+                1500
+            ],
+            "image_source": "envato_elements",
+            "person_or_place": "yes",
+            "image_urls": "https:\/\/elements.envato.com\/cheerful-businessman-working-in-cafe-WH3SRCK"
+        }
+    ]
+}

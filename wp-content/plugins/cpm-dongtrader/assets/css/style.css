@@ -1,0 +1,154 @@
+.dong-description {
+    max-width: 460px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+.dong-modal-toggle {
+    cursor: pointer;
+    color: #268bd2;
+}
+
+.dong-modal-wrapper {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    background: rgba(0, 0, 0, 0.8);
+    z-index: -1;
+    opacity: 0;
+
+    -webkit-transition: opacity 0.2s ease-in;
+    -moz-transition: opacity 0.2s ease-in;
+    transition: opacity 0.2s ease-in;
+
+    pointer-events: auto;
+}
+
+.dong-modal-wrapper>div {
+    width: 600px;
+    height: 70%;
+    position: absolute;
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    margin: auto;
+
+    vertical-align: middle;
+    padding: 20px;
+    border-radius: 6px;
+    background: #fff;
+    z-index: 1;
+}
+
+.dong-close {
+    background: #606061;
+    color: #ffffff;
+    line-height: 25px;
+    position: absolute;
+    right: -12px;
+    text-align: center;
+    top: -10px;
+    width: 24px;
+    text-decoration: none;
+    font-weight: bold;
+    -webkit-border-radius: 12px;
+    -moz-border-radius: 12px;
+    border-radius: 12px;
+}
+
+.dong-close:hover {
+    background: #00d9ff;
+}
+
+
+/* Modal Warnings */
+.info-msg,
+.success-msg,
+.warning-msg,
+.error-msg {
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 3px 3px 3px 3px;
+}
+
+.info-msg {
+    color: #059;
+    background-color: #BEF;
+}
+
+.success-msg {
+    color: #270;
+    background-color: #DFF2BF;
+}
+
+.warning-msg {
+    color: #9F6000;
+    background-color: #FEEFB3;
+}
+
+.error-msg {
+    color: #D8000C;
+    background-color: #FFBABA;
+}
+.qr-pic {
+    position: relative;
+    display: inline-block;
+}
+.qr-pic:hover{
+    position: relative;
+    display: inline-block;
+    background-color: #606061;
+    z-index: 100;
+}
+
+.qr-pic:hover .copy {
+    display: block;
+}
+
+.qr-pic:hover .delete {
+    display: block;
+}
+
+.copy {
+    padding-top: 7px;
+    padding-right: 7px;
+    position: absolute;
+    right: 50%;
+    top: 50%;
+    display: none;
+}
+
+.delete {
+    padding-top: 7px;
+    padding-right: 7px;
+    position: absolute;
+    right: 40%;
+    top: 50%;
+    display: none;
+}
+
+.copy a {
+    color: #000;
+}
+
+.delete a {
+    color: #000;
+}
+
+/* trading history css */
+.dong-trading-history-table thead th{
+text-align: center;
+}
+.dong-trading-history-table tbody h5{
+margin: 2px;
+}
+
+.woocommerce-checkout-review-order-table .shipping {
+    display: none;
+}

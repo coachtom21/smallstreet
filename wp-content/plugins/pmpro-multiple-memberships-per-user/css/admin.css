@@ -1,0 +1,40 @@
+
+tbody.membership-level-groups th {background: #FAFAFA; border-right: 1px solid #CCC; border-top: 5px solid #AAA; }
+tbody.membership-level-groups tr:nth-child(even) td {background: #FAFAFA; }
+table.pmprommpu_levels tr.remove_level td {background: #F2DEDE; }
+.membership-level-groups tr:first-child td, .membership-level-groups tr:nth-child(2)  td {border-top: 5px solid #AAA; }
+
+/**
+ * PMPro v2.0 style updates 
+ */
+ .memberships_page_pmpro-membershiplevels .pmpro_admin .mmpu-membership-levels tr.ui-sortable-handle {
+     border: 1px solid #2997C8;
+     cursor: move;
+ }
+.memberships_page_pmpro-membershiplevels .pmpro_admin .mmpu-membership-levels td.levelid:before {
+    color: #CCC;
+    content: "\f333";
+    display: inline-block;
+    font: 400 16px/1 dashicons;
+    opacity: 0;
+    width: 25px;
+}
+.memberships_page_pmpro-membershiplevels .pmpro_admin .mmpu-membership-levels tr:hover td.levelid:before {
+    opacity: 1;
+}
+.memberships_page_pmpro-membershiplevels .pmpro_admin .mmpu-membership-levels tr.grouprow {
+    cursor: move;
+}
+
+/**
+ * Moving around levels table
+ */
+.memberships_page_pmpro-membershiplevels .pmpro_admin tr td.level_name a {
+     font-size: 100%;
+     font-weight: normal;
+}
+.memberships_page_pmpro-membershiplevels .pmpro_admin tr td.level_name strong {
+    font-size: 115%;
+    font-weight: bold;
+}
+

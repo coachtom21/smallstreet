@@ -1,0 +1,162 @@
+{
+    "version": "0.4",
+    "title": "Signup Modal Block",
+    "type": "section",
+    "metadata": {
+        "template_type": "section-popup",
+        "include_in_zip": "1",
+        "elementor_pro_required": null,
+        "wp_page_template": "default"
+    },
+    "content": [
+        {
+            "id": "7f62ca9f",
+            "settings": {
+                "structure": "20",
+                "z_index": 99999
+            },
+            "elements": [
+                {
+                    "id": "b080f8e",
+                    "settings": {
+                        "_column_size": 50,
+                        "_inline_size": null,
+                        "padding": {
+                            "unit": "px",
+                            "top": "32",
+                            "right": "32",
+                            "bottom": "32",
+                            "left": "32",
+                            "isLinked": true
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "2d57ac5c",
+                            "settings": {
+                                "image": {
+                                    "url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/enc\u00f8re.png",
+                                    "id": 1009
+                                },
+                                "align": "left",
+                                "width": {
+                                    "unit": "px",
+                                    "size": 86,
+                                    "sizes": []
+                                },
+                                "_margin": {
+                                    "unit": "px",
+                                    "top": "0",
+                                    "right": "0",
+                                    "bottom": "42",
+                                    "left": "0",
+                                    "isLinked": false
+                                }
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "image",
+                            "elType": "widget"
+                        },
+                        {
+                            "id": "36517cbd",
+                            "settings": {
+                                "mf_form_id": "798***1586153403102"
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "metform",
+                            "elType": "widget"
+                        }
+                    ],
+                    "isInner": false,
+                    "elType": "column"
+                },
+                {
+                    "id": "1fa3909",
+                    "settings": {
+                        "_column_size": 50,
+                        "_inline_size": null,
+                        "content_position": "center",
+                        "background_background": "classic",
+                        "background_color": "#1B7EE4",
+                        "background_image": {
+                            "url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sh8ape.png",
+                            "id": 1013
+                        },
+                        "background_position": "initial",
+                        "background_xpos": {
+                            "unit": "px",
+                            "size": 237,
+                            "sizes": []
+                        },
+                        "background_ypos": {
+                            "unit": "px",
+                            "size": -94,
+                            "sizes": []
+                        },
+                        "background_repeat": "no-repeat",
+                        "background_size": "initial",
+                        "background_bg_width": {
+                            "unit": "px",
+                            "size": 400,
+                            "sizes": []
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "4a8c5c",
+                            "settings": {
+                                "carousel": [
+                                    {
+                                        "id": 159,
+                                        "url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sub2.png"
+                                    },
+                                    {
+                                        "id": 155,
+                                        "url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/home.png"
+                                    },
+                                    {
+                                        "id": 158,
+                                        "url": "https:\/\/demo.detheme.com\/encore\/wp-content\/uploads\/sites\/125\/2020\/04\/sub1.png"
+                                    }
+                                ],
+                                "thumbnail_size": "medium",
+                                "thumbnail_custom_dimension": {
+                                    "width": "450",
+                                    "height": "450"
+                                },
+                                "slides_to_show": "1",
+                                "navigation": "dots",
+                                "caption_type": "caption",
+                                "autoplay_speed": 3000,
+                                "speed": 700,
+                                "dots_color": "#4AD0FF",
+                                "caption_text_color": "#FFFFFF",
+                                "caption_typography_typography": "custom",
+                                "caption_typography_font_weight": "400",
+                                "caption_typography_font_style": "normal",
+                                "_padding": {
+                                    "unit": "px",
+                                    "top": "48",
+                                    "right": "32",
+                                    "bottom": "0",
+                                    "left": "32",
+                                    "isLinked": false
+                                }
+                            },
+                            "elements": [],
+                            "isInner": false,
+                            "widgetType": "image-carousel",
+                            "elType": "widget"
+                        }
+                    ],
+                    "isInner": false,
+                    "elType": "column"
+                }
+            ],
+            "isInner": false,
+            "elType": "section"
+        }
+    ]
+}

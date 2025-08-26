@@ -1,0 +1,42 @@
+2025-08-14T16:21:27+00:00 INFO Generating payment form for order 5286. Notify URL: https://www.smallstreet.app/wc-api/WC_Gateway_Paypal/
+2025-08-14T16:21:27+00:00 INFO PayPal Request Args for order 5286: Array
+(
+    [cmd] => _cart
+    [business] => biggfam@yahoo.com
+    [no_note] => 1
+    [currency_code] => USD
+    [charset] => utf-8
+    [rm] => 2
+    [upload] => 1
+    [return] => https://www.smallstreet.app/detente-checkout/order-received/5286/?key=wc_order_dgyLXlwiJITgv&utm_nooverride=1
+    [cancel_return] => https://www.smallstreet.app/cart/?cancel_order=true&order=wc_order_dgyLXlwiJITgv&order_id=5286&redirect&_wpnonce=ecea6d16d9
+    [image_url] => 
+    [paymentaction] => sale
+    [invoice] => WC-5286
+    [custom] => {"order_id":5286,"order_key":"wc_order_dgyLXlwiJITgv"}
+    [notify_url] => https://www.smallstreet.app/wc-api/WC_Gateway_Paypal/
+    [first_name] => ***
+    [last_name] => ***
+    [address1] => ***
+    [address2] => ***
+    [city] => ***
+    [state] => ***
+    [zip] => ***
+    [country] => ***
+    [email] => ***@***
+    [night_phone_a] => ***
+    [night_phone_b] => ***
+    [night_phone_c] => ***
+    [address_override] => 0
+    [no_shipping] => 0
+    [tax_cart] => 0.00
+    [item_name_1] => Orange Jesus MEGA T-shirt
+    [quantity_1] => 1
+    [amount_1] => 30
+    [item_number_1] => 
+    [item_name_2] => Yam is On Sticker - Distribution (Peace Pentagon Branch: Distribution)
+    [quantity_2] => 10
+    [amount_2] => 0.3
+    [item_number_2] => YAM-STICKER
+    [bn] => WooThemes_Cart
+)

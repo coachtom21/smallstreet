@@ -1,0 +1,3 @@
+csv_id,customer_email,billing_first_name,billing_last_name,billing_phone,billing_address_1,billing_postcode,billing_city,billing_state,billing_country,product_id,variation_id,affilate_user_id
+1,bizafu@finews.biz,bizafu,finews,875000,kathmandu,90011,kathmandu,CA,Nepal,1553,0,1
+2,palulapu@brand-app.biz,palu,brand,987547555,kathmandu,90011,kathmandu,CA,Nepal,1521,1524,1

@@ -1,0 +1,1004 @@
+/* =================== IMPORTING FONTS ============================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Acme&family=Ubuntu&display=swap");
+
+/* =================== GLOBAL DECLARATION ============================== */
+:root {
+  --dt-heading-font-family: "Acme", sans-serif;
+  --dt-text-font-family: "Ubuntu", sans-serif;
+  --white: #ffff;
+  --primary: #6f42c1;
+  --text: #0b0c13;
+  --secondary: #ffbc00;
+  --tertiary: #005bbb;
+  --red: #b0231c;
+  --dt-text-font-size: 16px;
+  --background: #d9d9d9;
+}
+body {
+  font-family: var(--dt-text-font-family) !important;
+  font-weight: 300;
+  font-size: var(--dt-text-font-size);
+}
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: var(--dt-heading-font-family) !important;
+  font-weight: 400 !important;
+}
+h2 {
+  font-size: 24px !important;
+  line-height: 30px !important;
+}
+h3 {
+  font-size: 22px !important;
+  line-height: 28px !important;
+}
+label,
+input,
+p,
+.elementor-kit-289 a {
+  font-family: var(--dt-text-font-family) !important;
+  font-size: var(--dt-text-font-size);
+}
+
+/* FOOTER */
+.elementor-location-footer {
+  display: none;
+}
+.home .elementor-location-footer {
+  display: block;
+}
+
+/* MODAL */
+.dialog-widget#elementor-popup-modal-2146 .dialog-close-button {
+  display: none;
+}
+.dialog-widget#elementor-popup-modal-2146 .elementor-icon i:before {
+  transform: none;
+}
+#elementor-popup-modal-2146 {
+  display: none !important;
+}
+.dong-mobile-popup p {
+  margin-bottom: 0;
+}
+
+/*========================= HEADER ========================  */
+/* home */
+.home .elementor .mobile-dong-menu img {
+  filter: brightness(0);
+}
+.home
+  .elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-hamburger-menu
+  svg {
+  fill: var(--text);
+}
+.home .elementor .mobile-dong-menu .jeg-elementor-kit img {
+  filter: brightness(1);
+}
+/* -------- */
+.mobile-dong-menu {
+  display: block;
+}
+.dong-menu-Jkit {
+  display: none;
+}
+.elementor .mobile-dong-menu img {
+  filter: brightness(1);
+}
+.elementor.elementor-18 .elementor-element.mobile-dong-menu {
+  padding-top: 10px;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-menu-wrapper {
+  max-width: 100%;
+  background-color: transparent;
+  background-image: url(./images/Franklindollar.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .jeg-elementor-kit
+  .jkit-menu-wrapper
+  .jkit-nav-site-title {
+  width: 30%;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-menu-wrapper
+  .jkit-nav-identity-panel
+  .jkit-nav-site-title
+  a.jkit-nav-logo
+  img {
+  max-width: 100%;
+  width: 106px;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-menu-wrapper
+  .jkit-nav-identity-panel {
+  padding: 10px 16px;
+  display: flex;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-menu-wrapper
+  .jkit-nav-identity-panel
+  .jkit-close-menu {
+  color: var(--white);
+  background-color: transparent;
+  margin: 0;
+  width: 70%;
+  text-align: end;
+  border: 0;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-menu-wrapper
+  .jkit-nav-identity-panel
+  .jkit-close-menu
+  svg {
+  fill: var(--white);
+  width: 22px;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-hamburger-menu
+  svg {
+  width: 28px;
+  fill: var(--white);
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-menu-wrapper
+  .jkit-menu-container {
+  background-color: var(--background);
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  ul.jkit-menu
+  li.menu-item
+  a {
+  color: var(--text);
+  border-bottom: 1px solid var(--white);
+  padding: 10px 32px;
+  font-weight: 300;
+  height: auto;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  ul.jkit-menu
+  li.current-menu-item
+  a {
+  border-color: var(--white);
+  /* border-width: 1px; */
+  background-color: var(--primary);
+  color: var(--white);
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-menu-wrapper
+  .jkit-nav-identity-panel
+  .jkit-nav-site-title
+  .jkit-nav-logo {
+  margin: 0;
+}
+.elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  ul.jkit-menu
+  li:last-child
+  a {
+  width: 40%;
+  background: var(--primary);
+  margin: 15px auto;
+  color: var(--white);
+  border: 1px solid var(--primary);
+  padding: 15px;
+  text-align: center;
+}
+
+/* ---------------------- End of HEADER ---------------------- */
+/* ===================== PAGE =============================== */
+.pmpro-account.page,
+.page.pmpro-login-page {
+  background-image: url(./images/mobile-background.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.home.page.pmpro-login-page,
+.page.page-id-11,
+.page.page-id-9,
+.page.page-id-3177,
+.page.page-id-2898 {
+  background-image: none;
+}
+.page.pmpro-login-page
+  .elementor.elementor-854
+  .elementor-section.elementor-element.dong-mobile {
+  padding: 130px 0 0px;
+  background-image: none;
+}
+.page.pmpro-login-page .mobile-dong-single-page,
+.pmpro-account.page.page-parent {
+  background-image: none;
+}
+.single-product
+  .elementor.product
+  .elementor-element.mobile-dong-single-product
+  .elementor-background-overlay {
+  background-image: none;
+  opacity: 1;
+}
+.elementor.elementor-854 .elementor-section.elementor-element.dong-mobile,
+.single-product .elementor .elementor-element.mobile-dong-single-product {
+  background-color: transparent;
+  position: relative;
+  padding: 100px 0 50px;
+  margin-top: -90px;
+}
+.pmpro-login-page
+  .elementor.elementor-854
+  .elementor-section.dong-mobile
+  .elementor-background-overlay {
+  content: url(./images/ComicCART2-scaled.jpg);
+  position: static;
+  opacity: 1;
+  width: 100%;
+  padding: 0 36px 38px;
+  background-image: none;
+  display: block;
+  height: auto;
+}
+.single-product .mobile-dong-single-product,
+.page .mobile-dong-single-page {
+  background-image: url(./images/single-product-banner.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+/* .elementor .elementor-section.dong-mobile .elementor-background-overlay,
+.pmpro-login-page
+  .elementor.elementor-location-header
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-hamburger-menu:not(
+    .logged-in.pmpro-login-page
+      .elementor.elementor-location-header
+      .elementor-element
+      .jeg-elementor-kit
+      .jkit-hamburger-menu
+  ), */
+.elementor
+  .elementor-element.dong-mobile
+  .dong-mobile-price
+  .elementor-heading-title,
+.page.woocommerce-account .mobile-dong-single-page {
+  display: none;
+}
+.home.pmpro-login-page
+  .elementor.elementor-location-header
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-hamburger-menu,
+.page-id-11.pmpro-login-page
+  .elementor.elementor-location-header
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-hamburger-menu,
+.page-id-9.pmpro-login-page
+  .elementor.elementor-location-header
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-hamburger-menu,
+.page-id-2898.pmpro-login-page
+  .elementor.elementor-location-header
+  .elementor-element
+  .jeg-elementor-kit
+  .jkit-hamburger-menu {
+  display: block !important;
+}
+.home .dong-mobile {
+  padding: 150px 0 !important;
+}
+/* =================== end of FOOTER ======================== */
+
+/* ====================== LOGIN ============================ */
+.pmpro_login_wrap {
+  padding: 0 16px;
+}
+.pmpro_login_wrap #loginform p.login-remember input {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  margin-right: 14px;
+  position: relative;
+  top: 2px;
+}
+#loginform p.login-username {
+  margin: 0 0 20px;
+}
+.elementor .pmpro_login_wrap form#loginform p.login-username input,
+.elementor .pmpro_login_wrap form#loginform p.login-password input {
+  max-width: 100%;
+  width: 100%;
+  min-height: 50px;
+  color: var(--text);
+}
+.elementor .pmpro_login_wrap form#loginform p.login-username label,
+.elementor .pmpro_login_wrap form#loginform p.login-password label {
+  display: none;
+}
+#loginform label {
+  color: var(--white);
+  font-weight: 300;
+}
+.pmpro_login_wrap #loginform input[type="submit"] {
+  padding: 16px;
+}
+.pmpro_login_wrap #loginform input[type="submit"]:hover {
+  background-color: transparent;
+}
+.pmpro_login_wrap hr {
+  display: none;
+}
+.elementor .pmpro_login_wrap .pmpro_actions_nav a {
+  color: var(--white);
+}
+.pmpro_message.pmpro_error {
+  margin: 0 16px 20px;
+  color: var(--red);
+  background-color: var(--white);
+  border: 0;
+  border-radius: 0;
+}
+.elementor .elementor-element-20e553b h6.elementor-heading-title {
+  display: none;
+}
+/* ---------------- End of LOGIN-----------------------*/
+
+/* ================= DASHBOARD ====================== */
+
+/*today*/
+.page.woocommerce-account {
+  background-image: url(./images/mobile-background.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.woocommerce h2,
+.woocommerce h3 {
+  color: var(--white);
+  text-align: center;
+}
+.woocommerce .pmpro_box h2,
+.woocommerce .pmpro_box h3 {
+  color: var(--text);
+  text-align: left;
+}
+/*today ends*/
+
+.woocommerce .woocommerce-MyAccount-navigation ul {
+  background: transparent;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.woocommerce .woocommerce-MyAccount-navigation ul li {
+  flex: 0 0 50%;
+  width: 50%;
+  text-align: center;
+  padding: 8px;
+}
+.woocommerce .woocommerce-MyAccount-navigation ul li a {
+  border-bottom: 0;
+  background: var(--white);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 15px;
+  padding: 5px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 80px;
+}
+.woocommerce .woocommerce-MyAccount-navigation ul li.is-active a {
+  background: var(--primary);
+  color: var(--white);
+}
+.woocommerce .woocommerce-MyAccount-navigation ul li.is-active a::before {
+  filter: brightness(0) invert(1);
+}
+.woocommerce .woocommerce-MyAccount-navigation ul li a::before {
+  display: block;
+  margin-bottom: 8px;
+  content: "";
+  width: 18px;
+  height: 18px;
+  background-size: contain;
+  margin: 0 auto 10px;
+}
+
+.woocommerce ul li.woocommerce-MyAccount-navigation-link--dashboard a::before {
+  background-image: url(./images/dashboard.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--detente-orders
+  a::before {
+  background-image: url(./images/orders.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--detente-treasury
+  a::before {
+  background-image: url(./images/chest.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--detente-group
+  a::before {
+  background-image: url(./images/group.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--detente-commission
+  a::before {
+  background-image: url(./images/commission.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--subscriptions
+  a::before {
+  background-image: url(./images/subscriptions.png);
+}
+.woocommerce ul li.woocommerce-MyAccount-navigation-link--downloads a::before {
+  background-image: url(./images/downloads.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--edit-address
+  a::before {
+  background-image: url(./images/addresses.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--show-order-form
+  a::before {
+  background-image: url(./images/addresses.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--show-membership-data
+  a::before {
+  background-image: url(./images/memberships.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--show-membership-affiliate-data
+  a::before {
+  background-image: url(./images/affiliate-referrals.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--show-membership-v-card
+  a::before {
+  background-image: url(./images/VCard.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--payment-methods
+  a::before {
+  background-image: url(./images/payment-methods.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--edit-account
+  a::before {
+  background-image: url(./images/account-details.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--customer-logout
+  a::before {
+  background-image: url(./images/logout.png);
+}
+.woocommerce
+  ul
+  li.woocommerce-MyAccount-navigation-link--export-affiliate-order
+  a::before {
+  background-image: url(./images/export.png);
+}
+.elementor .elementor-element.dong-dash-board {
+  /* margin-top: 80px; */
+  padding: 20px 16px;
+}
+.woocommerce .woocommerce-MyAccount-content {
+  margin: 50px 0 0;
+}
+.woocommerce .woocommerce-MyAccount-content p {
+  text-align: center;
+  color: var(--white);
+}
+.woocommerce .woocommerce-MyAccount-content p a {
+  color: var(--secondary);
+}
+.dong-dash-QR {
+  padding: 0 16px;
+}
+.dong-dash-QR.dong-half-dozen {
+  padding: 0 8px 20px;
+}
+
+/* WOOCOMMERCE BUTTON */
+.woocommerce .woocommerce-MyAccount-content .woocommerce-Button {
+  background-color: var(--primary);
+  color: #fff;
+  border-radius: 0;
+  border: 1px solid var(--primary);
+}
+.woocommerce .woocommerce-MyAccount-content .woocommerce-Button:hover {
+  background-color: transparent;
+  color: var(--primary);
+}
+
+/* BACK BUTTON */
+.woocommerce .dong-my-account-back {
+  text-align: end;
+}
+.woocommerce .dong-my-account-back a:before {
+  content: url(./images/back.png);
+  width: 30px;
+  height: 30px;
+  filter: brightness(0) invert(1);
+  position: relative;
+  top: 5px;
+  margin-right: 5px;
+}
+.woocommerce .dong-my-account-back a {
+  color: var(--white);
+}
+
+/* ORDERS */
+.woocommerce table.shop_table,
+.woocommerce table {
+  background-color: var(--white);
+}
+.woocommerce .woocommerce-order-details,
+.woocommerce .woocommerce-customer-details {
+  background-color: var(--white);
+  padding: 20px;
+}
+.woocommerce .woocommerce-MyAccount-content .addresses p {
+  color: var(--text);
+  text-align: left;
+}
+.woocommerce .woocommerce-MyAccount-content .addresses .woocommerce-column {
+  margin-bottom: 25px;
+}
+.woocommerce .woocommerce-MyAccount-content p mark {
+  background: none;
+  color: var(--secondary);
+}
+
+/* SUBSCRIPTIONS */
+.woocommerce
+  .woocommerce-MyAccount-content
+  .woocommerce_account_subscriptions
+  P {
+  color: var(--text);
+  text-align: left;
+}
+.woocommerce-page .woocommerce-error::before,
+.woocommerce-page .woocommerce-info::before,
+.woocommerce-page .woocommerce-message::before {
+  left: 1em;
+}
+.woocommerce-page .woocommerce-error,
+.woocommerce-page .woocommerce-info,
+.woocommerce-page .woocommerce-message {
+  padding: 1em 2em 1em 2.9em;
+}
+.woocommerce .woocommerce_account_subscriptions .woocommerce-Button {
+  float: left;
+  margin: 15px 0 5px;
+}
+
+/* DOWNLOADS */
+.woocommerce-downloads .woocommerce .woocommerce-info {
+  padding: 1em 2em 4em 2.9em;
+}
+.woocommerce-downloads .woocommerce .woocommerce-info .woocommerce-Button {
+  position: absolute;
+  bottom: 1em;
+}
+
+/* ADDRESSESS */
+.woocommerce .woocommerce-Addresses,
+.woocommerce .dongtraders_order_export,
+.woocommerce #pmpro_account,
+.woocommerce form.woocommerce-EditAccountForm {
+  background-color: var(--white);
+  padding: 10px 20px;
+}
+.woocommerce-account .addresses .title .edit {
+  margin-top: 10px;
+}
+.woocommerce-account .addresses .title h3 {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.woocommerce .woocommerce-Addresses .woocommerce-Address {
+  padding: 10px 0;
+}
+.woocommerce form {
+  background-color: var(--white);
+  padding: 20px;
+}
+.woocommerce form h3 {
+  color: var(--text);
+}
+.woocommerce .woocommerce-MyAccount-content .woocommerce-address-fields p {
+  text-align: left;
+}
+.woocommerce button[type="submit"] {
+  margin-top: 10px;
+}
+.woocommerce .woocommerce-form-login .woocommerce-form__label {
+  margin-top: 12px;
+}
+
+/* ADD ORDER */
+
+.woocommerce .order-export-form .form-group {
+  margin: 15px 0;
+}
+.woocommerce .order-export-form .form-group .variation-product {
+  margin-bottom: 10px;
+}
+.woocommerce .order-export-form .form-group select {
+  border-color: var(--background);
+  appearance: none;
+  background-image: url(./images/chevron-down-s.png);
+  background-repeat: no-repeat;
+  background-position: 95% 50%;
+}
+.woocommerce .order-export-form .form-group select option:checked {
+  background-color: var(--primary);
+}
+.woocommerce .order-export-form .form-group input[type="submit"] {
+  padding: 10px 30px;
+}
+
+/* MEMBERSHIPS */
+.woocommerce #pmpro_account .pmpro_box {
+  border: 0;
+  margin: 0;
+}
+.woocommerce #pmpro_account .pmpro_box h3 {
+  margin-bottom: 10px;
+}
+.woocommerce #pmpro_account .pmpro_box p,
+.woocommerce .woocommerce-MyAccount-content p.woocommerce-info {
+  color: var(--text);
+  text-align: left;
+}
+.woocommerce #pmpro_account .pmpro_box ul {
+  padding-left: 20px;
+  margin-top: 6px;
+}
+.woocommerce .pmpro_actionlinks a#pmpro_actionlink-levels,
+.woocommerce .vcards_buttons a,
+.woocommerce .vcards_buttons a.update_card:hover,
+.woocommerce-payment-methods
+  .woocommerce
+  .woocommerce-MyAccount-content
+  a:hover,
+.woocommerce .woocommerce-MyAccount-content p.order-again a,
+.woocommerce button[type="submit"],
+.woocommerce ul.products li.product .button,
+.woocommerce #respond input#submit.alt,
+.woocommerce a.button.alt,
+.woocommerce button.button.alt,
+.woocommerce input.button.alt,
+.wc-block-grid__product-add-to-cart.wp-block-button .wp-block-button__link {
+  background: var(--primary);
+  color: var(--white);
+  padding: 10px 20px;
+  border: 1px solid var(--primary);
+  border-radius: 0;
+}
+.woocommerce .pmpro_actionlinks a#pmpro_actionlink-levels:hover,
+.woocommerce .woocommerce-MyAccount-content p.order-again a:hover,
+.woocommerce button[type="submit"]:hover,
+.woocommerce ul.products li.product .button:hover,
+.woocommerce #respond input#submit.alt:hover,
+.woocommerce a.button.alt:hover,
+.woocommerce button.button.alt:hover,
+.woocommerce input.button.alt:hover,
+.wc-block-grid__product-add-to-cart.wp-block-button
+  .wp-block-button__link:hover,
+.elementor-kit-289 input[type="button"]:focus,
+.elementor-kit-289 input[type="button"]:hover,
+form.pmpro_form .pmpro_submit .pmpro_btn-cancel {
+  background: transparent;
+  color: var(--primary);
+}
+.pmpro-levels #pmpro_mmpu_groups .pmpro_mmpu_group {
+  margin-bottom: 0;
+}
+#pmpro_mmpu_levels {
+  background: var(--white);
+  padding: 20px;
+}
+.woocommerce .pmpro_table {
+  overflow: auto;
+  display: block;
+}
+
+/* AFFILIATE REFERRALS */
+.woocommerce table.affilate-data td {
+  text-align: center;
+}
+
+/* My VCARD */
+.woocommerce .qr_vcard_section .card img {
+  width: 80% !important;
+}
+.woocommerce .qr_vcard_section .card {
+  text-align: center;
+  color: var(--white);
+}
+.woocommerce .vcards_buttons {
+  text-align: center;
+  margin-top: 30px;
+}
+.woocommerce .vcards_buttons a.update_card,
+.woocommerce .vcards_buttons a:hover,
+.woocommerce-payment-methods .woocommerce .woocommerce-MyAccount-content a {
+  background: var(--white);
+  color: var(--primary);
+  border-color: var(--white);
+  border-radius: 0;
+}
+.woocommerce-MyAccount-content .qr-tiger-vcard-code-generator {
+  padding: 0 0 30px;
+  width: 80%;
+  margin: 0 auto;
+}
+.woocommerce-MyAccount-content .qr-tiger-vcard-code-generator h2 {
+  color: var(--white);
+  text-align: center;
+}
+.woocommerce-MyAccount-content
+  .qr-tiger-vcard-code-generator
+  .input-form-dong
+  input {
+  margin: 0 0 8px;
+}
+
+/* ACCOUNT DETAILS */
+.woocommerce form.woocommerce-EditAccountForm {
+  padding-top: 20px;
+}
+.woocommerce .woocommerce-MyAccount-content .woocommerce-EditAccountForm p {
+  text-align: left;
+  color: var(--text);
+}
+.woocommerce
+  .woocommerce-MyAccount-content
+  .woocommerce-EditAccountForm
+  p
+  span {
+  font-size: 14px;
+}
+.woocommerce form.woocommerce-EditAccountForm .form-row input.input-text {
+  margin-bottom: 5px;
+}
+.woocommerce .woocommerce-EditAccountForm fieldset {
+  border-color: var(--background);
+  border-width: 1px;
+}
+.woocommerce form.woocommerce-EditAccountForm .form-row label {
+  line-height: 1.5;
+  margin: 0 0 5px;
+}
+.woocommerce
+  .woocommerce-MyAccount-content
+  form.woocommerce-EditAccountForm
+  .woocommerce-Button {
+  margin-top: 20px;
+}
+
+/* PAYMENT METHODS */
+.woocommerce form#add_payment_method #payment ul.payment_methods {
+  padding: 0;
+}
+.woocommerce .woocommerce-MyAccount-content form#add_payment_method p {
+  text-align: left;
+  color: var(--text);
+}
+.woocommerce form#add_payment_method #payment.woocommerce-Payment {
+  background: transparent;
+}
+.woocommerce #add_payment_method #payment div.form-row {
+  padding: 0;
+  width: 100%;
+}
+.woocommerce #payment #place_order,
+.woocommerce-page #payment #place_order {
+  padding: 15px;
+}
+
+/* EXPORT YOUR AFFILIATE ORDER */
+.export-section form#export-csv-order {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  width: 100%;
+}
+form#export-csv-order .export-date.export-date-to {
+  padding: 10px 0;
+}
+form#export-csv-order .export-date input {
+  margin: 0;
+}
+form#export-csv-order .export-date {
+  width: 100%;
+  flex-wrap: wrap;
+}
+.woocommerce #my-account-affilate-order form {
+  background-color: transparent;
+  padding: 0;
+}
+.woocommerce #my-account-affilate-order button[type="submit"] {
+  margin-top: 0;
+}
+.woocommerce form#export-csv-order {
+  padding: 0;
+}
+
+/* =========================== WOOCOMMERCE SHOP ================================ */
+.woocommerce-shop.woocommerce .elementor .elementor-element.mobile-dong-menu {
+  margin-bottom: 0;
+}
+.woocommerce-shop.woocommerce
+  .elementor
+  .elementor-element.mobile-dong-menu
+  a
+  img {
+  filter: brightness(0);
+}
+.woocommerce-shop.woocommerce
+  .elementor
+  .elementor-element.mobile-dong-menu
+  .jkit-nav-identity-panel
+  a
+  img {
+  filter: brightness(1);
+}
+.woocommerce-shop.woocommerce
+  .elementor
+  .elementor-element.mobile-dong-menu
+  .elementor-element
+  .jeg-elementor-kit.jkit-nav-menu
+  .jkit-hamburger-menu
+  svg {
+  fill: var(--text);
+}
+.woocommerce-shop.woocommerce .site-main {
+  padding: 20px 26px 0;
+}
+.woocommerce-shop.woocommerce.woocommerce-page .woocommerce-ordering {
+  float: left;
+  padding: 0;
+  width: 100%;
+}
+.woocommerce ul.products {
+  padding: 20px 0 0;
+}
+.woocommerce.woocommerce-page ul.products li.product {
+  width: 100%;
+}
+.woocommerce ul.products li.product span.price {
+  color: var(--primary);
+}
+.woocommerce ul.products li.product .button {
+  margin: 5px 0 10px;
+}
+
+/* CART */
+.wc-block-components-notices .wc-block-components-notices__notice {
+  align-items: self-start;
+}
+.wc-block-components-totals-coupon .wc-block-components-panel__button {
+  padding: 15px 30px;
+}
+.wc-block-components-totals-coupon .wc-block-components-panel__content {
+  padding-top: 10px;
+}
+/* YOUR PROFILE */
+form.pmpro_form .pmpro_submit {
+  display: flex;
+  padding-top: 10px;
+}
+form.pmpro_form .pmpro_submit input {
+  margin-right: 4px;
+}
+form.pmpro_form .pmpro_member_profile_edit-fields input.input {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* NEW ORDER TABLE  */
+
+.widgets-holder-wrap table.wp-list-table tr th,
+.widgets-holder-wrap table.wp-list-table tr td {
+  display: block;
+  text-align: left;
+}
+.woocommerce .detente-treasury h3,
+.woocommerce .detente-commission h3,
+.woocommerce .detente-group h3,
+.woocommerce .detente-orders h3,
+.woocommerce .detente-groups h3 {
+  color: var(--white);
+  text-align: center;
+}
+
+/* CHECKOUT */
+.woocommerce form.woocommerce-checkout {
+  padding: 0;
+}
+.woocommerce .woocommerce-checkout h3 {
+  margin: 30px 0;
+}
+.payment_box fieldset p.momo-venmo {
+  text-align: center;
+}
+.payment_box fieldset p.momo-venmo a {
+  margin: 10px 0 20px;
+  display: block;
+}
+/* --------------------
+    MY ORDERS
+ -------------------- */
+
+.cpm-table-wrap #posts-filter {
+  display: block;
+}
+.cpm-table-wrap #posts-filter input,
+.cpm-table-wrap #posts-filter select {
+  margin: 10px 0;
+  width: 100%;
+}
+.cpm-table-wrap #posts-filter input.button {
+  margin-top: 5px;
+}

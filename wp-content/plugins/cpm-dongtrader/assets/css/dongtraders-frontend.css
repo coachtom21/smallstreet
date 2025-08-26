@@ -1,0 +1,233 @@
+/*--------------------------------------------------------------
+ * ## CPM PLUGIN NOTIFICATION-BOX
+ *--------------------------------------------------------------
+ */
+
+.success-box,
+.error-box,
+.info-box,
+.warning-box {
+    border-radius: 2px;
+    font-size: 16px;
+    margin: 10px 0;
+    padding: 15px 15px 15px 45px;
+    position: relative;
+}
+
+.success-box:before,
+.error-box:before,
+.info-box:before,
+.warning-box:before {
+    display: inline-block;
+    font-family: "dashicons";
+    font-size: 18px;
+    line-height: normal;
+    left: 15px;
+    position: absolute;
+    top: 17px;
+    vertical-align: top;
+}
+
+.success-box {
+    background-color: #dff2bf;
+    color: #4f8a10;
+}
+
+.success-box:before {
+    content: "\f12a";
+}
+
+.error-box {
+    background-color: #ffbaba;
+    color: #d8000c;
+}
+
+.error-box:before {
+    content: "\f153";
+}
+
+.info-box {
+    background-color: #d9edf7;
+    color: #31708f;
+}
+
+.info-box:before {
+    content: "\f348";
+}
+
+.warning-box {
+    background-color: #feefb3;
+    color: #9f6000;
+}
+
+.warning-box:before {
+    content: "\f534";
+}
+
+.export_variation_product_hide {
+    display: none;
+}
+
+/*--------------------------------------------------------------
+ * ## CPM PLUGIN CPM-TABLE-WRAP
+ *--------------------------------------------------------------
+ */
+
+.cpm-table-wrap {
+    font-size: 14px;
+    margin: 20px 0;
+    overflow-x: scroll;
+}
+
+.cpm-table-wrap table {
+    border-spacing: 0;
+    margin: 20px 0;
+    width: 100%;
+}
+
+.cpm-table-wrap thead th,
+.cpm-table-wrap tbody td {
+    padding: 15px;
+    text-align: left;
+}
+
+.cpm-table-wrap thead th {
+    border-left: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+
+}
+
+.cpm-table-wrap tbody td {
+    /* border: none; */
+    border-top: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+}
+
+/* .cpm-table-wrap thead th:first-child,
+.cpm-table-wrap tbody td:first-child {
+  border-left: none;
+} */
+
+.cpm-table-wrap tbody tr:nth-of-type(odd) td {
+    background: #fafafa;
+}
+
+/*--------------------------------------------------------------
+ * ## CPM PLUGIN SEC-TITLE
+ *--------------------------------------------------------------
+ */
+
+.sec-title {
+    margin-bottom: 30px;
+    padding: 15px;
+    position: relative;
+}
+
+.sec-title:after {
+    background: #23282d;
+    content: "";
+    height: 2px;
+    margin-top: -1px;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 90%;
+    z-index: 0;
+}
+
+.sec-title span {
+    background: #f1f1f1;
+    display: inline-block;
+    padding-right: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.sec-title span:before {
+    content: "\f106";
+    font-family: "dashicons";
+    display: inline-block;
+    margin-right: 10px;
+    font-size: 25px;
+}
+
+/* ---- EXPORTER ----- */
+form#export-csv-order {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+form#export-csv-order .export-date {
+    display: flex;
+    align-items: center;
+}
+
+form#export-csv-order .export-date.export-date-to {
+    padding: 0 10px;
+}
+
+form#export-csv-order .export-date input {
+    margin: 0 0 0 5px;
+    min-height: 30px;
+    padding: 0 8px;
+    line-height: 2;
+    font-size: 1em;
+}
+
+form#export-csv-order p button {
+    background: #2271b1;
+    padding: 0 10px;
+    color: #fff;
+    font-size: 13px;
+    line-height: 2.15384615;
+    min-height: 30px;
+}
+
+form#export-csv-order p {
+    position: relative;
+    top: -3px;
+}
+
+/* -----END OF EXPORTER */
+
+/* AFFILIATE REFERRALS */
+
+.cpm-table-wrap #posts-filter{
+    display: block;
+}
+.cpm-table-wrap #posts-filter input, .cpm-table-wrap #posts-filter select{
+    max-width: 100%;
+    width: 100%;
+    margin: 5px 0;
+}
+.cpm-table-wrap #posts-filter input.button{
+    width: 5rem;
+    margin-top: 3px;
+}
+.cpm-table-wrap #posts-filter span{
+    margin: 0;
+}
+.user-trading-details strong{
+    color: var(--white);
+    text-align: center;
+}
+
+form#export-csv-order {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.woocommerce-checkout-review-order-table .shipping {
+    display: none;
+}
+
+/*end of affiliate referrals*/
+
+/* ADD YOUR AFFILIATE ORDER */
+@media (min-width: 768px){
+    .order-export-form input[type="submit"]{
+        margin-top: 20px;
+    } 
+}
