@@ -3072,149 +3072,195 @@ add_action('wp_footer', function () {
 /**
  * Display XP balance and transaction history for users
  */
+
 function dongtrader_display_xp_dashboard() {
     if (!is_user_logged_in()) {
         return '<p>Please log in to view your XP dashboard.</p>';
     }
     
     $user_id = get_current_user_id();
-    $total_xp = get_user_meta($user_id, '_total_xp_balance', true);
-    $total_xp = $total_xp ? intval($total_xp) : 0;
-    
     $dong_user_role = get_user_meta($user_id, 'dong_user_role', true);
     $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
     
-    // Calculate pending XP
-    $meta_key = $is_seller ? '_seller_details' : '_buyer_details';
-    $transactions = get_user_meta($user_id, $meta_key, true);
-    $pending_xp = 0;
-    $completed_xp = 0;
+    // Get both buyer and seller details to calculate total XP
+    $seller_details = get_user_meta($user_id, '_seller_details', true);
+    $buyer_details = get_user_meta($user_id, '_buyer_details', true);
     
-    if (is_array($transactions)) {
-        foreach ($transactions as $transaction) {
-            if ($transaction['status'] === 'pending') {
-                $pending_xp += $transaction['xp_awarded'];
-            } else {
-                $completed_xp += $transaction['xp_awarded'];
+    // Initialize XP counters
+    $total_earned_xp = 0;
+    $total_pending_xp = 0;
+    $total_completed_xp = 0;
+    
+    // Calculate XP from seller transactions
+    if (is_array($seller_details) && !empty($seller_details)) {
+        foreach ($seller_details as $transaction) {
+            if (isset($transaction['xp_awarded'])) {
+                $total_earned_xp += intval($transaction['xp_awarded']);
+                
+                // Check if XP is pending or completed based on Discord membership
+                if (isset($transaction['discord_member']) && $transaction['discord_member']) {
+                    $total_completed_xp += intval($transaction['xp_awarded']);
+                } else {
+                    $total_pending_xp += intval($transaction['xp_awarded']);
+                }
+            }
+        }
+    }
+    
+    // Calculate XP from buyer transactions
+    if (is_array($buyer_details) && !empty($buyer_details)) {
+        foreach ($buyer_details as $transaction) {
+            if (isset($transaction['xp_awarded'])) {
+                $total_earned_xp += intval($transaction['xp_awarded']);
+                
+                // Check if XP is pending or completed based on Discord membership
+                if (isset($transaction['discord_member']) && $transaction['discord_member']) {
+                    $total_completed_xp += intval($transaction['xp_awarded']);
+                } else {
+                    $total_pending_xp += intval($transaction['xp_awarded']);
+                }
             }
         }
     }
     
     $output = '<div class="dongtrader-xp-dashboard" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">';
-    $output .= '<h3>XP Dashboard</h3>';
-    $output .= '<p><strong>Total XP Balance:</strong> ' . number_format($total_xp) . ' XP</p>';
-    $output .= '<p><strong>Completed XP:</strong> ' . number_format($completed_xp) . ' XP</p>';
-    $output .= '<p><strong>Pending XP:</strong> ' . number_format($pending_xp) . ' XP <span style="color: #856404; background: #fff3cd; padding: 2px 6px; border-radius: 3px; font-size: 12px;">Awaiting Discord Membership</span></p>';
-    $output .= '<p><strong>User Role:</strong> ' . ($dong_user_role ? $dong_user_role : 'Not Set') . '</p>';
-    $output .= '<p><strong>Account Type:</strong> ' . ($is_seller ? 'Seller' : 'Buyer') . '</p>';
+    $output .= '<h3 style="color: #2c3e50; margin-bottom: 20px;">🎮 XP Dashboard</h3>';
     
-    // Discord membership status
+    // XP Summary Section
+    $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #3498db;">';
+    $output .= '<h4 style="color: #2c3e50; margin-top: 0;">📊 XP Summary</h4>';
+    $output .= '<p style="margin: 8px 0;"><strong>Total XP Earned:</strong> <span style="color: #27ae60; font-weight: bold; font-size: 18px;">' . number_format($total_earned_xp) . ' XP</span></p>';
+    $output .= '<p style="margin: 8px 0;"><strong>Completed XP:</strong> <span style="color: #27ae60; font-weight: bold;">' . number_format($total_completed_xp) . ' XP</span></p>';
+    $output .= '<p style="margin: 8px 0;"><strong>Pending XP:</strong> <span style="color: #f39c12; font-weight: bold;">' . number_format($total_pending_xp) . ' XP</span> ⏳ <span style="color: #856404; background: #fff3cd; padding: 2px 6px; border-radius: 3px; font-size: 12px;">Awaiting Discord Membership</span></p>';
+    $output .= '</div>';
+    
+    // User Information Section
+    $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
+    $output .= '<h4 style="color: #2c3e50; margin-top: 0;">👤 Account Information</h4>';
+    $output .= '<p style="margin: 8px 0;"><strong>User Role:</strong> <span style="color: #8e44ad; font-weight: bold;">' . ($dong_user_role ? $dong_user_role : 'Not Set') . '</span></p>';
+    $output .= '<p style="margin: 8px 0;"><strong>Account Type:</strong> <span style="color: #8e44ad; font-weight: bold;">' . ($is_seller ? 'Seller' : 'Buyer') . '</span></p>';
+    
+    // Display membership information for buyers
+    if (!$is_seller) {
+        $buyer_details = get_user_meta($user_id, '_buyer_details', true);
+        if (is_array($buyer_details) && !empty($buyer_details)) {
+            // Get the latest membership from recent transactions
+            $latest_membership = '';
+            foreach (array_reverse($buyer_details) as $transaction) {
+                if (isset($transaction['membership']) && !empty($transaction['membership'])) {
+                    $latest_membership = $transaction['membership'];
+                    break;
+                }
+            }
+            if ($latest_membership) {
+                $output .= '<p style="margin: 8px 0;"><strong>Membership:</strong> <span style="color: #e67e22; font-weight: bold;">' . esc_html($latest_membership) . '</span></p>';
+            } else {
+                $output .= '<p style="margin: 8px 0;"><strong>Membership:</strong> <span style="color: #95a5a6; font-style: italic;">No Membership</span></p>';
+            }
+        }
+    }
+    $output .= '</div>';
+    
+    // Discord Connection Section
     $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
     if ($discord_user_id) {
-        $output .= '<p><strong>Discord ID:</strong> ' . esc_html($discord_user_id) . '</p>';
-        if ($pending_xp > 0) {
-            $output .= '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 15px 0;">';
-            $output .= '<h4>⚠️ XP Pending - Discord Membership Required</h4>';
-            $output .= '<p>You have ' . number_format($pending_xp) . ' XP pending. Join our Discord server to receive your XP!</p>';
-            $output .= '<p><a href="https://discord.gg/tY6mxRft" target="_blank" style="background: #7289da; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Join Discord Server</a></p>';
+        $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #9b59b6;">';
+        $output .= '<h4 style="color: #8e44ad; margin-top: 0;">Discord Connected</h4>';
+        $output .= '<p style="margin: 8px 0;"><strong>Discord ID:</strong> <span style="color: #9b59b6; font-weight: bold;">' . esc_html($discord_user_id) . '</span></p>';
+        
+        if ($total_pending_xp > 0) {
+            $output .= '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px; border-radius: 4px; margin-top: 10px;">';
+            $output .= '<p style="margin: 5px 0; color: #856404;"><strong>⚠️ XP Pending - Discord Membership Verification Required</strong></p>';
+            $output .= '<p style="margin: 5px 0; color: #856404;">You have <strong>' . number_format($total_pending_xp) . ' XP</strong> pending. Our Discord bot will verify your server membership to release these rewards.</p>';
+            $output .= '<p style="margin: 5px 0;"><a href="https://discord.gg/tY6mxRft" target="_blank" style="background: #8e44ad; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; display: inline-block;">🔗 Join Discord Server</a></p>';
             $output .= '</div>';
+        } else {
+            $output .= '<p style="margin: 8px 0; color: #27ae60;"><strong>✅ All XP has been verified and completed!</strong></p>';
         }
+        $output .= '</div>';
     } else {
-        $output .= '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; margin: 15px 0;">';
-        $output .= '<h4>🔗 Connect Discord Account</h4>';
-        $output .= '<p>Link your Discord account to receive XP rewards. Add your Discord User ID to your profile.</p>';
+        $output .= '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
+        $output .= '<h4 style="color: #721c24; margin-top: 0;">🔗 Connect Discord Account</h4>';
+        $output .= '<p style="margin: 8px 0; color: #721c24;"><strong>Action Required:</strong> To receive your XP rewards, you must connect your Discord account.</p>';
+
+        
+        // Add Join Gracebook button
+        $output .= '<div style="margin-top: 15px; text-align: center;">';
+        $output .= '<a href="https://discord.gg/g5jreAPbra" target="_blank" style="background: #8e44ad; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">Join Gracebook</a>';
+        $output .= '</div>';
+        
         $output .= '</div>';
     }
     
     // Display transaction history
     if ($is_seller) {
-        $seller_details = get_user_meta($user_id, '_seller_details', true);
         if (is_array($seller_details) && !empty($seller_details)) {
-            $output .= '<h4>Seller Transaction History</h4>';
-            $output .= '<table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
-            $output .= '<tr style="background: #e9ecef;"><th style="padding: 8px; border: 1px solid #ddd;">Date</th><th style="padding: 8px; border: 1px solid #ddd;">XP Awarded</th><th style="padding: 8px; border: 1px solid #ddd;">Type</th><th style="padding: 8px; border: 1px solid #ddd;">Status</th><th style="padding: 8px; border: 1px solid #ddd;">Discord</th></tr>';
+            $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #f39c12;">';
+            $output .= '<h4 style="color: #2c3e50; margin-top: 0;">📈 Seller Transaction History</h4>';
+            $output .= '<table style="width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #ddd;">';
+            $output .= '<tr style="background: #e9ecef;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Date</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">XP Awarded</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Type</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Status</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Discord</th></tr>';
             
             foreach ($seller_details as $transaction) {
-                $status_color = $transaction['status'] === 'completed' ? '#28a745' : '#ffc107';
-                $status_text = ucfirst($transaction['status']);
-                $discord_status = isset($transaction['discord_member']) && $transaction['discord_member'] ? '✅ Member' : '❌ Not Member';
+                $xp_amount = isset($transaction['xp_awarded']) ? intval($transaction['xp_awarded']) : 0;
+                $is_discord_member = isset($transaction['discord_member']) && $transaction['discord_member'];
+                $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                $status_text = $is_discord_member ? 'Completed' : 'Pending';
+                $discord_status = $is_discord_member ? '✅ Member' : '❌ Not Member';
                 
                 $output .= '<tr>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . (isset($transaction['verification_date']) ? $transaction['verification_date'] : 'N/A') . '</td>';
-                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . number_format($transaction['xp_awarded']) . ' XP</td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><strong>' . number_format($xp_amount) . ' XP</strong></td>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . (isset($transaction['transaction_type']) ? ucfirst($transaction['transaction_type']) : 'N/A') . '</td>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><span style="color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</span></td>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . $discord_status . '</td>';
                 $output .= '</tr>';
             }
             $output .= '</table>';
+            $output .= '</div>';
         }
     } else {
-        $buyer_details = get_user_meta($user_id, '_buyer_details', true);
         if (is_array($buyer_details) && !empty($buyer_details)) {
-            $output .= '<h4>Buyer Transaction History</h4>';
-            $output .= '<table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
-            $output .= '<tr style="background: #e9ecef;"><th style="padding: 8px; border: 1px solid #ddd;">Date</th><th style="padding: 8px; border: 1px solid #ddd;">XP Awarded</th><th style="padding: 8px; border: 1px solid #ddd;">Type</th><th style="padding: 8px; border: 1px solid #ddd;">Status</th><th style="padding: 8px; border: 1px solid #ddd;">Discord</th></tr>';
+            $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #3498db;">';
+            $output .= '<h4 style="color: #2c3e50; margin-top: 0;">🛒 Buyer Transaction History</h4>';
+            $output .= '<table style="width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #ddd;">';
+            $output .= '<tr style="background: #e9ecef;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Order ID</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Name</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Membership</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">XP Awarded</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Type</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Status</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Discord</th></tr>';
             
-            foreach ($buyer_details as $transaction) {
-                $status_color = $transaction['status'] === 'completed' ? '#28a745' : '#ffc107';
-                $status_text = ucfirst($transaction['status']);
-                $discord_status = isset($transaction['discord_member']) && $transaction['discord_member'] ? '✅ Member' : '❌ Not Member';
+            foreach ($buyer_details as $index => $transaction) {
+                $xp_amount = isset($transaction['xp_awarded']) ? intval($transaction['xp_awarded']) : 0;
+                $is_discord_member = isset($transaction['discord_member']) && $transaction['discord_member'];
+                $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                $status_text = $is_discord_member ? 'Completed' : 'Pending';
+                $discord_status = $is_discord_member ? '✅ Member' : '❌ Not Member';
+                
+                // Generate Order ID or use existing one
+                $order_id = isset($transaction['order_id']) ? $transaction['order_id'] : 'ORD-' . str_pad($index + 1, 4, '0', STR_PAD_LEFT);
+                
+                // Get name and membership
+                $name = isset($transaction['name']) ? $transaction['name'] : 'N/A';
+                $membership = isset($transaction['membership']) && !empty($transaction['membership']) ? $transaction['membership'] : 'No Membership';
+                
+                // Get transaction type with fallback
+                $transaction_type = 'OTP Verification';
+                if (isset($transaction['transaction_type']) && !empty($transaction['transaction_type'])) {
+                    $transaction_type = ucfirst($transaction['transaction_type']);
+                }
                 
                 $output .= '<tr>';
-                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . (isset($transaction['verification_date']) ? $transaction['verification_date'] : 'N/A') . '</td>';
-                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . number_format($transaction['xp_awarded']) . ' XP</td>';
-                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . (isset($transaction['transaction_type']) ? ucfirst($transaction['transaction_type']) : 'N/A') . '</td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html($order_id) . '</strong></td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($name) . '</td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><span style="color: #e67e22; font-weight: bold;">' . esc_html($membership) . '</span></td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><strong>' . number_format($xp_amount) . ' XP</strong></td>';
+                $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($transaction_type) . '</td>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;"><span style="color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</span></td>';
                 $output .= '<td style="padding: 8px; border: 1px solid #ddd;">' . $discord_status . '</td>';
                 $output .= '</tr>';
             }
             $output .= '</table>';
+            $output .= '</div>';
         }
     }
     
-    // Add refresh button for Discord membership check
-    if ($pending_xp > 0) {
-        $output .= '<div style="margin-top: 20px; text-align: center;">';
-        $output .= '<button id="check-discord-membership" style="background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🔄 Check Discord Membership & Award Pending XP</button>';
-        $output .= '<div id="discord-check-result" style="margin-top: 10px;"></div>';
-        $output .= '</div>';
-        
-        // Add JavaScript for Discord membership check
-        $output .= '<script>
-        jQuery(document).ready(function($) {
-            $("#check-discord-membership").click(function() {
-                var button = $(this);
-                button.prop("disabled", true).text("Checking...");
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: "POST",
-                    data: {
-                        action: "check_discord_membership",
-                        user_id: ' . $user_id . ',
-                        nonce: "' . wp_create_nonce('check_discord_membership') . '"
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            $("#discord-check-result").html("<div style=\"color: #28a745; background: #d4edda; padding: 10px; border-radius: 4px;\">" + response.data.message + "</div>");
-                            // Reload page after 2 seconds to show updated XP
-                            setTimeout(function() { location.reload(); }, 2000);
-                        } else {
-                            $("#discord-check-result").html("<div style=\"color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;\">Error: " + response.data.message + "</div>");
-                        }
-                    },
-                    error: function() {
-                        $("#discord-check-result").html("<div style=\"color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;\">Error: Could not check Discord membership</div>");
-                    },
-                    complete: function() {
-                        button.prop("disabled", false).text("🔄 Check Discord Membership & Award Pending XP");
-                    }
-                });
-            });
-        });
-        </script>';
-    }
+
     
     $output .= '</div>';
     

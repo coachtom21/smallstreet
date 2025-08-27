@@ -74,7 +74,7 @@ $seven_percent_total_funded = 0;
 				echo '</tfoot>';
 			else:
 				echo '<tr>';
-				echo '<td style="text-align:center;"colspan="6" >Details Not Found</td>';
+				echo '<td style="text-align:center;"colspan="7" >Details Not Found</td>';
 				echo '</tr>';
 			endif;
 			echo '</tbody>'; ?>
@@ -122,6 +122,8 @@ $seven_percent_total_funded = 0;
 
 					if ($is_order_payable) {
 						$pay_btn = '<a href="' . esc_url($order->get_checkout_payment_url()) . '" class="woocommerce-button wp-element-button button view">Pay Now</a>';
+					} else {
+						$pay_btn = '<span style="color: #95a5a6; font-style: italic;">Not Payable</span>';
 					}
 
 					echo '
@@ -133,7 +135,7 @@ $seven_percent_total_funded = 0;
 							<time datetime="2024-06-17T05:17:35+00:00">' . date_i18n('F j, Y', strtotime($order->get_date_created())) . '</time>
 						</td>
 						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Total">
-							<span class="woocommerce-Price-amount amount">' . $order->get_formatted_order_total() . ' for ' . $total_quantity . ' item(s)
+							<span class="woocommerce-Price-amount amount">' . $order->get_formatted_order_total() . ' for ' . $total_quantity . ' item(s)</span>
 						</td>
 						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Total">
 							<span class="woocommerce-Price-amount amount">' . wc_price($seven_percent) . '</span>
@@ -169,6 +171,8 @@ $seven_percent_total_funded = 0;
 							class="nobr">7%(funded)</span></th>
 					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
 							class="nobr">XP</span></th>
+					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
+							class="nobr">Status</span></th>
 					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-actions"><span
 							class="nobr">Actions</span></th>
 				</tr>
@@ -179,6 +183,8 @@ $seven_percent_total_funded = 0;
 				$total_paid_amount = 0;
 				$seven_percent_total_funded = 0;
 				$grand_total_xp = 0; // <-- overall total XP
+				$total_pending_xp = 0; // <-- overall pending XP
+				$total_completed_xp = 0; // <-- overall completed XP
 			
 				foreach ($paid_orders as $order) {
 					$total_quantity = 0;
@@ -191,14 +197,29 @@ $seven_percent_total_funded = 0;
 					$buyer_details = get_user_meta($customer_id, '_buyer_details', true);
 					$xp_earned = 0;
 					$total_xp = 0;
+					$pending_xp = 0;
+					$completed_xp = 0;
 
 					if (!empty($buyer_details) && is_array($buyer_details)) {
 						// XP for this order (first element in array)
 						$xp_earned = $buyer_details[0]['xp_awarded'];
 
-						// Total XP across all buyer orders
-						$total_xp = array_sum(array_column($buyer_details, 'xp_awarded'));
+						// Calculate pending vs completed XP across all buyer orders
+						foreach ($buyer_details as $transaction) {
+							if (isset($transaction['xp_awarded'])) {
+								$total_xp += intval($transaction['xp_awarded']);
+								
+								// Check if XP is pending or completed based on Discord membership
+								if (isset($transaction['discord_member']) && $transaction['discord_member']) {
+									$completed_xp += intval($transaction['xp_awarded']);
+								} else {
+									$pending_xp += intval($transaction['xp_awarded']);
+								}
+							}
+						}
 						$grand_total_xp += $total_xp; // add to global XP
+						$total_pending_xp += $pending_xp; // add to global pending XP
+						$total_completed_xp += $completed_xp; // add to global completed XP
 					}
 
 
@@ -221,7 +242,10 @@ $seven_percent_total_funded = 0;
 								<span class="woocommerce-Price-amount amount">' . wc_price($seven_percent) . '</span>
 							</td>
 							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="XP">
-								<span class="woocommerce-Price-amount amount">' . number_format($xp_earned) . ' XP</span>
+								<span class="woocommerce-Price-amount amount">' . number_format($total_xp) . ' XP</span>
+							</td>
+							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Status">
+								<span class="woocommerce-Price-amount amount">' . ($pending_xp > 0 ? 'Pending' : 'Completed') . '</span>
 							</td>
 							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-actions" data-title="Actions">
 								<a href="' . esc_url($order->get_view_order_url()) . '" class="woocommerce-button wp-element-button button view">View</a>
@@ -243,9 +267,93 @@ $seven_percent_total_funded = 0;
 		</table>
 		<p>Total 7%(funded): <?php echo wc_price($seven_percent_total_funded); ?></p>
 		<p>Total Paid Amount: <?php echo wc_price($total_paid_amount); ?></p>
-		<p>Total XP Earned: <?php echo number_format($grand_total_xp) . " " . "XP"; ?></p>
-		<p>Total YAM Earned: <?php echo number_format($yam_total, 10) . " " . "YAM"; ?></p>
-		<p>Total USD Earned: <?php echo number_format($usd_total, 10) . " " . "USD"; ?></p>
+		
+		<!-- XP Summary Section -->
+		<div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0;">
+			<h4 style="color: #2c3e50; margin: 0 0 15px 0; border-bottom: 2px solid #7f8c8d; padding-bottom: 8px;">XP Rewards Summary</h4>
+			
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+				<div>
+					<p style="margin: 8px 0; font-size: 16px;">
+						<strong style="color: #2c3e50;">Total XP Earned:</strong><br>
+						<span style="color: #2c3e50; font-size: 20px; font-weight: bold;"><?php echo number_format($grand_total_xp); ?> XP</span>
+					</p>
+					
+					<p style="margin: 8px 0;">
+						<strong style="color: #2c3e50;">XP Status:</strong><br>
+						<span style="color: #f39c12; font-weight: bold;"><?php echo number_format($total_pending_xp); ?> Pending</span> 
+						<small style="color: #7f8c8d;">(Awaiting Discord verification)</small><br>
+					</p>
+				</div>
+				
+				<div>
+					<p style="margin: 8px 0;">
+						<strong style="color: #2c3e50;">Conversion Rates:</strong><br>
+						<small style="color: #2c3e50;">1 USD = 21,000 YAM</small><br>
+						<small style="color: #2c3e50;">1 YAM = $0.0000476 USD</small><br>
+						<small style="color: #2c3e50;">1 YAM = 47,619,047,619,047,619 XP</small><br>
+						<small style="color: #2c3e50;">1 USD = 1,000,000,000,000,000,000,000 XP</small>
+					</p>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Currency Conversion Section -->
+		<div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0;">
+			<h4 style="color: #2c3e50; margin: 0 0 15px 0; border-bottom: 2px solid #7f8c8d; padding-bottom: 8px;">Currency Conversions</h4>
+			
+			<?php
+			// Calculate correct XP to YAM conversion using atomic units
+			$xp_per_yam = 47619047619047619; // 10^21 / 21,000
+			$xp_to_yam = $grand_total_xp / $xp_per_yam;
+			
+			// Calculate patronage split (10% total of gross)
+			$total_patronage_xp = $usd_total * 0.10 * pow(10, 21); // 10% in XP
+			$buyer_patronage_xp = $usd_total * 0.07 * pow(10, 21); // 7% in XP
+			$seller_patronage_xp = $usd_total * 0.03 * pow(10, 21); // 3% in XP
+			?>
+			
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+				<div>
+					<p style="margin: 8px 0;">
+						<strong style="color: #2c3e50;">YAM Tokens:</strong><br>
+						<span style="color: #e67e22; font-size: 18px; font-weight: bold;"><?php echo number_format($yam_total, 10); ?> YAM</span><br>
+						<small style="color: #2c3e50;">Value: $<?php echo number_format($yam_total / 21000, 2); ?> USD</small><br>
+						<small style="color: #2c3e50;">XP Value: <?php echo number_format($yam_total * $xp_per_yam, 0); ?> XP</small>
+					</p>
+				</div>
+				
+				<div>
+					<p style="margin: 8px 0;">
+						<strong style="color: #2c3e50;">USD Value:</strong><br>
+						<span style="color: #2c3e50; font-size: 18px; font-weight: bold;">$<?php echo number_format($usd_total, 2); ?> USD</span><br>
+						<small style="color: #2c3e50;">Equivalent: <?php echo number_format($usd_total * 21000, 0); ?> YAM</small><br>
+						<small style="color: #2c3e50;">XP Value: <?php echo number_format($usd_total * pow(10, 21), 0); ?> XP</small>
+					</p>
+				</div>
+			</div>
+			
+			<!-- Patronage Split Section -->
+			<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+				<h5 style="color: #2c3e50; margin: 0 0 10px 0;">Patronage Split (10% of Gross Value)</h5>
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+					<div>
+						<p style="margin: 5px 0;">
+							<strong style="color: #2c3e50;">Buyer Reward (7%):</strong><br>
+							<span style="color: #2c3e50; font-weight: bold;"><?php echo number_format($buyer_patronage_xp, 0); ?> XP</span><br>
+							<small style="color: #2c3e50;">$<?php echo number_format($usd_total * 0.07, 2); ?> USD</small>
+						</p>
+					</div>
+					<div>
+						<p style="margin: 5px 0;">
+							<strong style="color: #2c3e50;">Seller Reward (3%):</strong><br>
+							<span style="color: #e67e22; font-weight: bold;"><?php echo number_format($seller_patronage_xp, 0); ?> XP</span><br>
+							<small style="color: #2c3e50;">$<?php echo number_format($usd_total * 0.03, 2); ?> USD</small>
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
 		<br class="clear" />
 		<?php
 	} else {

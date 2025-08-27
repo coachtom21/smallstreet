@@ -65,14 +65,22 @@ if ($show_downloads) {
 			foreach ($order_items as $item_id => $item) {
 				$product = $item->get_product();
 
-				// Get total XP from all orders
+				// Get XP details from all orders
 				$xp_earned = 0;
-				$current_user_buyer_details = get_user_meta(get_current_user_id(), '_seller_details', true);
-var_dump($current_user_buyer_details);
+				$pending_xp = 0;
+				$completed_xp = 0;
+				$current_user_buyer_details = get_user_meta(get_current_user_id(), '_buyer_details', true);
 				if (!empty($current_user_buyer_details) && is_array($current_user_buyer_details)) {
 					foreach ($current_user_buyer_details as $detail) {
 						if (isset($detail['xp_awarded'])) {
 							$xp_earned += intval($detail['xp_awarded']);
+							
+							// Check if XP is pending or completed based on Discord membership
+							if (isset($detail['discord_member']) && $detail['discord_member']) {
+								$completed_xp += intval($detail['xp_awarded']);
+							} else {
+								$pending_xp += intval($detail['xp_awarded']);
+							}
 						}
 					}
 				}
@@ -87,6 +95,8 @@ var_dump($current_user_buyer_details);
 						'purchase_note' => $product ? $product->get_purchase_note() : '',
 						'product' => $product,
 						'xp_earned' => $xp_earned,
+						'pending_xp' => $pending_xp,
+						'completed_xp' => $completed_xp,
 					)
 				);
 			}
@@ -118,8 +128,14 @@ var_dump($current_user_buyer_details);
 			$membership_name = get_post_meta($order->get_id(), '_membership_name', true);
 			if (!empty($membership_name)): ?>
 				<tr>
-					<th><?php esc_html_e('XP Rewards Earned:', 'woocommerce'); ?></th>
-					<td><strong><?php echo number_format(10000000); ?> XP</strong></td>
+					<th><?php esc_html_e('XP Rewards:', 'woocommerce'); ?></th>
+					<td>
+						<strong><?php echo number_format($xp_earned); ?> XP</strong>
+						<br><small>
+							<span style="color: #f39c12;"><?php echo number_format($pending_xp); ?> Pending</span> / 
+							<span style="color: #27ae60;"><?php echo number_format($completed_xp); ?> Completed</span>
+						</small>
+					</td>
 				</tr>
 			<?php endif; ?>
 

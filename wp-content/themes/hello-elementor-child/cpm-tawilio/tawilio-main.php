@@ -23,7 +23,7 @@ function ct_get_user_country_code()
 }
 
 /**
- * Check Discord membership (placeholder - you can implement real Discord API later)
+ * Check Discord membership (placeholder - you can implement real Discord API later
  */
 function ct_check_discord_membership($discord_user_id)
 {
