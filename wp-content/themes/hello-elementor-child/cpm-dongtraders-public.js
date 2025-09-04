@@ -1,3 +1,10 @@
+// Fix for missing print_country function
+function print_country() {
+    // This function is called but not defined, adding a placeholder
+    console.log("print_country function called");
+    return true;
+}
+
 jQuery(window).on("load", function () {
   //   alert("js file run");
   //jQuery("#elementor-popup-modal-2146").css("display", "none");

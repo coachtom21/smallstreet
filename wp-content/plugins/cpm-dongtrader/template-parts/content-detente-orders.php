@@ -186,6 +186,20 @@ $seven_percent_total_funded = 0;
 				$total_pending_xp = 0; // <-- overall pending XP
 				$total_completed_xp = 0; // <-- overall completed XP
 			
+				// Check if Discord invite data exists to release all pending XP
+				$customer_id = get_current_user_id();
+				$discord_invite_data = get_user_meta($customer_id, '_discord_invite', true);
+				$has_discord_invite = false;
+				
+				if (!empty($discord_invite_data)) {
+					if (is_string($discord_invite_data)) {
+						$decoded_data = json_decode($discord_invite_data, true);
+						$has_discord_invite = (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded']));
+					} else {
+						$has_discord_invite = is_array($discord_invite_data) && !empty($discord_invite_data);
+					}
+				}
+
 				foreach ($paid_orders as $order) {
 					$total_quantity = 0;
 					$total_paid_amount += $order->get_total();
@@ -193,7 +207,6 @@ $seven_percent_total_funded = 0;
 					$seven_percent_total_funded += $seven_percent;
 
 					// Get XP earned from user meta _buyer_details
-					$customer_id = $order->get_customer_id();
 					$buyer_details = get_user_meta($customer_id, '_buyer_details', true);
 					$xp_earned = 0;
 					$total_xp = 0;
@@ -209,11 +222,16 @@ $seven_percent_total_funded = 0;
 							if (isset($transaction['xp_awarded'])) {
 								$total_xp += intval($transaction['xp_awarded']);
 								
-								// Check if XP is pending or completed based on Discord membership
-								if (isset($transaction['discord_member']) && $transaction['discord_member']) {
+								// If Discord invite exists, all XP is automatically released
+								if ($has_discord_invite) {
 									$completed_xp += intval($transaction['xp_awarded']);
 								} else {
-									$pending_xp += intval($transaction['xp_awarded']);
+									// Check if XP is pending or completed based on Discord membership
+									if (isset($transaction['discord_member']) && $transaction['discord_member']) {
+										$completed_xp += intval($transaction['xp_awarded']);
+									} else {
+										$pending_xp += intval($transaction['xp_awarded']);
+									}
 								}
 							}
 						}
@@ -245,7 +263,7 @@ $seven_percent_total_funded = 0;
 								<span class="woocommerce-Price-amount amount">' . number_format($total_xp) . ' XP</span>
 							</td>
 							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Status">
-								<span class="woocommerce-Price-amount amount">' . ($pending_xp > 0 ? 'Pending' : 'Completed') . '</span>
+								<span class="woocommerce-Price-amount amount">' . ($has_discord_invite ? 'Released' : ($pending_xp > 0 ? 'Pending' : 'Completed')) . '</span>
 							</td>
 							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-actions" data-title="Actions">
 								<a href="' . esc_url($order->get_view_order_url()) . '" class="woocommerce-button wp-element-button button view">View</a>
@@ -281,8 +299,14 @@ $seven_percent_total_funded = 0;
 					
 					<p style="margin: 8px 0;">
 						<strong style="color: #2c3e50;">XP Status:</strong><br>
-						<span style="color: #f39c12; font-weight: bold;"><?php echo number_format($total_pending_xp); ?> Pending</span> 
-						<small style="color: #7f8c8d;">(Awaiting Discord verification)</small><br>
+						<?php if ($has_discord_invite): ?>
+							<span style="color: #17a2b8; font-weight: bold;"><?php echo number_format($grand_total_xp); ?> Released</span> 
+							<small style="color: #7f8c8d;">(Discord verified - All XP available)</small><br>
+						<?php else: ?>
+							<span style="color: #f39c12; font-weight: bold;"><?php echo number_format($total_pending_xp); ?> Pending</span> 
+							<small style="color: #7f8c8d;">(Awaiting Discord verification)</small><br>
+							<span style="color: #28a745; font-weight: bold;"><?php echo number_format($total_completed_xp); ?> Completed</span>
+						<?php endif; ?>
 					</p>
 				</div>
 				
