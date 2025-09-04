@@ -69,17 +69,38 @@ if ($show_downloads) {
 				$xp_earned = 0;
 				$pending_xp = 0;
 				$completed_xp = 0;
+				$released_xp = 0;
+				
+				// Check if Discord invite data exists to release all pending XP
+				$discord_invite_data = get_user_meta(get_current_user_id(), '_discord_invite', true);
+				$has_discord_invite = false;
+				
+				if (!empty($discord_invite_data)) {
+					if (is_string($discord_invite_data)) {
+						$decoded_data = json_decode($discord_invite_data, true);
+						$has_discord_invite = (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded']));
+					} else {
+						$has_discord_invite = is_array($discord_invite_data) && !empty($discord_invite_data);
+					}
+				}
+				
 				$current_user_buyer_details = get_user_meta(get_current_user_id(), '_buyer_details', true);
 				if (!empty($current_user_buyer_details) && is_array($current_user_buyer_details)) {
 					foreach ($current_user_buyer_details as $detail) {
 						if (isset($detail['xp_awarded'])) {
-							$xp_earned += intval($detail['xp_awarded']);
+							$xp_amount = intval($detail['xp_awarded']);
+							$xp_earned += $xp_amount;
 							
+							// If Discord invite exists, all XP is automatically released
+							if ($has_discord_invite) {
+								$released_xp += $xp_amount;
+							} else {
 							// Check if XP is pending or completed based on Discord membership
 							if (isset($detail['discord_member']) && $detail['discord_member']) {
-								$completed_xp += intval($detail['xp_awarded']);
+									$completed_xp += $xp_amount;
 							} else {
-								$pending_xp += intval($detail['xp_awarded']);
+									$pending_xp += $xp_amount;
+								}
 							}
 						}
 					}
@@ -97,6 +118,8 @@ if ($show_downloads) {
 						'xp_earned' => $xp_earned,
 						'pending_xp' => $pending_xp,
 						'completed_xp' => $completed_xp,
+						'released_xp' => $released_xp,
+						'has_discord_invite' => $has_discord_invite,
 					)
 				);
 			}
@@ -132,8 +155,13 @@ if ($show_downloads) {
 					<td>
 						<strong><?php echo number_format($xp_earned); ?> XP</strong>
 						<br><small>
+							<?php if ($has_discord_invite): ?>
+								<span style="color: #17a2b8;"><?php echo number_format($released_xp); ?> Released</span>
+								<br><em style="color: #6c757d;">Discord verified - All XP available</em>
+							<?php else: ?>
 							<span style="color: #f39c12;"><?php echo number_format($pending_xp); ?> Pending</span> / 
 							<span style="color: #27ae60;"><?php echo number_format($completed_xp); ?> Completed</span>
+							<?php endif; ?>
 						</small>
 					</td>
 				</tr>

@@ -12,6 +12,7 @@ define('APP_SID', 'VA597048a004f28f441a60e510b72c0c0d');
 add_shortcode('cpm_twilio_otp', 'ct_twilio_otp_fields');
 function ct_twilio_otp_fields($atts)
 {
+
     $atts = shortcode_atts(
         array(
             'shadow' => 'no',
@@ -129,7 +130,11 @@ function ct_send_twilio_otp()
 
     $phone_number = $_POST['phone_number'];
 
-    $country_code = ct_get_user_country_code();
+    $country_code = ct_get_user_country_code($phone_number);
+
+
+    // var_dump($country_code);
+    // die();
     if (!empty($country_code) && $country_code == 'NP') {
         $country_code = '+977';
     } else {
@@ -160,21 +165,25 @@ add_action('wp_ajax_ct_validate_twilio_otp', 'ct_validate_twilio_otp'); // For l
 add_action('wp_ajax_nopriv_ct_validate_twilio_otp', 'ct_validate_twilio_otp'); // For non-logged-in users
 function ct_validate_twilio_otp()
 {
+    // wp_send_json_success(["valid_otp", wp_create_nonce('ct_user_signin')]);
     //check nonce
     if (!(isset($_POST['nonce']) && wp_verify_nonce($_POST['nonce'], 'ct_validate_twilio_otp'))) {
         wp_send_json_success(["nonce_fail", '']);
         wp_die();
     }
 
-    $country_code = ct_get_user_country_code();
+    $phoneNumber = sanitize_text_field($_POST['phone_number']);
+    $otp = sanitize_text_field($_POST['otp']);
+
+    $country_code = ct_get_user_country_code($phoneNumber);
     if (!empty($country_code) && $country_code == 'NP') {
         $country_code = '+977';
     } else {
         $country_code = '+1';
     }
+    // $country_code = '+977';
 
-    $phoneNumber = sanitize_text_field($_POST['phone_number']);
-    $otp = sanitize_text_field($_POST['otp']);
+
 
     $twilio = new Client(ACCOUNT_SID, AUTH_TOKEN);
 
@@ -188,18 +197,72 @@ function ct_validate_twilio_otp()
         );
 
     if ($verification_check->status == "approved") {
-        // Check if current page URL contains ?redirect=qr
-        $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        
-        if (strpos($current_url, '?redirect=qr') !== false || 
-            strpos($current_url, 'redirect=qr') !== false) {
-            
-            // OTP verified successfully AND URL contains redirect=qr - now save XP earning data
-            ct_save_xp_after_otp_verification($phoneNumber);
-            error_log("XP DEBUG: OTP verified with redirect=qr - XP awarded");
+        // Check URL for debugging
+        $current_url = $_SERVER['HTTP_REFERER'] ?? '';
+        $redirect_qr = strpos($current_url, 'redirect=qr') !== false;
+
+        // Get user role for debugging
+        $user_role = 'Not found';
+        $args = array(
+            'meta_query' => array(
+                'relation' => 'OR',
+                array(
+                    'key' => 'mega-mobile',
+                    'value' => $phoneNumber,
+                    'compare' => 'LIKE'
+                )
+            )
+        );
+
+        $users = get_users($args);
+        if (!empty($users)) {
+            $user_id = $users[0]->ID;
+            $dong_user_role = get_user_meta($user_id, 'dong_user_role', true);
+            $user_role = $dong_user_role ?: 'No role set';
+
+            // Check if user is seller or buyer
+            $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
+            $user_type = $is_seller ? 'SELLER' : 'BUYER';
         } else {
-            // OTP verified but no redirect=qr - no XP awarded
-            error_log("XP DEBUG: OTP verified without redirect=qr - no XP awarded");
+            $user_type = 'USER NOT FOUND';
+        }
+
+        // If URL contains redirect=qr and user is a seller, insert data
+        if ($redirect_qr && $user_type === 'BUYER') {
+            try {
+                // Get existing seller details or create new array
+                $existing_seller_details = get_user_meta($user_id, '_seller_details', true);
+                if (!is_array($existing_seller_details)) {
+                    $existing_seller_details = array();
+                }
+
+                // Create new seller transaction data
+                $new_transaction = array(
+                    'xp_awarded' => 1000000, // 1 million XP for scanning/OTP verification
+                    'transaction_type' => 'scanning_verification',
+                    'phone_number' => $phoneNumber,
+                    'verification_date' => current_time('mysql'),
+                    'user_role' => $dong_user_role,
+                    'status' => 'completed',
+                    'discord_member' => false // Will be updated when Discord is verified
+                );
+
+                // Add new transaction to existing array
+                $existing_seller_details[] = $new_transaction;
+
+                // Update user meta with new seller details
+                update_user_meta($user_id, '_seller_details', $existing_seller_details);
+
+                // Log successful insertion
+                error_log('QR Redirect: Seller data inserted for user ' . $user_id . ' with role ' . $dong_user_role);
+            } catch (Exception $e) {
+                // Log error but don't break the OTP verification
+                error_log('QR Redirect error: ' . $e->getMessage());
+            }
+
+        } else if ($redirect_qr && $user_type === 'BUYER') {
+            // Log that user is not a seller
+            error_log('QR Redirect: User ' . $user_id . ' is a BUYER (role: ' . $user_role . ') - no seller data inserted');
         }
 
         wp_send_json_success(["valid_otp", wp_create_nonce('ct_user_signin')]);
@@ -209,154 +272,7 @@ function ct_validate_twilio_otp()
 
     wp_die();
 }
-/**
- * Save XP earning data after successful OTP verification
- * @param string $phone_number The verified phone number
- */
-function ct_save_xp_after_otp_verification($phone_number)
-{
-    // Find user by phone number
-    $user = get_user_by('meta_value', $phone_number, 'phone_number');
 
-    if (!$user) {
-        // Try to find by user meta
-        $users = get_users(array(
-            'meta_key' => 'phone_number',
-            'meta_value' => $phone_number,
-            'number' => 1
-        ));
-
-        if (!empty($users)) {
-            $user = $users[0];
-        }
-    }
-
-    if (!$user) {
-        error_log("XP ERROR: User not found for phone number: {$phone_number}");
-        return false; // User not found
-    }
-
-    $user_id = $user->ID;
-
-    // Get user role to determine if buyer or seller
-    $dong_user_role = get_user_meta($user_id, 'dong_user_role', true);
-
-    // Determine if user is buyer or seller based on role
-    $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
-    $is_buyer = !$is_seller; // If not seller, assume buyer
-
-    // XP calculation constants (corrected amounts)
-    $seller_xp = 1000000;   // 1,000,000 XP for sellers
-    $buyer_xp = 10000000;   // 10,000,000 XP for buyers
-
-    // Get Discord user ID from user meta
-    $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
-
-    // Check Discord membership
-    $is_discord_member = ct_check_discord_membership($discord_user_id);
-
-    // XP amount based on user type
-    $xp_amount = $is_seller ? $seller_xp : $buyer_xp;
-
-    // DEBUG: Log transaction details
-    error_log("XP DEBUG: Processing XP for user {$user_id} ({$dong_user_role}): {$xp_amount} XP");
-
-    if ($is_seller) {
-        // Use the exact same pattern as existing code in cpm-woocommerce-functions.php
-        // Get existing meta
-        $seller_meta = get_user_meta($user_id, '_seller_details', true);
-
-        // Assign empty array if meta is empty
-        $seller_metas = !empty($seller_meta) ? $seller_meta : [];
-
-        // Add new transaction following the exact same structure
-        $seller_metas[] = [
-            'xp_awarded' => $xp_amount, // XP awarded for this verification
-            'transaction_type' => 'otp_verification',
-            'phone_number' => $phone_number,
-            'verification_date' => current_time('mysql'),
-            'user_role' => $dong_user_role,
-            'discord_member' => $is_discord_member,
-            'discord_user_id' => $discord_user_id,
-            'discord_check_date' => current_time('mysql')
-        ];
-
-        // Update the meta using the same pattern as existing code
-        if (!empty($seller_metas)) {
-            $update_result = update_user_meta($user_id, '_seller_details', $seller_metas);
-
-            // DEBUG: Confirm meta update
-            error_log("XP DEBUG: Seller meta update result: " . ($update_result ? 'SUCCESS' : 'FAILED'));
-            error_log("XP DEBUG: Total seller transactions: " . count($seller_metas));
-
-            // Add success alert for seller
-            add_action('wp_footer', function () use ($user_id, $dong_user_role, $xp_amount, $phone_number, $is_discord_member) {
-                $status = $is_discord_member ? 'COMPLETED (Discord Member)' : 'PENDING (Not Discord Member)';
-                $message = $is_discord_member ?
-                    "�� XP AWARDED SUCCESSFULLY!" :
-                    "⏳ XP PENDING - DISCORD MEMBERSHIP REQUIRED!";
-
-                echo '<script>
-                if (typeof jQuery !== "undefined") {
-                    jQuery(document).ready(function($) {
-                        alert("' . $message . '\\n\\nUser ID: ' . $user_id . '\\nRole: ' . $dong_user_role . '\\nXP Amount: ' . number_format($xp_amount) . '\\nPhone: ' . $phone_number . '\\nStatus: ' . $status . '\\n\\nData saved to: _seller_details");
-                    });
-                }
-                </script>';
-            });
-        }
-
-    } else {
-        // Use the exact same pattern as existing code for buyers
-        // Get existing meta
-        $buyer_meta = get_user_meta($user_id, '_buyer_details', true);
-
-        // Assign empty array if meta is empty
-        $buyer_metas = !empty($buyer_meta) ? $buyer_meta : [];
-
-        // Add new transaction following the exact same structure
-        $buyer_metas[] = [
-            'xp_awarded' => $xp_amount, // XP awarded for this verification
-            'transaction_type' => 'otp_verification',
-            'phone_number' => $phone_number,
-            'verification_date' => current_time('mysql'),
-            'user_role' => $dong_user_role,
-            'discord_member' => $is_discord_member,
-            'discord_user_id' => $discord_user_id,
-            'discord_check_date' => current_time('mysql')
-        ];
-
-        // Update the meta using the same pattern as existing code
-        if (!empty($buyer_metas)) {
-            $update_result = update_user_meta($user_id, '_buyer_details', $buyer_metas);
-
-            // DEBUG: Confirm meta update
-            error_log("XP DEBUG: Buyer meta update result: " . ($update_result ? 'SUCCESS' : 'FAILED'));
-            error_log("XP DEBUG: Total buyer transactions: " . count($buyer_metas));
-
-            // Add success alert for buyer
-            add_action('wp_footer', function () use ($user_id, $xp_amount, $phone_number, $is_discord_member) {
-                $status = $is_discord_member ? 'COMPLETED (Discord Member)' : 'PENDING (Not Discord Member)';
-                $message = $is_discord_member ?
-                    "�� XP AWARDED SUCCESSFULLY!" :
-                    "⏳ XP PENDING - DISCORD MEMBERSHIP REQUIRED!";
-
-                echo '<script>
-                if (typeof jQuery !== "undefined") {
-                    jQuery(document).ready(function($) {
-                        alert("' . $message . '\\n\\nUser ID: ' . $user_id . '\\nRole: Buyer\\nXP Amount: ' . number_format($xp_amount) . '\\nPhone: ' . $phone_number . '\\nStatus: ' . $status . '\\n\\nData saved to: _buyer_details");
-                    });
-                }
-                </script>';
-            });
-        }
-    }
-
-    // DEBUG: Final confirmation
-    error_log("XP DEBUG: Complete transaction saved successfully for user {$user_id}");
-
-    return true;
-}
 
 add_action('wp_ajax_ct_user_signin', 'ct_user_signin'); // For logged-in users
 add_action('wp_ajax_nopriv_ct_user_signin', 'ct_user_signin'); // For non-logged-in users

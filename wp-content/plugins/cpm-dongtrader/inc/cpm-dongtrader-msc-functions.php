@@ -1,4 +1,11 @@
 <?php
+/**
+ * CPM Dongtrader MSC Functions
+ * 
+ * @package CPM_Dongtrader
+ * @since 1.0.0
+ */
+
 //Cronjob filters
 
 
@@ -503,7 +510,7 @@ function mega_save_order_details($user_orders){
                 'rebate'        => $rebate,
                 'rebate_d'      => 0,
                 'total'         => $rebate,
-               
+                'xp_awarded'    => 10000000, // XP awarded for this order
             ];
             
      
@@ -526,7 +533,7 @@ function mega_save_order_details($user_orders){
                     'rebate'        => 0,
                     'rebate_d'      => $rebate_d,
                     'total'         => $rebate_d,
-                   
+                    'xp_awarded'    => 10000000, // XP awarded for sponsor
                 ];
                 update_user_meta($sponsor,'_buyer_details',$sponsor_buyer_metas);
            }
@@ -584,7 +591,8 @@ function mega_save_my_treasury($orders_members){
             'seller_reward' => 0,
             'group_reward'  => 0,
             'smallstreet_reward' => $smallstreet_reward_10_c,
-            'totals' => $smallstreet_reward_10_c
+            'totals' => $smallstreet_reward_10_c,
+            'xp_awarded'    => 10000000 // XP awarded for this order
         ];
         
         // updating treasury details to the current user 
@@ -607,7 +615,7 @@ function mega_save_my_treasury($orders_members){
                 'group_reward'  => 0,
                 'smallstreet_reward' => $smallstreet_reward_10_c,
                 'totals' => $smallstreet_reward_10_c+$member_reward_50_i,
-                'xp_awarded'    => 10000000 // XP awarded to buyer for this order
+                'xp_awarded'    => 100000000 // XP awarded to buyer for this order
             ];
             
             update_user_meta($sponsor,'_treasury_details',$sponsor_treasury_metas);
@@ -631,7 +639,7 @@ function mega_save_my_treasury($orders_members){
                 'group_reward_c_g_40'  => 0,
                 'smallstreet_reward_c_10' => $smallstreet_reward_c,
                 'totals' =>$totals,
-                'xp_awarded'    => 10000000 // XP awarded to buyer for this order
+                'xp_awarded'    => 100000000 // XP awarded to buyer for this order
             ];
             
             update_user_meta($sponsor,'_income_details',$seller_income_metas);

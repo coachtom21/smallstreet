@@ -14,9 +14,12 @@ function enqueue_parent_styles()
     wp_enqueue_style('parent-style', get_stylesheet_directory_uri() . '/style.css');
     wp_enqueue_style('dashicons');
 
+    // Ensure jQuery is loaded
+    wp_enqueue_script('jquery');
+
     if (wp_is_mobile()) {
         wp_enqueue_style('dong_mobile_styles', get_stylesheet_directory_uri() . '/mobile-style.css', array(), '1.0', 'all');
-        wp_enqueue_script('cpm-dong-public-js', get_stylesheet_directory_uri() . '/cpm-dongtraders-public.js', '', '', true);
+        wp_enqueue_script('cpm-dong-public-js', get_stylesheet_directory_uri() . '/cpm-dongtraders-public.js', array('jquery'), '1.0', true);
     }
 }
 
@@ -333,6 +336,13 @@ add_action('rest_api_init', function () {
         'methods' => 'GET',
         'callback' => 'myapi_hello_endpoint',
     ]);
+    
+    // Add Discord user insert endpoint
+    register_rest_route('myapi/v1', '/discord-user', array(
+        'methods' => 'POST',
+        'callback' => 'handle_discord_user_insert',
+        'permission_callback' => 'check_api_permission'
+    ));
 });
 
 function myapi_hello_endpoint($request)
@@ -341,7 +351,7 @@ function myapi_hello_endpoint($request)
 
     // Join users and membership table
     $results = $wpdb->get_results("
-       SELECT 
+       SELECT
     u.ID as user_id,
     u.user_login,
     u.user_email,
@@ -357,6 +367,77 @@ LEFT JOIN {$wpdb->prefix}pmpro_membership_levels l ON m.membership_id = l.id
 
     return new WP_REST_Response($results, 200);
 }
+
+/**
+ * Handle Discord user data insertion
+ */
+function handle_discord_user_insert($request) {
+    $params = $request->get_params();
+    
+    // Validate required fields
+    if (empty($params['discord_id']) || empty($params['email'])) {
+        return new WP_Error('missing_fields', 'Discord ID and email are required', array('status' => 400));
+    }
+    
+    // Check if user with this email exists
+    $user = get_user_by('email', $params['email']);
+    
+    if ($user) {
+        // Get existing discord invite data
+        $existing_discord_data = get_user_meta($user->ID, '_discord_invite', true);
+        if (!is_array($existing_discord_data)) {
+            $existing_discord_data = array();
+        }
+        
+        // Create new discord entry
+        $discord_entry = array(
+            'discord_id' => $params['discord_id'],
+            'discord_username' => isset($params['discord_username']) ? $params['discord_username'] : '',
+            'discord_display_name' => isset($params['discord_display_name']) ? $params['discord_display_name'] : '',
+            'joined_at' => isset($params['joined_at']) ? $params['joined_at'] : current_time('mysql'),
+            'guild_id' => isset($params['guild_id']) ? $params['guild_id'] : '',
+            'joined_via_invite' => isset($params['joined_via_invite']) ? $params['joined_via_invite'] : '',
+            'xp_type' => 'discord_invite',
+            'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 5000000,
+            'status' => 'completed',
+            'verification_date' => current_time('mysql')
+        );
+        
+        // Add to existing array
+        $existing_discord_data[] = $discord_entry;
+        
+        // Save as serialized array
+        update_user_meta($user->ID, '_discord_invite', $existing_discord_data);
+        
+        return array(
+            'success' => true,
+            'message' => 'Discord invite data saved successfully',
+            'user_id' => $user->ID,
+            'data_format' => 'serialized_array',
+            'meta_key' => '_discord_invite',
+            'entries_count' => count($existing_discord_data)
+        );
+    } else {
+        return new WP_Error('user_not_found', 'User with this email not found', array('status' => 404));
+    }
+}
+
+/**
+ * Check API permission
+ */
+function check_api_permission($request) {
+    $auth_header = $request->get_header('Authorization');
+    $api_key = str_replace('Bearer ', '', $auth_header);
+    return $api_key === get_option('smallstreet_api_key');
+}
+
+/**
+ * Get REST API URL
+ */
+function get_discord_api_url() {
+    return get_rest_url(null, 'myapi/v1/discord-user');
+}
+
 add_action('wp_footer', 'make_quantity_readonly_for_YAM_is_on_product');
 function make_quantity_readonly_for_YAM_is_on_product()
 {
@@ -400,5 +481,7 @@ function make_quantity_readonly_for_mordern_piggy_bank_product()
         }
     }
 }
+
+
 
 

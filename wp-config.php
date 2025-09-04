@@ -92,6 +92,13 @@ if ( ! defined( 'WP_DEBUG' ) ) {
 }
 
 define( 'WP_ENVIRONMENT_TYPE', 'local' );
+
+// Twilio Configuration
+// Replace these with your actual Twilio credentials from https://console.twilio.com/
+define( 'TWILIO_ACCOUNT_SID', 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' );
+define( 'TWILIO_AUTH_TOKEN', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' );
+define( 'TWILIO_APP_SID', 'VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' );
+
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */

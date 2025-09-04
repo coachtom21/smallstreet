@@ -98,3 +98,19 @@ function dongtraders_api_register_settings()
 
 add_action('admin_init', 'dongtraders_api_register_settings');
 
+// Add WooCommerce hook to automatically set dong_user_role on checkout completion
+add_action('woocommerce_order_status_completed', 'dong_auto_set_user_role_on_checkout');
+
+function dong_auto_set_user_role_on_checkout($order_id) {
+    $order = wc_get_order($order_id);
+    $user_id = $order->get_user_id();
+    
+    if ($user_id) {
+        foreach ($order->get_items() as $item) {
+            $product_id = $item->get_product_id();
+            dong_set_user_role($user_id, $product_id);
+            break; // Only set role for first product
+        }
+    }
+}
+
