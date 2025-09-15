@@ -3087,7 +3087,7 @@ function dongtrader_display_xp_dashboard() {
     // Get seller and Discord details to calculate total XP
     $seller_details = get_user_meta($user_id, '_seller_details', true);
     $discord_details = get_user_meta($user_id, '_discord_details', true);
-    
+    $talentshow_entry = get_user_meta($user_id, '_talentshow_entry', false);
     // Get orders data instead of buyer_details
     $paid_orders = get_user_orders(['completed']);
     error_log("Retrieved " . (is_array($paid_orders) ? count($paid_orders) : 'non-array') . " paid orders");
@@ -3219,6 +3219,53 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
+    // Calculate XP from Talent Show entries
+    $talentshow_xp_earned = 0;
+    $talentshow_xp_pending = 0;
+    $talentshow_xp_completed = 0;
+    
+    if (!empty($talentshow_entry)) {
+        // Handle multiple talent show entries (array of JSON strings)
+        $processed_entries = array();
+        
+        if (is_array($talentshow_entry)) {
+            // Multiple entries from database
+            foreach ($talentshow_entry as $entry_string) {
+                if (is_string($entry_string)) {
+                    $decoded_data = json_decode($entry_string, true);
+                    if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                        $processed_entries[] = $decoded_data;
+                    }
+                }
+            }
+        } else if (is_string($talentshow_entry)) {
+            // Single entry (fallback)
+            $decoded_data = json_decode($talentshow_entry, true);
+            if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                $processed_entries[] = $decoded_data;
+            }
+        }
+        
+        // Process the decoded entries
+        foreach ($processed_entries as $talent_entry) {
+            if (isset($talent_entry['xp_awarded'])) {
+                $xp_amount = intval($talent_entry['xp_awarded']);
+                $talentshow_xp_earned += $xp_amount;
+                $total_earned_xp += $xp_amount;
+                
+                // Check if XP is pending or completed based on Discord membership
+                $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
+                if ($is_discord_member) {
+                    $talentshow_xp_completed += $xp_amount;
+                    $total_completed_xp += $xp_amount;
+                } else {
+                    $talentshow_xp_pending += $xp_amount;
+                    $total_pending_xp += $xp_amount;
+                }
+            }
+        }
+    }
+    
     // If Discord invite is available, release all pending XP from other sources
     if ($has_discord_invite) {
         // Move all pending XP to completed
@@ -3232,6 +3279,8 @@ function dongtrader_display_xp_dashboard() {
         $buyer_xp_pending = 0;
         $discord_details_xp_completed += $discord_details_xp_pending;
         $discord_details_xp_pending = 0;
+        $talentshow_xp_completed += $talentshow_xp_pending;
+        $talentshow_xp_pending = 0;
     }
     
     $output = '<div class="dongtrader-xp-dashboard" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">';
@@ -3444,6 +3493,69 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
+    // Display Talent Show Entry transactions
+    $talentshow_entry_data_for_display = get_user_meta($user_id, '_talentshow_entry', false);
+    if (!empty($talentshow_entry_data_for_display)) {
+        // Handle multiple talent show entries (array of JSON strings)
+        $processed_entries = array();
+        
+        if (is_array($talentshow_entry_data_for_display)) {
+            // Multiple entries from database
+            foreach ($talentshow_entry_data_for_display as $entry_string) {
+                if (is_string($entry_string)) {
+                    $decoded_data = json_decode($entry_string, true);
+                    if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                        $processed_entries[] = $decoded_data;
+                    }
+                }
+            }
+        } else if (is_string($talentshow_entry_data_for_display)) {
+            // Single entry (fallback)
+            $decoded_data = json_decode($talentshow_entry_data_for_display, true);
+            if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                $processed_entries[] = $decoded_data;
+            }
+        }
+        
+        $talentshow_entry_data_for_display = $processed_entries;
+        
+        if (is_array($talentshow_entry_data_for_display) && !empty($talentshow_entry_data_for_display)) {
+            foreach ($talentshow_entry_data_for_display as $index => $talent_entry) {
+                $xp_amount = isset($talent_entry['xp_awarded']) ? intval($talent_entry['xp_awarded']) : 0;
+                
+                // Skip transactions with no XP awarded
+                if ($xp_amount <= 0) {
+                    continue;
+                }
+                
+                // Check XP status for talent show entries - use status field
+                $status = isset($talent_entry['status']) ? $talent_entry['status'] : 'pending';
+                if ($status === 'submitted' || $status === 'completed') {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } else {
+                    $status_text = 'Pending';
+                    $status_color = '#ffc107';
+                }
+                
+                // Format order details for talent show entry
+                $order_details = 'Talent Show Entry';
+                if (isset($talent_entry['performance_type'])) {
+                    $order_details = ucfirst(str_replace('_', ' ', $talent_entry['performance_type']));
+                }
+                if (isset($talent_entry['submission_date'])) {
+                    $order_details .= ' - ' . $talent_entry['submission_date'];
+                }
+                
+                $output .= '<tr style="background: #fff3e0; border-bottom: 1px solid #dee2e6;">';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #f57c00;">' . esc_html($order_details) . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #f57c00; font-weight: 600;">' . number_format($xp_amount) . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+                $output .= '</tr>';
+            }
+        }
+    }
+    
     // Show message if no transactions
     $has_discord_data = false;
     $discord_check_data = get_user_meta($user_id, '_discord_invite', true);
@@ -3456,9 +3568,25 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
-    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details))) {
+    // Check if talent show entry data exists
+    $has_talentshow_data = false;
+    $talentshow_check_data = get_user_meta($user_id, '_talentshow_entry', false);
+    if (!empty($talentshow_check_data) && is_array($talentshow_check_data)) {
+        // Check if any of the entries have valid XP data
+        foreach ($talentshow_check_data as $entry_string) {
+            if (is_string($entry_string)) {
+                $decoded_talentshow = json_decode($entry_string, true);
+                if (json_last_error() === JSON_ERROR_NONE && $decoded_talentshow && isset($decoded_talentshow['xp_awarded'])) {
+                    $has_talentshow_data = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details)) && !$has_talentshow_data) {
         $output .= '<tr style="background: #f8f9fa; border-bottom: 1px solid #dee2e6;">';
-        $output .= '<td colspan="3" style="padding: 20px; border: 1px solid #ddd; text-align: center; color: #6c757d; font-style: italic;">No transactions found. Complete your first order, scanning activity, or Discord activity to see XP here.</td>';
+        $output .= '<td colspan="3" style="padding: 20px; border: 1px solid #ddd; text-align: center; color: #6c757d; font-style: italic;">No transactions found. Complete your first order, scanning activity, Discord activity, or talent show entry to see XP here.</td>';
         $output .= '</tr>';
     }
     
