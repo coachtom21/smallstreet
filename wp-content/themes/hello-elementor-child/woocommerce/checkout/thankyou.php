@@ -74,12 +74,18 @@ defined( 'ABSPATH' ) || exit;
 					</li>
 				<?php endif; ?>
 				<?php 
-				// Always show XP rewards for debugging
+				// Show XP rewards based on membership type
 				$membership_name = get_post_meta( $order->get_id(), '_membership_name', true );
+				$xp_amount = 10000000; // Default XP for paid memberships
+				
+				// YAMer gets 0 XP
+				if ( $membership_name === 'YAMer' ) {
+					$xp_amount = 0;
+				}
 				?>
 				<li class="woocommerce-order-overview__xp-rewards xp-rewards">
 					<?php esc_html_e( 'XP Rewards Earned:', 'woocommerce' ); ?>
-					<strong><?php echo number_format( 10000000 ); ?> XP</strong>
+					<strong><?php echo number_format( $xp_amount ); ?> XP</strong>
 					<?php if ( !empty( $membership_name ) ) : ?>
 						<small>(<?php echo esc_html( $membership_name ); ?> Membership)</small>
 					<?php endif; ?>

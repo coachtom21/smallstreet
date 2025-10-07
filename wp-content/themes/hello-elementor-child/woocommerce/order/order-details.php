@@ -149,18 +149,31 @@ if ($show_downloads) {
 			<?php
 			// Add XP rewards to the order details table
 			$membership_name = get_post_meta($order->get_id(), '_membership_name', true);
-			if (!empty($membership_name)): ?>
+			if (!empty($membership_name)): 
+				// Override XP for YAMer membership
+				$display_xp_earned = $xp_earned;
+				$display_released_xp = $released_xp;
+				$display_pending_xp = $pending_xp;
+				$display_completed_xp = $completed_xp;
+				
+				if ($membership_name === 'YAMer') {
+					$display_xp_earned = 0;
+					$display_released_xp = 0;
+					$display_pending_xp = 0;
+					$display_completed_xp = 0;
+				}
+			?>
 				<tr>
 					<th><?php esc_html_e('XP Rewards:', 'woocommerce'); ?></th>
 					<td>
-						<strong><?php echo number_format($xp_earned); ?> XP</strong>
+						<strong><?php echo number_format($display_xp_earned); ?> XP</strong>
 						<br><small>
 							<?php if ($has_discord_invite): ?>
-								<span style="color: #17a2b8;"><?php echo number_format($released_xp); ?> Released</span>
+								<span style="color: #17a2b8;"><?php echo number_format($display_released_xp); ?> Released</span>
 								<br><em style="color: #6c757d;">Discord verified - All XP available</em>
 							<?php else: ?>
-							<span style="color: #f39c12;"><?php echo number_format($pending_xp); ?> Pending</span> / 
-							<span style="color: #27ae60;"><?php echo number_format($completed_xp); ?> Completed</span>
+							<span style="color: #f39c12;"><?php echo number_format($display_pending_xp); ?> Pending</span> / 
+							<span style="color: #27ae60;"><?php echo number_format($display_completed_xp); ?> Completed</span>
 							<?php endif; ?>
 						</small>
 					</td>

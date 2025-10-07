@@ -32,6 +32,63 @@ function qrtiger_upload_logo()
 {
 }
 
+/**
+ * YAM JAM XP Conversion Rate Helper Functions
+ * Based on documentation: $1 = 21,000 YAM = 1,000 XP
+ */
+
+/**
+ * Get XP per dollar (sextillionth precision)
+ * @return int XP per USD
+ */
+function dongtrader_xp_per_dollar() {
+    return 1000000000000000000000; // 1 USD = 1,000,000,000,000,000,000,000 XP (10^21)
+}
+
+/**
+ * Get XP per YAM token
+ * @return float XP per YAM
+ */
+function dongtrader_xp_per_yam() {
+    return 1000000000000000000000 / 21000; // 47,619,047,619,047,619 XP per YAM (10^21 / 21,000)
+}
+
+/**
+ * Convert USD to XP
+ * @param float $usd_amount USD amount
+ * @return int XP amount
+ */
+function dongtrader_usd_to_xp($usd_amount) {
+    return intval($usd_amount * dongtrader_xp_per_dollar());
+}
+
+/**
+ * Convert XP to USD
+ * @param int $xp_amount XP amount
+ * @return float USD amount
+ */
+function dongtrader_xp_to_usd($xp_amount) {
+    return $xp_amount / dongtrader_xp_per_dollar();
+}
+
+/**
+ * Convert XP to YAM
+ * @param int $xp_amount XP amount
+ * @return float YAM amount
+ */
+function dongtrader_xp_to_yam($xp_amount) {
+    return $xp_amount / dongtrader_xp_per_yam();
+}
+
+/**
+ * Convert YAM to XP
+ * @param float $yam_amount YAM amount
+ * @return int XP amount
+ */
+function dongtrader_yam_to_xp($yam_amount) {
+    return intval($yam_amount * dongtrader_xp_per_yam());
+}
+
 /*This function is used to make the Qrtiger API requests.
  *These are valid urls . Requests might be  costly so plz use mock url from stoplight api
  *GET URL : https://qrtiger.com/data/6BF7
@@ -3088,9 +3145,8 @@ function dongtrader_display_xp_dashboard() {
     $seller_details = get_user_meta($user_id, '_seller_details', true);
     $discord_details = get_user_meta($user_id, '_discord_details', true);
     $talentshow_entry = get_user_meta($user_id, '_talentshow_entry', false);
-    // Get orders data instead of buyer_details
-    $paid_orders = get_user_orders(['completed']);
-    error_log("Retrieved " . (is_array($paid_orders) ? count($paid_orders) : 'non-array') . " paid orders");
+    // Get buyer details from usermeta for XP calculation
+    $buyer_details = get_user_meta($user_id, '_buyer_details', true);
     
     // Initialize XP counters with detailed breakdown
     $total_earned_xp = 0;
@@ -3131,21 +3187,16 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
-    // Calculate XP from buyer transactions (purchases/orders)
-    if (!empty($paid_orders)) {
-        foreach ($paid_orders as $order) {
-            // Fixed XP amount for orders
-            $order_total = $order->get_total();
-            $xp_amount = 10000000; // Fixed 10 million XP for all orders
-            
-            // Debug: Add some logging
-            error_log("Order ID: " . $order->get_id() . ", Total: " . $order_total . ", XP Amount: " . $xp_amount);
+    // Calculate XP from buyer transactions (_buyer_details usermeta)
+    if (is_array($buyer_details) && !empty($buyer_details)) {
+        foreach ($buyer_details as $transaction) {
+            $xp_amount = isset($transaction['xp_awarded']) ? intval($transaction['xp_awarded']) : 0;
             
             if ($xp_amount > 0) {
                 $buyer_xp_earned += $xp_amount;
                 $total_earned_xp += $xp_amount;
                 
-                // Check Discord membership status for this order
+                // Check Discord membership status for this transaction
                 $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
                 
                 if ($is_discord_member) {
@@ -3157,9 +3208,6 @@ function dongtrader_display_xp_dashboard() {
                 }
             }
         }
-    } else {
-        // Debug: Log if no orders found
-        error_log("No paid orders found for user: " . $user_id);
     }
     
     // Calculate XP from Discord invite data
@@ -3266,6 +3314,45 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
+    // Calculate XP from Discord poll data
+    $discord_poll_xp_earned = 0;
+    $discord_poll_xp_pending = 0;
+    $discord_poll_xp_completed = 0;
+    
+    $discord_poll_data = get_user_meta($user_id, '_discord_poll', true);
+    if (!empty($discord_poll_data)) {
+        // Handle both JSON string and array formats
+        if (is_string($discord_poll_data)) {
+            $decoded_data = json_decode($discord_poll_data, true);
+            if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                $discord_poll_data = array($decoded_data);
+            } else {
+                $discord_poll_data = array();
+            }
+        }
+        
+        // Process the data
+        if (is_array($discord_poll_data) && !empty($discord_poll_data)) {
+            foreach ($discord_poll_data as $poll_entry) {
+                if (isset($poll_entry['xp_awarded'])) {
+                    $xp_amount = intval($poll_entry['xp_awarded']);
+                    $discord_poll_xp_earned += $xp_amount;
+                    $total_earned_xp += $xp_amount;
+                    
+                    // Check if XP is pending or completed based on Discord membership
+                    $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
+                    if ($is_discord_member) {
+                        $discord_poll_xp_completed += $xp_amount;
+                        $total_completed_xp += $xp_amount;
+                    } else {
+                        $discord_poll_xp_pending += $xp_amount;
+                        $total_pending_xp += $xp_amount;
+                    }
+                }
+            }
+        }
+    }
+    
     // If Discord invite is available, release all pending XP from other sources
     if ($has_discord_invite) {
         // Move all pending XP to completed
@@ -3281,6 +3368,8 @@ function dongtrader_display_xp_dashboard() {
         $discord_details_xp_pending = 0;
         $talentshow_xp_completed += $talentshow_xp_pending;
         $talentshow_xp_pending = 0;
+        $discord_poll_xp_completed += $discord_poll_xp_pending;
+        $discord_poll_xp_pending = 0;
     }
     
     $output = '<div class="dongtrader-xp-dashboard" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">';
@@ -3343,16 +3432,13 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
-    // Display buyer transactions (purchases/orders)
-    if (!empty($paid_orders)) {
-        
-        foreach ($paid_orders as $order) {
-            // Fixed XP amount for orders
-            $order_total = $order->get_total();
-            $xp_amount = 10000000; // Fixed 10 million XP for all orders
+    // Display buyer transactions from _buyer_details usermeta (not direct WooCommerce orders)
+    $buyer_details = get_user_meta($user_id, '_buyer_details', true);
+    if (is_array($buyer_details) && !empty($buyer_details)) {
+        foreach ($buyer_details as $index => $transaction) {
+            $xp_amount = isset($transaction['xp_awarded']) ? intval($transaction['xp_awarded']) : 0;
             
-            
-            // Skip orders with no XP
+            // Skip transactions with no XP awarded
             if ($xp_amount <= 0) {
                 continue;
             }
@@ -3360,7 +3446,6 @@ function dongtrader_display_xp_dashboard() {
             $referral_xp = 0; // Placeholder for Discord invite XP
             $funding_xp = 0; // Placeholder for funding XP
             $total_xp = $xp_amount + $referral_xp + $funding_xp;
-            
             
             // Check XP status - if Discord invite exists, all XP is released
             $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
@@ -3372,39 +3457,17 @@ function dongtrader_display_xp_dashboard() {
                 $status_color = $is_discord_member ? '#28a745' : '#ffc107';
             }
             
-            // Format order details from WooCommerce order
-            $order_id = $order->get_id();
-            $order_date = $order->get_date_created();
-            $formatted_date = $order_date ? date_i18n('F j, Y', $order_date->getTimestamp()) : 'N/A';
+            // Format order details from _buyer_details transaction
+            $order_id = isset($transaction['order_id']) ? $transaction['order_id'] : 'N/A';
+            $membership_name = isset($transaction['membership']) ? $transaction['membership'] : '';
             
-            // Get order items to determine membership type
-            $items = $order->get_items();
-            $membership_type = '';
-            $item_count = 0;
-            
-            foreach ($items as $item) {
-                $item_count += $item->get_quantity();
-                $product_name = $item->get_name();
-                
-                // Determine membership type from product name
-                if (strpos($product_name, 'YAM') !== false) {
-                    $membership_type = 'YAM\'er Membership';
-                } elseif (strpos($product_name, 'MEGAvoter') !== false) {
-                    $membership_type = 'MEGAvoter Membership';
-                } elseif (strpos($product_name, 'Patron') !== false) {
-                    $membership_type = 'Patron Membership';
-                }
-            }
-            
-            // Format order details - simplified version
             $order_details = '';
-            if (!empty($membership_type)) {
-                $order_details = $membership_type;
+            if (!empty($membership_name)) {
+                $order_details = $membership_name . ' Membership';
             } else {
                 $order_details = 'Order #' . $order_id;
             }
-            $order_details .= ' (Order #' . $order_id . ') - ' . $formatted_date;
-            
+            $order_details .= ' (Order #' . $order_id . ') - Stored Transaction';
             
             $output .= '<tr style="background: #f0f8ff; border-bottom: 1px solid #dee2e6;">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #1e3a8a;">' . esc_html($order_details) . '</td>';
@@ -3413,6 +3476,7 @@ function dongtrader_display_xp_dashboard() {
             $output .= '</tr>';
         }
     }
+    
     
     // Display Discord invite transactions
     $discord_invite_data_for_display = get_user_meta($user_id, '_discord_invite', true);
@@ -3584,7 +3648,20 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
-    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details)) && !$has_talentshow_data) {
+    // Check if buyer details exist (including YAMer with 0 XP)
+    $has_buyer_data = false;
+    $buyer_check_data = get_user_meta($user_id, '_buyer_details', true);
+    if (is_array($buyer_check_data) && !empty($buyer_check_data)) {
+        // Check if any buyer transactions exist (regardless of XP amount)
+        foreach ($buyer_check_data as $transaction) {
+            if (isset($transaction['xp_awarded'])) {
+                $has_buyer_data = true;
+                break;
+            }
+        }
+    }
+    
+    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details)) && !$has_talentshow_data && !$has_buyer_data) {
         $output .= '<tr style="background: #f8f9fa; border-bottom: 1px solid #dee2e6;">';
         $output .= '<td colspan="3" style="padding: 20px; border: 1px solid #ddd; text-align: center; color: #6c757d; font-style: italic;">No transactions found. Complete your first order, scanning activity, Discord activity, or talent show entry to see XP here.</td>';
         $output .= '</tr>';
@@ -3601,15 +3678,15 @@ function dongtrader_display_xp_dashboard() {
     $total_xp_earned = $total_earned_xp;
     $total_completed_xp = $total_xp_earned - $total_pending_xp;
     
-    // XP to YAM conversion: (XP × 21,000) ÷ 10^21
-    $total_yam = ($total_completed_xp * 21000) / pow(10, 21);
+    // XP to YAM conversion using helper functions
+    $total_yam = dongtrader_xp_to_yam($total_completed_xp);
     
     // YAM to USD conversion: YAM ÷ 21,000
     $total_usd = $total_yam / 21000;
     
-    // Calculate conversion rates for display
-    $xp_per_usd = pow(10, 21); // 1 USD = 10^21 XP
-    $xp_per_yam = pow(10, 21) / 21000; // 47,619,047,619,047,619 XP per YAM
+    // Calculate conversion rates for display using helper functions
+    $xp_per_usd = dongtrader_xp_per_dollar(); // 1 USD = 1,000,000,000,000,000,000,000 XP (10^21)
+    $xp_per_yam = dongtrader_xp_per_yam(); // 47,619,047,619,047,619 XP per YAM
     $yam_per_usd = 21000; // 21,000 YAM = 1 USD
     
     $output .= '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
@@ -3643,21 +3720,21 @@ function dongtrader_display_xp_dashboard() {
     // XP to YAM Conversion
     $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
     $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;">XP to YAM</p>';
-    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = ' . number_format($total_yam, 8) . ' YAM</p>';
+    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = ' . number_format($total_yam, 0) . ' YAM</p>';
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 YAM = ' . number_format($xp_per_yam, 0) . ' XP</p>';
     $output .= '</div>';
     
     // YAM to USD Conversion
     $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
     $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;">YAM to USD</p>';
-    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_yam, 8) . ' YAM = $' . number_format($total_usd, 8) . '</p>';
+    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_yam, 0) . ' YAM = $' . number_format($total_usd, 0) . '</p>';
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 USD = ' . number_format($yam_per_usd, 0) . ' YAM</p>';
     $output .= '</div>';
     
     // XP to USD Conversion
     $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
     $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;">XP to USD</p>';
-    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 8) . '</p>';
+    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 0) . '</p>';
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 USD = ' . number_format($xp_per_usd, 0) . ' XP</p>';
     $output .= '</div>';
     
@@ -3771,8 +3848,8 @@ function dongtrader_test_xp_award() {
         // Determine if user is buyer or seller
         $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
         
-        $seller_xp = 1000000;  
-        $buyer_xp = 10000000;  
+        $seller_xp = dongtrader_usd_to_xp(1); // 1 USD worth of XP for sellers
+        $buyer_xp = dongtrader_usd_to_xp(10); // 10 USD worth of XP for buyers
         
         $xp_to_award = $is_seller ? $seller_xp : $buyer_xp;
         

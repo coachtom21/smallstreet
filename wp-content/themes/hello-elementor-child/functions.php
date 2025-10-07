@@ -330,20 +330,110 @@ function disable_payment_gateways_on_checkout($available_gateways)
 
 
 //rest api to return the uers and their membership level
-
 add_action('rest_api_init', function () {
     register_rest_route('myapi/v1', '/api/', [
         'methods' => 'GET',
         'callback' => 'myapi_hello_endpoint',
     ]);
-    
+
     // Add Discord user insert endpoint
     register_rest_route('myapi/v1', '/discord-user', array(
         'methods' => 'POST',
         'callback' => 'handle_discord_user_insert',
         'permission_callback' => 'check_api_permission'
     ));
+
+    // Add Talent Show Entry endpoint
+    register_rest_route('myapi/v1', '/talentshow-entry', array(
+        'methods' => 'POST',
+        'callback' => 'handle_talentshow_entry_insert',
+        'permission_callback' => 'check_api_permission'
+    ));
+
+    // Add new endpoint to fetch usermeta with _discord_invite
+    register_rest_route('myapi/v1', '/discord-invites', array(
+        'methods' => 'GET',
+        'callback' => 'get_discord_invite_users',
+        'permission_callback' => '__return_true', // change if you need protection
+    ));
+
+     // Add new endpoint to fetch usermeta with _discord_poll
+     register_rest_route('myapi/v1', '/get-discord-poll', array(
+        'methods' => 'GET',
+        'callback' => 'get_discord_poll_data',
+        'permission_callback' => '__return_true', // change if you need protection
+    ));
+
+    // Add new endpoint for Discord Poll votes
+    register_rest_route('myapi/v1', '/discord-poll', array(
+        'methods' => 'POST',
+        'callback' => 'handle_discord_poll_insert',
+        'permission_callback' => 'check_api_permission'
+    ));
 });
+
+/**
+ * Callback: Fetch users with _discord_invite meta
+ */
+function get_discord_invite_users(WP_REST_Request $request)
+{
+    global $wpdb;
+
+    // Query usermeta table directly
+    $results = $wpdb->get_results(
+        $wpdb->prepare("SELECT user_id, meta_value FROM $wpdb->usermeta WHERE meta_key = %s", '_discord_invite'),
+        ARRAY_A
+    );
+
+    if (empty($results)) {
+        return new WP_REST_Response(['message' => 'No users found with _discord_invite'], 200);
+    }
+
+    // Optionally map user_id to username/email
+    $users = [];
+    foreach ($results as $row) {
+        $user_info = get_userdata($row['user_id']);
+        $users[] = [
+            'user_id' => $row['user_id'],
+            'user_login' => $user_info ? $user_info->user_login : null,
+            'email' => $user_info ? $user_info->user_email : null,
+            'discord_invite' => $row['meta_value'],
+        ];
+    }
+
+    return new WP_REST_Response($users, 200);
+}
+function get_discord_poll_data(WP_REST_Request $request)
+{
+    global $wpdb;
+
+    // Query usermeta table for '_discord_poll'
+    $results = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT user_id, meta_value FROM $wpdb->usermeta WHERE meta_key = %s",
+            '_discord_poll'
+        ),
+        ARRAY_A
+    );
+
+    if (empty($results)) {
+        return new WP_REST_Response(['message' => 'No users found with _discord_poll'], 200);
+    }
+
+    // Map user_id to username and email
+    $users = [];
+    foreach ($results as $row) {
+        $user_info = get_userdata($row['user_id']);
+        $users[] = [
+            'user_id' => $row['user_id'],
+            'user_login' => $user_info ? $user_info->user_login : null,
+            'email' => $user_info ? $user_info->user_email : null,
+            'discord_poll' => $row['meta_value'],
+        ];
+    }
+
+    return new WP_REST_Response($users, 200);
+}
 
 function myapi_hello_endpoint($request)
 {
@@ -371,61 +461,170 @@ LEFT JOIN {$wpdb->prefix}pmpro_membership_levels l ON m.membership_id = l.id
 /**
  * Handle Discord user data insertion
  */
-function handle_discord_user_insert($request) {
-    $params = $request->get_params();
-    
+function handle_discord_user_insert($request)
+{
+    $params = $request->get_json_params(); // Safer for JSON POST requests
+
     // Validate required fields
     if (empty($params['discord_id']) || empty($params['email'])) {
-        return new WP_Error('missing_fields', 'Discord ID and email are required', array('status' => 400));
+        return new WP_Error('missing_fields', 'Discord ID and email are required', ['status' => 400]);
     }
-    
-    // Check if user with this email exists
-    $user = get_user_by('email', $params['email']);
-    
-    if ($user) {
-        // Get existing discord invite data
-        $existing_discord_data = get_user_meta($user->ID, '_discord_invite', true);
-        if (!is_array($existing_discord_data)) {
-            $existing_discord_data = array();
-        }
-        
-        // Create new discord entry
-        $discord_entry = array(
-            'discord_id' => $params['discord_id'],
-            'discord_username' => isset($params['discord_username']) ? $params['discord_username'] : '',
-            'discord_display_name' => isset($params['discord_display_name']) ? $params['discord_display_name'] : '',
-            'joined_at' => isset($params['joined_at']) ? $params['joined_at'] : current_time('mysql'),
-            'guild_id' => isset($params['guild_id']) ? $params['guild_id'] : '',
-            'joined_via_invite' => isset($params['joined_via_invite']) ? $params['joined_via_invite'] : '',
-            'xp_type' => 'discord_invite',
-            'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 5000000,
-            'status' => 'completed',
-            'verification_date' => current_time('mysql')
-        );
-        
-        // Add to existing array
-        $existing_discord_data[] = $discord_entry;
-        
-        // Save as serialized array
-        update_user_meta($user->ID, '_discord_invite', $existing_discord_data);
-        
-        return array(
+
+    // Get user by email
+    $user = get_user_by('email', sanitize_email($params['email']));
+    if (!$user) {
+        return new WP_Error('user_not_found', 'User with this email not found', ['status' => 404]);
+    }
+
+    // Sanitize and prepare data
+    $discord_entry = [
+        'discord_id' => sanitize_text_field($params['discord_id']),
+        'discord_username' => isset($params['discord_username']) ? sanitize_text_field($params['discord_username']) : '',
+        'discord_display_name' => isset($params['discord_display_name']) ? sanitize_text_field($params['discord_display_name']) : '',
+        'joined_at' => isset($params['joined_at']) ? sanitize_text_field($params['joined_at']) : current_time('mysql'),
+        'guild_id' => isset($params['guild_id']) ? sanitize_text_field($params['guild_id']) : '',
+        'joined_via_invite' => isset($params['joined_via_invite']) ? sanitize_text_field($params['joined_via_invite']) : '',
+        'xp_type' => 'discord_invite',
+        'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 5000000,
+        'status' => 'completed',
+        'verification_date' => current_time('mysql')
+    ];
+
+    // Encode entry as JSON
+    $meta_value = wp_json_encode($discord_entry);
+
+    // Insert as a new row in usermeta (one per invite)
+    $insert_id = add_user_meta($user->ID, '_discord_invite', $meta_value);
+
+    if ($insert_id) {
+        return rest_ensure_response([
             'success' => true,
             'message' => 'Discord invite data saved successfully',
             'user_id' => $user->ID,
-            'data_format' => 'serialized_array',
             'meta_key' => '_discord_invite',
-            'entries_count' => count($existing_discord_data)
-        );
+            'meta_id' => $insert_id,
+            'data' => $discord_entry
+        ]);
+
+
+
     } else {
-        return new WP_Error('user_not_found', 'User with this email not found', array('status' => 404));
+        return new WP_Error('insert_failed', 'Failed to save Discord data', ['status' => 500]);
+    }
+
+}
+
+
+/**
+ * Handle Talent Show entry data insertion
+ */
+function handle_talentshow_entry_insert($request)
+{
+    $params = $request->get_json_params();
+
+    // Validate required fields
+    if (empty($params['email']) || empty($params['performance_type'])) {
+        return new WP_Error('missing_fields', 'Email and performance type are required', ['status' => 400]);
+    }
+
+    // Get user by email
+    $user = get_user_by('email', sanitize_email($params['email']));
+    if (!$user) {
+        return new WP_Error('user_not_found', 'User with this email not found', ['status' => 404]);
+    }
+
+    // Prepare Talent Show entry data
+    $talent_entry = [
+        'performance_type' => sanitize_text_field($params['performance_type']),
+        'video_url' => isset($params['video_url']) ? esc_url_raw($params['video_url']) : '',
+        'description' => isset($params['description']) ? sanitize_textarea_field($params['description']) : '',
+        'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 3000000,
+        'status' => 'submitted',
+        'submission_date' => current_time('mysql')
+    ];
+
+    // Encode data as JSON
+    $meta_value = wp_json_encode($talent_entry);
+
+    // Insert as a new usermeta entry
+    $insert_id = add_user_meta($user->ID, '_talentshow_entry', $meta_value);
+
+    if ($insert_id) {
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Talent show entry saved successfully',
+            'user_id' => $user->ID,
+            'meta_key' => '_talentshow_entry',
+            'meta_id' => $insert_id,
+            'data' => $talent_entry
+        ]);
+    } else {
+        return new WP_Error('insert_failed', 'Failed to save talent show data', ['status' => 500]);
+    }
+}
+
+
+/**
+ * Handle Discord poll data insertion
+ */
+function handle_discord_poll_insert($request)
+{
+    $params = $request->get_json_params();
+
+    // Validate required fields
+    if (empty($params['poll_id']) || empty($params['email']) || empty($params['vote'])) {
+        return new WP_Error('missing_fields', 'poll_id, email and vote are required', ['status' => 400]);
+    }
+
+    // Get user by email
+    $user = get_user_by('email', sanitize_email($params['email']));
+    if (!$user) {
+        return new WP_Error('user_not_found', 'User with this email not found', ['status' => 404]);
+    }
+
+    // Prepare poll entry
+    $poll_entry = [
+        'poll_id' => sanitize_text_field($params['poll_id']),
+        'vote' => sanitize_text_field($params['vote']),
+        'vote_type' => sanitize_text_field($params['vote_type']),
+        'status' => 'submitted',
+        'submitted_at' => current_time('mysql'),
+
+        // user info
+        'discord_id' => intval($params['discord_id']),
+        'username' => sanitize_text_field($params['username']),
+        'display_name' => sanitize_text_field($params['display_name']),
+        'membership' => sanitize_text_field($params['membership']),
+
+        // XP & rewards
+        'xp_awarded' => intval($params['xp_awarded']),
+    ];
+
+    // Encode entry as JSON
+    $meta_value = wp_json_encode($poll_entry);
+
+    // Insert as a new row in usermeta with key "_discord_poll"
+    $insert_id = add_user_meta($user->ID, '_discord_poll', $meta_value);
+
+    if ($insert_id) {
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Poll data saved successfully',
+            'user_id' => $user->ID,
+            'meta_key' => '_discord_poll',
+            'meta_id' => $insert_id,
+            'data' => $poll_entry
+        ]);
+    } else {
+        return new WP_Error('insert_failed', 'Failed to save poll data', ['status' => 500]);
     }
 }
 
 /**
  * Check API permission
  */
-function check_api_permission($request) {
+function check_api_permission($request)
+{
     $auth_header = $request->get_header('Authorization');
     $api_key = str_replace('Bearer ', '', $auth_header);
     return $api_key === get_option('smallstreet_api_key');
@@ -434,9 +633,17 @@ function check_api_permission($request) {
 /**
  * Get REST API URL
  */
-function get_discord_api_url() {
-    return get_rest_url(null, 'myapi/v1/discord-user');
-}
+// Show API URL and API Key as an admin notice
+add_action('admin_notices', function () {
+    $api_url = get_rest_url(null, 'myapi/v1/discord-poll');
+    $api_key = get_option('smallstreet_api_key', 'Not Set');
+
+    echo '<div class="notice notice-success is-dismissible">';
+    echo '<p><strong>Discord API URL:</strong> ' . esc_url($api_url) . '</p>';
+    echo '<p><strong>API Key:</strong> ' . esc_html($api_key) . '</p>';
+    echo '</div>';
+});
+
 
 add_action('wp_footer', 'make_quantity_readonly_for_YAM_is_on_product');
 function make_quantity_readonly_for_YAM_is_on_product()
@@ -481,6 +688,7 @@ function make_quantity_readonly_for_mordern_piggy_bank_product()
         }
     }
 }
+
 
 
 
