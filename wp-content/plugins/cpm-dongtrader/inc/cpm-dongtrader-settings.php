@@ -347,6 +347,29 @@ $release_profits = $wpdb->prepare("SELECT * FROM $release_fund ORDER BY release_
 						        <?php endwhile; endif; wp_reset_postdata(); ?>
 						    </select>
 						</div>
+						<h3><?php _e('Bundled Products For YAMer (Free Membership)', 'cpm-dongtrader') ?></h3>
+						<div class="form-group">
+						    <select class="cpm-multiselect form-control" name="dongtraders_api_settings_fields[dong_yamer_mem][]" multiple="multiple">
+						        
+						        <?php
+						        // Query WooCommerce products
+						        $args = array(
+						            'post_type' => 'product',
+						            'posts_per_page' => -1, // Show all products
+						        );
+						        $products = new WP_Query( $args );
+
+						        // Loop through products and populate the dropdown
+						        if ( $products->have_posts() ) :
+						            while ( $products->have_posts() ) : $products->the_post();
+						                $product_id = get_the_ID();
+						                $product_title = get_the_title();
+						                $check_yamer_saved_productid = is_array($vals['dong_yamer_mem']) && in_array($product_id , $vals['dong_yamer_mem']) ? 'selected' : '';
+						        ?>
+						        <option <?php echo  $check_yamer_saved_productid; ?> value="<?php echo esc_attr( $product_id ); ?>"><?php echo esc_html($product_title.'--'.$product_id); ?></option>
+						        <?php endwhile; endif; wp_reset_postdata(); ?>
+						    </select>
+						</div>
 						<div class="form-group settings-submit">
 							<input type="submit" class="cpm-btn submit save-settings-dash" name="submit" value="Save changes">
 						</div>

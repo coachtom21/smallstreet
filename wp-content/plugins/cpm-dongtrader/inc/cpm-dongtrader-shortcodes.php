@@ -140,7 +140,17 @@ function mega_process_popup_params()
 
 		} elseif ($_GET['membership_selection'] == 'yamer' && $selected_sector_id) {
 
-			$new_build_url = site_url() . '/user-registration';
+			// Get YAMer free products from settings
+			$yamer_pro_val = isset($settings['dong_yamer_mem']) ? $settings['dong_yamer_mem'] : array();
+
+			if (!empty($yamer_pro_val)) {
+				$cart_items = mega_add_variation_to_cart($yamer_pro_val, $selected_sector_id);
+				$yamer_items = implode(',', $cart_items);
+				$new_build_url = site_url() . '?multiple-items=' . $yamer_items;
+			} else {
+				// Fallback: Direct checkout redirect for YAMer (free membership)
+				$new_build_url = site_url() . '/checkout?yamer=1&sector=' . $selected_sector_id;
+			}
 
 		} else {
 			$new_build_url = site_url();

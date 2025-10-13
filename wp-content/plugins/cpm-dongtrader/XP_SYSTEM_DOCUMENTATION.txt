@@ -1,0 +1,219 @@
+================================================================================
+                    CPM DONGTRADER XP SYSTEM DOCUMENTATION
+================================================================================
+
+OVERVIEW
+--------
+The XP (Experience Points) system is the core reward mechanism in the DongTrader 
+ecosystem. Users earn XP through various activities and can convert them to 
+YAM tokens and USD values.
+
+================================================================================
+CONVERSION RATES
+================================================================================
+
+PRIMARY CONVERSION RATE:
+- 1 USD = 1,000,000,000,000,000,000,000 XP (10^21)
+- This astronomical scale ensures XP values align with large economic systems
+
+YAM TOKEN CONVERSION:
+- 1 YAM = 47,619,047,619,047,619 XP (10^21 ÷ 21,000)
+- 1 USD = 21,000 YAM
+- 1 YAM = $0.0000476 USD
+
+================================================================================
+HOW TO EARN XP
+================================================================================
+
+1. PURCHASES
+   - Earn XP equal to your order total in USD
+   - Example: $100 purchase = 100,000,000,000,000,000,000,000 XP
+   - XP is calculated automatically using dongtrader_usd_to_xp() function
+
+2. DISCORD MEMBERSHIP
+   - Join Discord server to unlock all pending XP
+   - Automatic verification releases all earned XP immediately
+   - Required for full XP access
+
+3. REFERRALS
+   - Earn bonus XP for successful referrals
+   - Additional rewards for bringing new community members
+
+4. COMMUNITY PARTICIPATION
+   - Active community members receive bonus XP
+   - Engagement rewards for Discord participation
+
+================================================================================
+XP STATUS SYSTEM
+================================================================================
+
+RELEASED (🟢):
+- Available immediately
+- Discord verified users
+- All XP is accessible for use
+
+PENDING (🟡):
+- Awaiting Discord verification
+- XP earned but not yet accessible
+- Requires Discord membership to unlock
+
+COMPLETED (🟢):
+- Verified and available
+- Confirmed through Discord integration
+- Ready for conversion or use
+
+================================================================================
+PATRONAGE REWARDS SYSTEM
+================================================================================
+
+TOTAL PATRONAGE: 10% of gross value
+- BUYER REWARD: 7% of gross value
+- SELLER REWARD: 3% of gross value
+
+CALCULATION EXAMPLE:
+- Order Total: $1,000 USD
+- Total Patronage: $100 USD (10%)
+- Buyer Patronage: $70 USD (7%)
+- Seller Patronage: $30 USD (3%)
+
+XP CONVERSION:
+- Buyer Patronage XP: 70,000,000,000,000,000,000,000 XP
+- Seller Patronage XP: 30,000,000,000,000,000,000,000 XP
+
+================================================================================
+TECHNICAL IMPLEMENTATION
+================================================================================
+
+CORE FUNCTIONS:
+- dongtrader_xp_per_dollar(): Returns 1,000,000,000,000,000,000,000
+- dongtrader_xp_per_yam(): Returns 47,619,047,619,047,619
+- dongtrader_usd_to_xp($amount): Converts USD to XP
+- dongtrader_xp_to_yam($xp): Converts XP to YAM tokens
+- dongtrader_xp_to_usd($xp): Converts XP to USD
+
+USER ROLES:
+- BUYER: Earns 10 USD worth of XP per transaction
+- SELLER: Earns 1 USD worth of XP per transaction
+- Roles: Planning, Budget, Media, Distribution, Membership
+
+================================================================================
+DISCORD INTEGRATION
+================================================================================
+
+VERIFICATION PROCESS:
+1. User joins Discord server
+2. System detects Discord membership
+3. All pending XP automatically released
+4. User gains immediate access to all earned XP
+
+BENEFITS:
+- Instant XP release
+- Community access
+- Additional rewards
+- Enhanced user experience
+
+================================================================================
+CALCULATION EXAMPLES
+================================================================================
+
+EXAMPLE 1 - SMALL PURCHASE:
+- Order Total: $50 USD
+- XP Earned: 50,000,000,000,000,000,000,000 XP
+- YAM Tokens: 2,380,952,380,952,380 YAM
+- USD Value: $50 USD
+
+EXAMPLE 2 - LARGE PURCHASE:
+- Order Total: $1,000 USD
+- XP Earned: 1,000,000,000,000,000,000,000,000 XP
+- YAM Tokens: 47,619,047,619,047,619 YAM
+- USD Value: $1,000 USD
+
+EXAMPLE 3 - PATRONAGE CALCULATION:
+- Order Total: $500 USD
+- Buyer Patronage (7%): $35 USD
+- Seller Patronage (3%): $15 USD
+- Buyer XP: 35,000,000,000,000,000,000,000 XP
+- Seller XP: 15,000,000,000,000,000,000,000 XP
+
+================================================================================
+SYSTEM REQUIREMENTS
+================================================================================
+
+WORDPRESS REQUIREMENTS:
+- WooCommerce plugin
+- User meta system
+- Order management system
+
+DATABASE FIELDS:
+- _buyer_details: Stores XP transaction history
+- _discord_invite: Stores Discord verification status
+- dong_user_role: Stores user role information
+
+================================================================================
+SECURITY CONSIDERATIONS
+================================================================================
+
+XP PROTECTION:
+- XP amounts stored as integers to prevent precision loss
+- Discord verification required for XP release
+- User role validation for seller/buyer rewards
+
+VALIDATION:
+- Order verification before XP award
+- Discord membership verification
+- User role confirmation
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+COMMON ISSUES:
+
+1. XP NOT SHOWING:
+   - Check Discord membership status
+   - Verify order completion
+   - Confirm user role assignment
+
+2. CONVERSION ERRORS:
+   - Ensure functions are properly loaded
+   - Check for PHP integer overflow
+   - Verify calculation accuracy
+
+3. PENDING XP ISSUES:
+   - Join Discord server
+   - Contact support for manual verification
+   - Check user meta data
+
+================================================================================
+FUTURE ENHANCEMENTS
+================================================================================
+
+PLANNED FEATURES:
+- XP marketplace for trading
+- Advanced referral bonuses
+- Community challenges
+- XP-based privileges
+- Mobile app integration
+
+================================================================================
+SUPPORT CONTACT
+================================================================================
+
+For technical support or questions about the XP system:
+- Discord: Join our community server
+- Email: [Support Email]
+- Documentation: This file
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+v1.0 - Initial XP system implementation
+v1.1 - Updated conversion rates to 10^21 scale
+v1.2 - Added Discord integration
+v1.3 - Enhanced patronage system
+v1.4 - Comprehensive documentation
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

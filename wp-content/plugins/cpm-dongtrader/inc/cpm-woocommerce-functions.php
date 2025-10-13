@@ -17,6 +17,21 @@ function add_cashback_row_to_checkout()
     // Calculate 7% cashback
     $cashback = ($total * 0.07) * $actual_vnd_rate;
 
+    // Determine XP amount based on cart contents
+    $xp_amount = 10000000; // Default XP for paid memberships
+    
+    // Check if this is a YAMer order (free product)
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        $product_id = $cart_item['product_id'];
+        $product = wc_get_product($product_id);
+        
+        // If any product in cart is free, this is likely a YAMer order
+        if ($product && $product->get_price() == 0) {
+            $xp_amount = 0; // YAMer gets 0 XP
+            break;
+        }
+    }
+
     ?>
     <tr class="cashback-row">
         <th><?php _e('Cash Back 7% (YAM rewards)', 'your-text-domain'); ?></th>
@@ -24,7 +39,7 @@ function add_cashback_row_to_checkout()
     </tr>
     <tr class="xp-rewards-row">
         <th><?php _e('Experience Points (XP)', 'your-text-domain'); ?></th>
-        <td><?php echo number_format(10000000); ?> XP</td>
+        <td><?php echo number_format($xp_amount); ?> XP</td>
     </tr>
     <?php
 }
@@ -476,6 +491,60 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
                 }
             }
 
+            wp_redirect($checkout_url);
+            exit();
+        }
+        
+        // Handle YAMer direct checkout
+        if (isset($_GET['yamer']) && $_GET['yamer'] == '1') {
+            $checkout_url = wc_get_checkout_url();
+            
+            // Clear cart
+            WC()->cart->empty_cart();
+            
+            // Add a free YAMer product
+            $yamer_product_id = 5348; // Your YAMer product ID
+            
+            // Try multiple approaches to add product to cart
+            $product_added = false;
+            
+            // Method 1: Standard WooCommerce method
+            $product = wc_get_product($yamer_product_id);
+            if ($product) {
+                $cart_result = WC()->cart->add_to_cart($yamer_product_id, 1);
+                if ($cart_result) {
+                    $product_added = true;
+                    error_log('YAMer product added to cart: SUCCESS');
+                } else {
+                    error_log('YAMer product add to cart: FAILED');
+                }
+            } else {
+                error_log('YAMer product ID 5348 not found');
+            }
+            
+            // Method 2: If standard method failed, try direct database approach
+            if (!$product_added) {
+                // Force add to cart using WooCommerce session
+                WC()->cart->add_to_cart($yamer_product_id, 1);
+                WC()->cart->calculate_totals();
+                error_log('YAMer: Attempted force add to cart');
+            }
+            
+            // Method 3: If still empty, create a temporary product
+            if (WC()->cart->is_empty()) {
+                // Create a simple virtual product on the fly
+                $temp_product = new WC_Product_Simple();
+                $temp_product->set_name('YAMer Free Membership');
+                $temp_product->set_price(0);
+                $temp_product->set_regular_price(0);
+                $temp_product->set_virtual(true);
+                $temp_product->set_status('publish');
+                $temp_product->save();
+                
+                WC()->cart->add_to_cart($temp_product->get_id(), 1);
+                error_log('YAMer: Created temporary product with ID: ' . $temp_product->get_id());
+            }
+            
             wp_redirect($checkout_url);
             exit();
         }
@@ -1042,6 +1111,113 @@ function mega_custom_account_sections($fields)
     return $fields;
 }
 
+/**
+ * Show admin notice about Yamer membership level status
+ */
+add_action('admin_notices', 'yamer_membership_level_admin_notice');
+function yamer_membership_level_admin_notice() {
+    if (!function_exists('pmpro_getAllLevels')) {
+        return;
+    }
+    
+    $levels = pmpro_getAllLevels(true);
+    $yamer_level_exists = false;
+    $yamer_level_id = null;
+    
+    foreach ($levels as $level) {
+        if (strtolower($level->name) === 'yamer' || strtolower($level->name) === 'yammer') {
+            $yamer_level_exists = true;
+            $yamer_level_id = $level->id;
+            break;
+        }
+    }
+    
+    if ($yamer_level_exists) {
+        echo '<div class="notice notice-success is-dismissible">';
+        echo '<p><strong>YAMer Membership:</strong> Level exists with ID ' . $yamer_level_id . '</p>';
+        echo '</div>';
+    } else {
+        echo '<div class="notice notice-warning is-dismissible">';
+        echo '<p><strong>YAMer Membership:</strong> Level not found. It will be created automatically on next checkout.</p>';
+        echo '</div>';
+    }
+}
+
+/**
+ * Initialize Yamer membership level on plugin activation or admin init
+ */
+add_action('admin_init', 'initialize_yamer_membership_level');
+function initialize_yamer_membership_level() {
+    // Only run this once per day to avoid unnecessary database calls
+    $last_check = get_option('yamer_membership_level_last_check', 0);
+    if (time() - $last_check < 86400) { // 24 hours
+        return;
+    }
+    
+    create_yamer_membership_level_if_not_exists();
+    update_option('yamer_membership_level_last_check', time());
+}
+
+/**
+ * Create Yamer membership level if it doesn't exist
+ */
+function create_yamer_membership_level_if_not_exists() {
+    if (!function_exists('pmpro_getAllLevels')) {
+        return false;
+    }
+    
+    $levels = pmpro_getAllLevels(true); // Include hidden levels
+    $yamer_level_exists = false;
+    $yamer_level_id = null;
+    
+    // Check if Yamer level already exists
+    foreach ($levels as $level) {
+        if (strtolower($level->name) === 'yamer' || strtolower($level->name) === 'yammer') {
+            $yamer_level_exists = true;
+            $yamer_level_id = $level->id;
+            break;
+        }
+    }
+    
+    // If Yamer level doesn't exist, create it
+    if (!$yamer_level_exists) {
+        global $wpdb;
+        
+        $yamer_level_data = array(
+            'name' => 'YAMer',
+            'description' => 'Free membership level for YAMer users',
+            'confirmation' => 'Welcome to YAMer membership! This is a free membership level.',
+            'initial_payment' => 0.00,
+            'billing_amount' => 0.00,
+            'cycle_number' => 0,
+            'cycle_period' => 'Month',
+            'billing_limit' => 0,
+            'trial_amount' => 0.00,
+            'trial_limit' => 0,
+            'allow_signups' => 1,
+            'expiration_number' => 0,
+            'expiration_period' => 'Month'
+        );
+        
+        $result = $wpdb->insert(
+            $wpdb->pmpro_membership_levels,
+            $yamer_level_data,
+            array(
+                '%s', '%s', '%s', '%f', '%f', '%d', '%s', '%d', '%f', '%d', '%d', '%d', '%s'
+            )
+        );
+        
+        if ($result) {
+            $yamer_level_id = $wpdb->insert_id;
+            error_log('YAMer membership level created with ID: ' . $yamer_level_id);
+        } else {
+            error_log('Failed to create YAMer membership level: ' . $wpdb->last_error);
+        }
+    }
+    
+    return $yamer_level_id;
+}
+
 add_action('woocommerce_checkout_order_created', 'mega_set_membership_level', 7, 1);
 function mega_set_membership_level($order)
 {
@@ -1057,6 +1233,51 @@ function mega_set_membership_level($order)
     foreach ($order_items as $oi) {
 
         $ordered_pid[] = $oi->get_product_id();
+    }
+
+    if (!empty($settings['dong_yamer_mem'])) {
+
+        $yamer_items_int = array_map('intval', $settings['dong_yamer_mem']);
+
+        $diff_yamer_x = array_diff($ordered_pid, $yamer_items_int);
+
+        if (empty($diff_yamer_x)) {
+            // Create Yamer level if it doesn't exist and get its ID
+            $yamer_level_id = create_yamer_membership_level_if_not_exists();
+            
+            if ($yamer_level_id) {
+                pmpro_changeMembershipLevel($yamer_level_id, $customer_id);
+                error_log('YAMer membership level ' . $yamer_level_id . ' assigned to user ' . $customer_id);
+            } else {
+                error_log('Failed to assign YAMer membership - level ID not found');
+            }
+            update_post_meta($order->get_id(), '_membership_type', $yamer_level_id);
+            update_post_meta($order->get_id(), '_membership_name', esc_attr('YAMer'));
+        }
+    } else {
+        // Fallback: Check if order contains YAMer product (ID 5348) or any free product
+        $is_yamer_order = false;
+        foreach ($order_items as $item) {
+            $product = $item->get_product();
+            if ($product && $product->get_price() == 0) {
+                $is_yamer_order = true;
+                break;
+            }
+        }
+        
+        if ($is_yamer_order) {
+            // Create Yamer level if it doesn't exist and get its ID
+            $yamer_level_id = create_yamer_membership_level_if_not_exists();
+            
+            if ($yamer_level_id) {
+                pmpro_changeMembershipLevel($yamer_level_id, $customer_id);
+                update_post_meta($order->get_id(), '_membership_type', $yamer_level_id);
+                update_post_meta($order->get_id(), '_membership_name', esc_attr('YAMer'));
+                error_log('YAMer membership level ' . $yamer_level_id . ' assigned to user ' . $customer_id . ' (fallback)');
+            } else {
+                error_log('Failed to assign YAMer membership - level ID not found (fallback)');
+            }
+        }
     }
 
     if (!empty($settings['dong_patron_mem'])) {
@@ -1519,6 +1740,9 @@ function mega_update_mlm_database($orderObj)
 
             $wpdb->query($group_update);
         }
+
+        // Save buyer details for existing customers (this was missing!)
+        mega_save_order_details([$customer_id => [$orderObj->get_id()]]);
     }
 
     if (!$customer_exists) {
@@ -1658,6 +1882,12 @@ function mega_save_details_for_non_gf_members($oobj)
     //  Amount remaining after distribution 
     $remaining_total_amt = $order_total - $distributed_total_amt;
 
+    // Determine XP amount based on membership type
+    $xp_amount = 10000000; // Default XP for paid memberships
+    if ($membership_name === 'YAMer') {
+        $xp_amount = 0; // YAMer gets 0 XP
+    }
+
     //new array for new order which we will append to 
     $buyer_metas[] = [
         'order_id' => $oobj->get_id(),
@@ -1666,7 +1896,7 @@ function mega_save_details_for_non_gf_members($oobj)
         'rebate' => $rebate,
         'process' => $process_amt,
         'total' => $distributed_total_amt,
-        'xp_awarded'    => 10000000, // XP awarded for this order
+        'xp_awarded'    => $xp_amount, // XP awarded for this order
     ];
 
 
@@ -1687,7 +1917,7 @@ function mega_save_details_for_non_gf_members($oobj)
         'total_amt' => $order_total,
         'distrb_amt' => $distributed_total_amt,
         'rem_amt' => $remaining_total_amt,
-        'xp_awarded'    => 10000000, // XP awarded for this order
+        'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
     ];
 
     if (!empty($treasury_metas)) {
@@ -1713,7 +1943,7 @@ function mega_save_details_for_non_gf_members($oobj)
             'rebate' => 0,
             'process' => $process_amt,
             'total' => $process_amt,
-            'xp_awarded'    => 10000000, // XP awarded for this order
+            'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
         ];
 
         if (!empty($sponsor_metas)) {
@@ -1798,7 +2028,7 @@ function use_email_as_username($order_id)
         <div class="popup" id="discordPopup">
             <h3>Join Our Discord Server!<br>Gracebook</h3>
             <p>Official Discord for the Legacy To Live By community, the Cookie Jar economy, and the YAM movement.</p>
-            <a href="https://discord.gg/tY6mxRft" target="_blank" class="popup-button">Join Now</a>
+            <a href="https://discord.gg/g5jreAPbra" target="_blank" class="popup-button">Join Now</a>
         </div>
         <script>
             jQuery(document).ready(function ($) {
