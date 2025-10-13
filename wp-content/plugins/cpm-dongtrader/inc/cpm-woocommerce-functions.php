@@ -2028,7 +2028,7 @@ function use_email_as_username($order_id)
         <div class="popup" id="discordPopup">
             <h3>Join Our Discord Server!<br>Gracebook</h3>
             <p>Official Discord for the Legacy To Live By community, the Cookie Jar economy, and the YAM movement.</p>
-            <a href="https://discord.gg/tY6mxRft" target="_blank" class="popup-button">Join Now</a>
+            <a href="https://discord.gg/g5jreAPbra" target="_blank" class="popup-button">Join Now</a>
         </div>
         <script>
             jQuery(document).ready(function ($) {

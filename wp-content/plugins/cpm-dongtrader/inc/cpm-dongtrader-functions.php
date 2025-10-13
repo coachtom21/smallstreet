@@ -3319,17 +3319,30 @@ function dongtrader_display_xp_dashboard() {
     $discord_poll_xp_pending = 0;
     $discord_poll_xp_completed = 0;
     
-    $discord_poll_data = get_user_meta($user_id, '_discord_poll', true);
+    $discord_poll_data = get_user_meta($user_id, '_discord_poll', false);
     if (!empty($discord_poll_data)) {
-        // Handle both JSON string and array formats
-        if (is_string($discord_poll_data)) {
+        // Handle multiple Discord poll entries (array of JSON strings)
+        $processed_entries = array();
+        
+        if (is_array($discord_poll_data)) {
+            // Multiple entries from database
+            foreach ($discord_poll_data as $entry_string) {
+                if (is_string($entry_string)) {
+                    $decoded_data = json_decode($entry_string, true);
+                    if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                        $processed_entries[] = $decoded_data;
+                    }
+                }
+            }
+        } else if (is_string($discord_poll_data)) {
+            // Single entry (fallback)
             $decoded_data = json_decode($discord_poll_data, true);
             if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
-                $discord_poll_data = array($decoded_data);
-            } else {
-                $discord_poll_data = array();
+                $processed_entries[] = $decoded_data;
             }
         }
+        
+        $discord_poll_data = $processed_entries;
         
         // Process the data
         if (is_array($discord_poll_data) && !empty($discord_poll_data)) {
@@ -3557,6 +3570,77 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
+    // Display Discord Poll transactions
+    $discord_poll_data_for_display = get_user_meta($user_id, '_discord_poll', false);
+    if (!empty($discord_poll_data_for_display)) {
+        // Handle multiple Discord poll entries (array of JSON strings)
+        $processed_entries = array();
+        
+        if (is_array($discord_poll_data_for_display)) {
+            // Multiple entries from database
+            foreach ($discord_poll_data_for_display as $entry_string) {
+                if (is_string($entry_string)) {
+                    $decoded_data = json_decode($entry_string, true);
+                    if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                        $processed_entries[] = $decoded_data;
+                    }
+                }
+            }
+        } else if (is_string($discord_poll_data_for_display)) {
+            // Single entry (fallback)
+            $decoded_data = json_decode($discord_poll_data_for_display, true);
+            if (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded'])) {
+                $processed_entries[] = $decoded_data;
+            }
+        }
+        
+        $discord_poll_data_for_display = $processed_entries;
+        
+        if (is_array($discord_poll_data_for_display) && !empty($discord_poll_data_for_display)) {
+            foreach ($discord_poll_data_for_display as $index => $poll_entry) {
+                $xp_amount = isset($poll_entry['xp_awarded']) ? intval($poll_entry['xp_awarded']) : 0;
+                
+                // Skip transactions with no XP awarded
+                if ($xp_amount <= 0) {
+                    continue;
+                }
+                
+                // Check XP status - if Discord invite exists, all XP is released
+                $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
+                if ($has_discord_invite) {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } else {
+                    $status_text = $is_discord_member ? 'Completed' : 'Pending';
+                    $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                }
+                
+                // Format order details for Discord poll
+                $order_details = 'Discord Poll Participation';
+                if (isset($poll_entry['vote_type']) && !empty($poll_entry['vote_type'])) {
+                    $order_details = ucfirst(str_replace('_', ' ', $poll_entry['vote_type']));
+                }
+                if (isset($poll_entry['username']) && !empty($poll_entry['username'])) {
+                    $order_details .= ' - @' . $poll_entry['username'];
+                }
+                if (isset($poll_entry['vote']) && !empty($poll_entry['vote'])) {
+                    $order_details .= ' (' . $poll_entry['vote'] . ')';
+                }
+                
+                // Check for submitted_at field (the actual date field)
+                if (isset($poll_entry['submitted_at']) && !empty($poll_entry['submitted_at'])) {
+                    $order_details .= ' - ' . $poll_entry['submitted_at'];
+                }
+                
+                $output .= '<tr style="background: #e1f5fe; border-bottom: 1px solid #dee2e6;">';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #0277bd;">' . esc_html($order_details) . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #0277bd; font-weight: 600;">' . number_format($xp_amount) . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+                $output .= '</tr>';
+            }
+        }
+    }
+    
     // Display Talent Show Entry transactions
     $talentshow_entry_data_for_display = get_user_meta($user_id, '_talentshow_entry', false);
     if (!empty($talentshow_entry_data_for_display)) {
@@ -3661,9 +3745,25 @@ function dongtrader_display_xp_dashboard() {
         }
     }
     
-    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details)) && !$has_talentshow_data && !$has_buyer_data) {
+    // Check if Discord poll data exists
+    $has_discord_poll_data = false;
+    $discord_poll_check_data = get_user_meta($user_id, '_discord_poll', false);
+    if (!empty($discord_poll_check_data) && is_array($discord_poll_check_data)) {
+        // Check if any of the entries have valid XP data
+        foreach ($discord_poll_check_data as $entry_string) {
+            if (is_string($entry_string)) {
+                $decoded_poll = json_decode($entry_string, true);
+                if (json_last_error() === JSON_ERROR_NONE && $decoded_poll && isset($decoded_poll['xp_awarded'])) {
+                    $has_discord_poll_data = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if ((!is_array($seller_details) || empty($seller_details)) && empty($paid_orders) && !$has_discord_data && (!is_array($discord_details) || empty($discord_details)) && !$has_talentshow_data && !$has_buyer_data && !$has_discord_poll_data) {
         $output .= '<tr style="background: #f8f9fa; border-bottom: 1px solid #dee2e6;">';
-        $output .= '<td colspan="3" style="padding: 20px; border: 1px solid #ddd; text-align: center; color: #6c757d; font-style: italic;">No transactions found. Complete your first order, scanning activity, Discord activity, or talent show entry to see XP here.</td>';
+        $output .= '<td colspan="3" style="padding: 20px; border: 1px solid #ddd; text-align: center; color: #6c757d; font-style: italic;">No transactions found. Complete your first order, scanning activity, Discord activity, Discord poll participation, or talent show entry to see XP here.</td>';
         $output .= '</tr>';
     }
     
@@ -3778,6 +3878,11 @@ function dongtrader_display_xp_dashboard() {
     
     // Discord Connection Section
     $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
+    
+    // Check if there's any Discord invite data
+    $discord_invite_data = get_user_meta($user_id, '_discord_invite', false);
+    $has_discord_invite_data = !empty($discord_invite_data);
+    
     if ($discord_user_id) {
         $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #9b59b6;">';
         $output .= '<h4 style="color: #8e44ad; margin-top: 0;">Discord Connected</h4>';
@@ -3787,13 +3892,14 @@ function dongtrader_display_xp_dashboard() {
             $output .= '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px; border-radius: 4px; margin-top: 10px;">';
             $output .= '<p style="margin: 5px 0; color: #856404;"><strong>⚠️ XP Pending - Discord Membership Verification Required</strong></p>';
             $output .= '<p style="margin: 5px 0; color: #856404;">You have <strong>' . number_format($total_pending_xp) . ' XP</strong> pending. Our Discord bot will verify your server membership to release these rewards.</p>';
-            $output .= '<p style="margin: 5px 0;"><a href="https://discord.gg/tY6mxRft" target="_blank" style="background: #8e44ad; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; display: inline-block;">🔗 Join Discord Server</a></p>';
+            $output .= '<p style="margin: 5px 0;"><a href="https://discord.gg/g5jreAPbra" target="_blank" style="background: #8e44ad; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; display: inline-block;">🔗 Join Discord Server</a></p>';
             $output .= '</div>';
         } else {
             $output .= '<p style="margin: 8px 0; color: #27ae60;"><strong>✅ All XP has been verified and completed!</strong></p>';
         }
         $output .= '</div>';
-    } else {
+    } else if (!$has_discord_invite_data) {
+        // Only show "Connect Discord Account" if there's no Discord invite data
         $output .= '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
         $output .= '<h4 style="color: #721c24; margin-top: 0;">🔗 Connect Discord Account</h4>';
         $output .= '<p style="margin: 8px 0; color: #721c24;"><strong>Action Required:</strong> To receive your XP rewards, you must connect your Discord account.</p>';

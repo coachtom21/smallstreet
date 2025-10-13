@@ -335,7 +335,7 @@ add_action('rest_api_init', function () {
         'methods' => 'GET',
         'callback' => 'myapi_hello_endpoint',
     ]);
-
+    
     // Add Discord user insert endpoint
     register_rest_route('myapi/v1', '/discord-user', array(
         'methods' => 'POST',
@@ -368,6 +368,13 @@ add_action('rest_api_init', function () {
     register_rest_route('myapi/v1', '/discord-poll', array(
         'methods' => 'POST',
         'callback' => 'handle_discord_poll_insert',
+        'permission_callback' => 'check_api_permission'
+    ));
+
+    // Add new endpoint to retrieve user XP data
+    register_rest_route('myapi/v1', '/user-xp-data', array(
+        'methods' => 'GET',
+        'callback' => 'get_user_xp_data',
         'permission_callback' => 'check_api_permission'
     ));
 });
@@ -464,7 +471,7 @@ LEFT JOIN {$wpdb->prefix}pmpro_membership_levels l ON m.membership_id = l.id
 function handle_discord_user_insert($request)
 {
     $params = $request->get_json_params(); // Safer for JSON POST requests
-
+    
     // Validate required fields
     if (empty($params['discord_id']) || empty($params['email'])) {
         return new WP_Error('missing_fields', 'Discord ID and email are required', ['status' => 400]);
@@ -484,18 +491,18 @@ function handle_discord_user_insert($request)
         'joined_at' => isset($params['joined_at']) ? sanitize_text_field($params['joined_at']) : current_time('mysql'),
         'guild_id' => isset($params['guild_id']) ? sanitize_text_field($params['guild_id']) : '',
         'joined_via_invite' => isset($params['joined_via_invite']) ? sanitize_text_field($params['joined_via_invite']) : '',
-        'xp_type' => 'discord_invite',
-        'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 5000000,
-        'status' => 'completed',
-        'verification_date' => current_time('mysql')
+            'xp_type' => 'discord_invite',
+            'xp_awarded' => isset($params['xp_awarded']) ? intval($params['xp_awarded']) : 5000000,
+            'status' => 'completed',
+            'verification_date' => current_time('mysql')
     ];
-
+        
     // Encode entry as JSON
     $meta_value = wp_json_encode($discord_entry);
-
+        
     // Insert as a new row in usermeta (one per invite)
     $insert_id = add_user_meta($user->ID, '_discord_invite', $meta_value);
-
+        
     if ($insert_id) {
         return rest_ensure_response([
             'success' => true,
@@ -621,6 +628,135 @@ function handle_discord_poll_insert($request)
 }
 
 /**
+ * Get user XP data for specified meta keys
+ */
+function get_user_xp_data(WP_REST_Request $request)
+{
+    // Get parameters
+    $user_id = $request->get_param('user_id');
+    $email = $request->get_param('email');
+    $meta_keys = $request->get_param('meta_keys'); // Comma-separated list
+    
+    // Default meta keys if not specified
+    $default_meta_keys = ['_buyer_details', '_seller_details', '_talentshow_entry', '_discord_invite', '_discord_poll'];
+    
+    if ($meta_keys) {
+        $requested_keys = array_map('trim', explode(',', $meta_keys));
+        $meta_keys_to_fetch = array_intersect($requested_keys, $default_meta_keys);
+    } else {
+        $meta_keys_to_fetch = $default_meta_keys;
+    }
+    
+    if (empty($meta_keys_to_fetch)) {
+        return new WP_Error('invalid_meta_keys', 'No valid meta keys specified', ['status' => 400]);
+    }
+    
+    // If no specific user parameters provided, return all users by default
+    if (empty($user_id) && empty($email)) {
+        return get_all_users_xp_data($meta_keys_to_fetch);
+    }
+    
+    // Handle single user request
+    $user = null;
+    if ($user_id) {
+        $user = get_user_by('id', intval($user_id));
+    } elseif ($email) {
+        $user = get_user_by('email', sanitize_email($email));
+    }
+    
+    if (!$user) {
+        return new WP_Error('user_not_found', 'User not found', ['status' => 404]);
+    }
+    
+    // Get single user data
+    $user_meta_data = get_single_user_xp_data($user, $meta_keys_to_fetch);
+    
+    return new WP_REST_Response($user_meta_data, 200);
+}
+
+/**
+ * Get XP data for all users
+ */
+function get_all_users_xp_data($meta_keys_to_fetch)
+{
+    // Get all users
+    $users = get_users([
+        'fields' => ['ID', 'user_login', 'user_email', 'display_name'],
+        'number' => -1 // Get all users
+    ]);
+    
+    $all_users_data = [
+        'total_users' => count($users),
+        'users' => []
+    ];
+    
+    foreach ($users as $user) {
+        $user_data = get_single_user_xp_data($user, $meta_keys_to_fetch);
+        $all_users_data['users'][] = $user_data;
+    }
+    
+    return new WP_REST_Response($all_users_data, 200);
+}
+
+/**
+ * Get XP data for a single user
+ */
+function get_single_user_xp_data($user, $meta_keys_to_fetch)
+{
+    // Organize the data
+    $user_meta_data = [
+        'user_id' => $user->ID,
+        'user_login' => $user->user_login,
+        'user_email' => $user->user_email,
+        'display_name' => $user->display_name,
+        'meta_data' => []
+    ];
+    
+    // Fetch each meta key using get_user_meta()
+    foreach ($meta_keys_to_fetch as $meta_key) {
+        // For _discord_poll and _talentshow_entry, get all values (multiple entries)
+        if ($meta_key === '_discord_poll' || $meta_key === '_talentshow_entry') {
+            $meta_values = get_user_meta($user->ID, $meta_key, false);
+            
+            // Process multiple entries
+            $processed_entries = [];
+            if (is_array($meta_values) && !empty($meta_values)) {
+                foreach ($meta_values as $entry_string) {
+                    if (is_string($entry_string)) {
+                        $decoded_data = json_decode($entry_string, true);
+                        if (json_last_error() === JSON_ERROR_NONE && $decoded_data) {
+                            $processed_entries[] = $decoded_data;
+                        }
+                    }
+                }
+            }
+            
+            $meta_value = $processed_entries;
+        } else {
+            // For other meta keys, get single value
+            $meta_value = get_user_meta($user->ID, $meta_key, true);
+            
+            // Handle empty or false values
+            if ($meta_value === false || $meta_value === '') {
+                $meta_value = [];
+            }
+            
+            // Try to decode JSON if it's a JSON string
+            if (is_string($meta_value)) {
+                $json_decoded = json_decode($meta_value, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $meta_value = $json_decoded;
+                }
+            }
+        }
+        
+        $user_meta_data['meta_data'][$meta_key] = $meta_value;
+    }
+    
+    return $user_meta_data;
+}
+
+/**
  * Check API permission
  */
 function check_api_permission($request)
@@ -635,7 +771,7 @@ function check_api_permission($request)
  */
 // Show API URL and API Key as an admin notice
 add_action('admin_notices', function () {
-    $api_url = get_rest_url(null, 'myapi/v1/discord-poll');
+    $api_url = get_rest_url(null, 'myapi/v1/user-xp-data');
     $api_key = get_option('smallstreet_api_key', 'Not Set');
 
     echo '<div class="notice notice-success is-dismissible">';
