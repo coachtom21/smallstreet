@@ -825,6 +825,391 @@ function make_quantity_readonly_for_mordern_piggy_bank_product()
     }
 }
 
+/**
+ * Add Redemption Requests admin menu
+ */
+add_action('admin_menu', 'dongtrader_add_redemption_admin_menu');
+
+function dongtrader_add_redemption_admin_menu() {
+    add_menu_page(
+        'Redemption Requests',           // Page title
+        'Redemption Requests',           // Menu title
+        'manage_options',                // Capability
+        'redemption-requests',           // Menu slug
+        'dongtrader_redemption_admin_page', // Function to display page
+        'dashicons-money-alt',          // Icon
+        30                              // Position
+    );
+}
+
+/**
+ * Display redemption requests admin page
+ */
+function dongtrader_redemption_admin_page() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    // Handle status updates
+    if (isset($_POST['update_status']) && isset($_POST['redemption_id']) && isset($_POST['new_status'])) {
+        $redemption_id = intval($_POST['redemption_id']);
+        $new_status = sanitize_text_field($_POST['new_status']);
+        $admin_notes = isset($_POST['admin_notes']) ? sanitize_textarea_field($_POST['admin_notes']) : '';
+        
+        $result = $wpdb->update(
+            $table_name,
+            array(
+                'status' => $new_status,
+                'admin_notes' => $admin_notes,
+                'processed_date' => current_time('mysql')
+            ),
+            array('id' => $redemption_id),
+            array('%s', '%s', '%s'),
+            array('%d')
+        );
+        
+        if ($result !== false) {
+            echo '<div class="notice notice-success"><p>Status updated successfully!</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>Failed to update status.</p></div>';
+        }
+    }
+    
+    // Get all redemption requests
+    $redemptions = $wpdb->get_results("SELECT * FROM $table_name ORDER BY redem_date DESC");
+    
+    ?>
+    <div class="wrap">
+        <h1>Redemption Requests</h1>
+        
+        <div class="tablenav top">
+            <div class="alignleft actions">
+                <select name="status_filter" id="status_filter">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <button type="button" class="button" onclick="filterByStatus()">Filter</button>
+            </div>
+        </div>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>XP Amount</th>
+                    <th>YAM Amount</th>
+                    <th>USD Amount</th>
+                    <th>Payment Method</th>
+                    <th>Payment Details</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($redemptions)): ?>
+                    <tr>
+                        <td colspan="10" style="text-align: center; padding: 20px;">No redemption requests found.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($redemptions as $redemption): ?>
+                        <?php 
+                        $user = get_userdata($redemption->user_id);
+                        $user_name = $user ? $user->display_name : 'Unknown User';
+                        $user_email = $user ? $user->user_email : 'N/A';
+                        ?>
+                        <tr>
+                            <td><?php echo $redemption->id; ?></td>
+                            <td>
+                                <strong><?php echo esc_html($user_name); ?></strong><br>
+                                <small><?php echo esc_html($user_email); ?></small>
+                            </td>
+                            <td><?php echo number_format($redemption->xp_redem); ?></td>
+                            <td><?php echo number_format($redemption->yam_redem, 2); ?></td>
+                            <td>$<?php echo number_format($redemption->usd_redem, 2); ?></td>
+                            <td><?php echo esc_html($redemption->payment_method); ?></td>
+                            <td><?php echo esc_html($redemption->payment_details); ?></td>
+                            <td>
+                                <span class="status-<?php echo esc_attr($redemption->status); ?>">
+                                    <?php echo esc_html(ucfirst($redemption->status)); ?>
+                                </span>
+                            </td>
+                            <td><?php echo date('M j, Y g:i A', strtotime($redemption->redem_date)); ?></td>
+                            <td>
+                                <button type="button" class="button button-small" onclick="showRedemptionDetails(<?php echo $redemption->id; ?>)">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Redemption Details Modal -->
+    <div id="redemption-modal" class="redemption-modal" style="display: none;">
+        <div class="redemption-modal-content">
+            <span class="close" onclick="closeRedemptionModal()">&times;</span>
+            <div id="redemption-details"></div>
+        </div>
+    </div>
+    
+    <style>
+        .status-pending { color: #f56e28; font-weight: bold; }
+        .status-processing { color: #0073aa; font-weight: bold; }
+        .status-completed { color: #46b450; font-weight: bold; }
+        .status-rejected { color: #dc3232; font-weight: bold; }
+        
+        .redemption-modal {
+            position: absolute;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .redemption-modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 5px;
+            position: relative;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .redemption-details {
+            margin-top: 20px;
+        }
+        
+        .redemption-details h3 {
+            margin-top: 0;
+        }
+        
+        .redemption-details .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        
+        .redemption-details .detail-label {
+            font-weight: bold;
+            width: 150px;
+        }
+        
+        .redemption-details .detail-value {
+            flex: 1;
+        }
+        
+        .status-update-form {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        
+        .status-update-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .status-update-form select,
+        .status-update-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .status-update-form textarea {
+            height: 80px;
+        }
+    </style>
+    
+    <script>
+        function filterByStatus() {
+            var status = document.getElementById('status_filter').value;
+            var rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(function(row) {
+                if (status === '') {
+                    row.style.display = '';
+                } else {
+                    var statusCell = row.querySelector('.status-' + status);
+                    row.style.display = statusCell ? '' : 'none';
+                }
+            });
+        }
+        
+        function showRedemptionDetails(redemptionId) {
+            // AJAX call to get redemption details
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', ajaxurl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        document.getElementById('redemption-details').innerHTML = response.data.html;
+                        document.getElementById('redemption-modal').style.display = 'block';
+                    } else {
+                        alert('Error loading redemption details: ' + response.data);
+                    }
+                }
+            };
+            xhr.send('action=get_redemption_details&redemption_id=' + redemptionId);
+        }
+        
+        function closeRedemptionModal() {
+            document.getElementById('redemption-modal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            var modal = document.getElementById('redemption-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+    <?php
+}
+
+/**
+ * AJAX handler to get redemption details
+ */
+add_action('wp_ajax_get_redemption_details', 'dongtrader_get_redemption_details');
+
+function dongtrader_get_redemption_details() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $redemption_id = intval($_POST['redemption_id']);
+    $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+    
+    if (!$redemption) {
+        wp_send_json_error('Redemption request not found');
+    }
+    
+    $user = get_userdata($redemption->user_id);
+    $user_name = $user ? $user->display_name : 'Unknown User';
+    $user_email = $user ? $user->user_email : 'N/A';
+    
+    $html = '<div class="redemption-details">';
+    $html .= '<h3>Redemption Request #' . $redemption->id . '</h3>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">User:</div>';
+    $html .= '<div class="detail-value">' . esc_html($user_name) . ' (' . esc_html($user_email) . ')</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">XP Amount:</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->xp_redem) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">YAM Amount:</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->yam_redem, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">USD Amount:</div>';
+    $html .= '<div class="detail-value">$' . number_format($redemption->usd_redem, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Conversion Rate (XP/YAM):</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->conversion_rate_xp_yam, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Conversion Rate (YAM/USD):</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->conversion_rate_yam_usd, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Payment Method:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->payment_method) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Payment Details:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->payment_details) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Meta IDs:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->meta_ids) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Status:</div>';
+    $html .= '<div class="detail-value"><span class="status-' . esc_attr($redemption->status) . '">' . esc_html(ucfirst($redemption->status)) . '</span></div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Submission Date:</div>';
+    $html .= '<div class="detail-value">' . date('M j, Y g:i A', strtotime($redemption->redem_date)) . '</div>';
+    $html .= '</div>';
+    
+    if ($redemption->processed_date) {
+        $html .= '<div class="detail-row">';
+        $html .= '<div class="detail-label">Processed Date:</div>';
+        $html .= '<div class="detail-value">' . date('M j, Y g:i A', strtotime($redemption->processed_date)) . '</div>';
+        $html .= '</div>';
+    }
+    
+    if ($redemption->admin_notes) {
+        $html .= '<div class="detail-row">';
+        $html .= '<div class="detail-label">Admin Notes:</div>';
+        $html .= '<div class="detail-value">' . esc_html($redemption->admin_notes) . '</div>';
+        $html .= '</div>';
+    }
+    
+    // Status update form
+    $html .= '<div class="status-update-form">';
+    $html .= '<h4>Update Status</h4>';
+    $html .= '<form method="post" action="">';
+    $html .= '<input type="hidden" name="redemption_id" value="' . $redemption->id . '">';
+    
+    $html .= '<label for="new_status">Status:</label>';
+    $html .= '<select name="new_status" id="new_status" required>';
+    $html .= '<option value="pending"' . ($redemption->status === 'pending' ? ' selected' : '') . '>Pending</option>';
+    $html .= '<option value="processing"' . ($redemption->status === 'processing' ? ' selected' : '') . '>Processing</option>';
+    $html .= '<option value="completed"' . ($redemption->status === 'completed' ? ' selected' : '') . '>Completed</option>';
+    $html .= '<option value="rejected"' . ($redemption->status === 'rejected' ? ' selected' : '') . '>Rejected</option>';
+    $html .= '</select>';
+    
+    $html .= '<label for="admin_notes">Admin Notes:</label>';
+    $html .= '<textarea name="admin_notes" id="admin_notes" placeholder="Add notes about this redemption request...">' . esc_textarea($redemption->admin_notes) . '</textarea>';
+    
+    $html .= '<button type="submit" name="update_status" class="button button-primary">Processed</button>';
+    $html .= '</form>';
+    $html .= '</div>';
+    
+    $html .= '</div>';
+    
+    wp_send_json_success(array('html' => $html));
+}
+
 
 
 

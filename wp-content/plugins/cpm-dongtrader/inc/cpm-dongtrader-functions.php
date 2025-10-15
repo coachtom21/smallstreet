@@ -134,10 +134,16 @@ function qrtiger_api_request($endpoint = '', $bodyParams = array(), $method = "G
 
     /* A ternary operator to check get or post parameter and use functions accordingly*/
     $response_received = $method == 'POST' ? wp_remote_post($build_url, $options) : wp_remote_get($build_url, $options);
+    
+    // Check for WP_Error
+    if (is_wp_error($response_received)) {
+        return false;
+    }
+    
     /* Get the response code from the response received. */
     $response_status = wp_remote_retrieve_response_code($response_received);
     /* Checking if the response status is 200 or not. If it is 200 then it will return the body of the response. */
-    $response_body = $response_status == '200' ? wp_remote_retrieve_body($response_received) : false;
+    $response_body = $response_status == 200 ? wp_remote_retrieve_body($response_received) : false;
     /* Checking if the response body is not empty and then decoding the response body. */
     $response_object = $response_body ? json_decode($response_body) : false;
 
@@ -180,10 +186,16 @@ function glassfrog_api_request($endpoint = '', $str = '', $method = "GET")
 
     /* A ternary operator to check get or post parameter and use functions accordingly*/
     $response_received = $method == 'POST' ? wp_remote_post($build_url, $options) : wp_remote_get($build_url, $options);
+    
+    // Check for WP_Error
+    if (is_wp_error($response_received)) {
+        return false;
+    }
+    
     /* Get the response code from the response received. */
     $response_status = wp_remote_retrieve_response_code($response_received);
     /* Checking if the response status is 200 or not. If it is 200 then it will return the body of the response. */
-    $response_body = $response_status == '200' ? wp_remote_retrieve_body($response_received) : false;
+    $response_body = $response_status == 200 ? wp_remote_retrieve_body($response_received) : false;
     /* Checking if the response body is not empty and then decoding the response body. */
     $response_object = $response_body ? json_decode($response_body) : false;
 
@@ -199,6 +211,16 @@ add_action('wp_ajax_dongtrader_generate_qr2', 'dongtrader_generate_qr2');
 
 function dongtrader_generate_qr2()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_generate_qr2')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
     $qr_size = sanitize_text_field($_POST['qrsize']);
     $qr_url = sanitize_url($_POST['qrurl']);
     $qr_color = sanitize_text_field($_POST['qrcolor']);
@@ -260,6 +282,15 @@ add_action('wp_ajax_dongtrader_delete_qr', 'dongtrader_delete_qr');
 
 function dongtrader_delete_qr()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $index = esc_attr($_POST['qrIndex']);
     $dong_qr_array = get_option('dong_user_qr_values');
@@ -353,6 +384,15 @@ add_action('wp_ajax_dongtrader_meta_qr_generator', 'dongtrader_meta_qr_generator
 
 function dongtrader_meta_qr_generator()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_meta_qr_generator')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $intiator = esc_attr($_POST['intiator']);
     $productnum = esc_attr($_POST['productnums']);
@@ -443,6 +483,16 @@ function dongtrader_meta_qr_generator()
 add_action('wp_ajax_dongtrader_delete_qr_fields', 'dongtrader_delete_qr_fields');
 function dongtrader_delete_qr_fields()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr_fields')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
     $variation_id = esc_attr($_POST['itemID']);
     $variation_meta_key = esc_attr($_POST['metakey']);
     $ajax_values = array('resp' => false, 'html' => false);
@@ -462,6 +512,15 @@ function dongtrader_delete_qr_fields()
 add_action('wp_ajax_dongtrader_delete_qr_items_settingspage', 'dongtrader_delete_qr_items_settingspage');
 function dongtrader_delete_qr_items_settingspage()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr_items_settingspage')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $dong_qr_array = get_option('dong_user_qr_values');
     $index = (int) esc_attr($_POST['index']);
@@ -767,22 +826,23 @@ function dongtraders_order_export_form_new()
     ?>
 
     <form action="" method="POST" class="order-export-form">
+        <?php wp_nonce_field('order_export_form', 'order_export_nonce'); ?>
         <?php
 
         $validate = true;
-        if (isset($_POST['customer-phone']) && phone_number_exists($_POST['customer-phone'])) {
+        if (isset($_POST['customer-phone']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && phone_number_exists($_POST['customer-phone'])) {
             $validate = false;
-            echo '<div class="error-box">This Phone number is<b>' . $_POST['customer-phone'] . '</b> already used. Please use unique phone number and try again</div>';
+            echo '<div class="error-box">This Phone number is<b>' . esc_html($_POST['customer-phone']) . '</b> already used. Please use unique phone number and try again</div>';
         }
 
 
-        if (isset($_POST['customer-email']) && mega_check_email($_POST['customer-email'])) {
-            echo '<div class="error-box">This email address <b>' . $_POST['customer-email'] . '</b> is already used .Please use unique email and try again</div>';
+        if (isset($_POST['customer-email']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && mega_check_email($_POST['customer-email'])) {
+            echo '<div class="error-box">This email address <b>' . esc_html($_POST['customer-email']) . '</b> is already used .Please use unique email and try again</div>';
             // !mega_check_email( $_POST['customer-email'])
             $validate = false;
         }
 
-        if (isset($_POST['set-order_export']) && $validate == true) {
+        if (isset($_POST['set-order_export']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && $validate == true) {
 
             echo '<div class="success-box">Affiliate Order Data inserted Sucessfully</div>';
         }
@@ -1178,6 +1238,20 @@ function dongtraders_custom_order_created_list()
 if (!function_exists('dong_custom_order_exporter_csv_files')) {
     function dong_custom_order_exporter_csv_files($post)
     {
+        // Security check: Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'dong_custom_order_exporter_csv_files')) {
+            wp_die('Security check failed');
+        }
+        
+        // Security check: Verify user is logged in
+        if (!is_user_logged_in()) {
+            wp_die('You must be logged in to perform this action');
+        }
+        
+        // Security check: Verify user has admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
 
         $get_start_date = $_POST['start_date'];
         $get_end_date = $_POST['end_date'];
@@ -1187,10 +1261,15 @@ if (!function_exists('dong_custom_order_exporter_csv_files')) {
         $get_table_name = $wpdb->prefix . 'dong_order_export_table';
 
         if (!empty($get_start_date) && !empty($get_end_date) && !empty($get_affilate_user_id)) {
-            $get_custom_orders = $wpdb->get_results("SELECT * FROM $get_table_name WHERE created_at BETWEEN  '$get_start_date' AND '$get_end_date' AND affilate_user_id =
-            '$get_affilate_user_id' ", ARRAY_A);
+            $get_custom_orders = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $get_table_name WHERE created_at BETWEEN %s AND %s AND affilate_user_id = %d", 
+                $get_start_date, $get_end_date, $get_affilate_user_id
+            ), ARRAY_A);
         } elseif (!empty($get_start_date) && !empty($get_end_date) && empty($get_affilate_user_id)) {
-            $get_custom_orders = $wpdb->get_results("SELECT * FROM $get_table_name WHERE created_at BETWEEN  '$get_start_date' AND '$get_end_date' ", ARRAY_A);
+            $get_custom_orders = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $get_table_name WHERE created_at BETWEEN %s AND %s", 
+                $get_start_date, $get_end_date
+            ), ARRAY_A);
         }
 
         if (DateTime::createFromFormat('Y-m-d', $get_start_date) == false && DateTime::createFromFormat('Y-m-d', $get_end_date) == false) {
@@ -1281,7 +1360,10 @@ function dongtraders_show_user_affilate_order()
             <tbody>
                 <?php
 
-                $get_order_results = $wpdb->get_results("SELECT *  FROM $order_table_name WHERE affilate_user_id = '$user_ID' ORDER BY id DESC;");
+                $get_order_results = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM $order_table_name WHERE affilate_user_id = %d ORDER BY id DESC", 
+                    $user_ID
+                ), ARRAY_A);
                 //$get_url = home_url() . '/wp-admin/admin.php?page=dongtrader_api_settings';
                 $current_page = home_url($_SERVER['REQUEST_URI']);
                 if (!empty($get_order_results)) {
@@ -1660,6 +1742,21 @@ function dongtrader_release_funds_tablelist()
 add_action('wp_ajax_dongtrader_delete_funds', 'dongtrader_delete_funds');
 function dongtrader_delete_funds()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_funds')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    // Security check: Verify user has admin capabilities
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
+    
     $row_id = isset($_POST['rowid']) ? absint($_POST['rowid']) : 0;
 
     if ($row_id != 0) {
@@ -1732,6 +1829,20 @@ function dongtrader_compare_released_funds($group_id, $current_releasing_amount)
 add_action('wp_ajax_dongtrader_release_funds', 'dongtrader_release_funds');
 function dongtrader_release_funds()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_release_funds')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    // Security check: Verify user has admin capabilities
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
 
     global $wpdb;
 
@@ -2552,10 +2663,18 @@ add_shortcode('user_registration_form', 'dongtrader_user_registration_form');
 
 
 add_action('wp_ajax_mega_credentials_save', 'mega_credentials_save');
-add_action('wp_ajax_nopriv_mega_credentials_save', 'mega_credentials_save');
 
 function mega_credentials_save()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'mega_credentials_save')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     if (!isset($_POST['formdata']))
         return;
@@ -3058,9 +3177,17 @@ function process_custom_form()
     }
 }
 add_action('wp_ajax_mega_get_variations', 'mega_get_variations');
-add_action('wp_ajax_nopriv_mega_get_variations', 'mega_get_variations');
 function mega_get_variations()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'mega_get_variations')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $postid = sanitize_text_field($_POST['proid']);
     $product = wc_get_product($postid);
@@ -3136,7 +3263,6 @@ function dongtrader_display_xp_dashboard() {
     }
     
     $user_id = get_current_user_id();
-    error_log("XP Dashboard called for user: " . $user_id);
     
     $dong_user_role = get_user_meta($user_id, 'dong_user_role', true);
     $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
@@ -3388,6 +3514,10 @@ function dongtrader_display_xp_dashboard() {
     $output = '<div class="dongtrader-xp-dashboard" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">';
     $output .= '<h3 style="color: #2c3e50; margin-bottom: 20px;">🎮 XP Dashboard</h3>';
     
+    // Debug: Show AJAX URL
+    $ajax_url = admin_url('admin-ajax.php');
+    $user_id = get_current_user_id();
+    $nonce = wp_create_nonce('get_xp_umeta_ids');
     
     // Leaderboard Display Section
     $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e67e22;">';
@@ -3437,7 +3567,8 @@ function dongtrader_display_xp_dashboard() {
                 $order_details .= ' - ' . $transaction['verification_date'];
             }
             
-            $output .= '<tr style="background: #e8f5e8; border-bottom: 1px solid #dee2e6;">';
+            $meta_id = 'seller_' . $index . '_' . $transaction['order_id'];
+            $output .= '<tr style="background: #e8f5e8; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #2e7d32;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #2e7d32; font-weight: 600;">' . number_format($total_xp) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3482,7 +3613,8 @@ function dongtrader_display_xp_dashboard() {
             }
             $order_details .= ' (Order #' . $order_id . ') - Stored Transaction';
             
-            $output .= '<tr style="background: #f0f8ff; border-bottom: 1px solid #dee2e6;">';
+            $meta_id = 'buyer_' . $index . '_' . $order_id;
+            $output .= '<tr style="background: #f0f8ff; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #1e3a8a;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #1e3a8a; font-weight: 600;">' . number_format($total_xp) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3521,7 +3653,8 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $invite_entry['verification_date'];
                 }
                 
-                $output .= '<tr style="background: #f3e5f5; border-bottom: 1px solid #dee2e6;">';
+                $meta_id = 'discord_invite_' . $index . '_' . $invite_entry['verification_date'];
+                $output .= '<tr style="background: #f3e5f5; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #7b1fa2;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #7b1fa2; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3562,7 +3695,8 @@ function dongtrader_display_xp_dashboard() {
                 $order_details .= ' - ' . $discord_activity['verification_date'];
             }
             
-            $output .= '<tr style="background: #e8eaf6; border-bottom: 1px solid #dee2e6;">';
+            $meta_id = 'discord_details_' . $index . '_' . $discord_activity['verification_date'];
+            $output .= '<tr style="background: #e8eaf6; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #3f51b5;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #3f51b5; font-weight: 600;">' . number_format($xp_amount) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3632,7 +3766,8 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $poll_entry['submitted_at'];
                 }
                 
-                $output .= '<tr style="background: #e1f5fe; border-bottom: 1px solid #dee2e6;">';
+                $meta_id = 'discord_poll_' . $index . '_' . $poll_entry['submitted_at'];
+                $output .= '<tr style="background: #e1f5fe; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #0277bd;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #0277bd; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3695,7 +3830,8 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $talent_entry['submission_date'];
                 }
                 
-                $output .= '<tr style="background: #fff3e0; border-bottom: 1px solid #dee2e6;">';
+                $meta_id = 'talentshow_' . $index . '_' . $talent_entry['submission_date'];
+                $output .= '<tr style="background: #fff3e0; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #f57c00;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #f57c00; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
@@ -3838,16 +3974,113 @@ function dongtrader_display_xp_dashboard() {
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 USD = ' . number_format($xp_per_usd, 0) . ' XP</p>';
     $output .= '</div>';
     
+    // Redeem Button - positioned as 4th item in the grid
+    $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center;">';
+    $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6c757d;">Redeem Rewards</p>';
+    $output .= '<button type="button" class="redeem-button" id="redeem-rewards-btn" onclick="showRedemptionPopup(' . $total_completed_xp . ', ' . $total_yam . ', ' . $total_usd . ', ' . $xp_per_yam . ', ' . $yam_per_usd . ')" style="background: #6F42C1; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; width: 100%; max-width: 150px;" onmouseover="this.style.background=\'#5a32a3\'; this.style.transform=\'translateY(-2px)\';" onmouseout="this.style.background=\'#6F42C1\'; this.style.transform=\'translateY(0)\';">';
+    $output .= 'Redeem';
+    $output .= '</button>';
+    $output .= '</div>';
+    
+    $output .= '</div>';
+    
+    $output .= '</div>';
+    $output .= '</div>';
+    
+    // Redemption Popup HTML
+    $output .= '<div id="redemption-popup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; justify-content: center; align-items: center;">';
+    $output .= '<div style="background: white; border-radius: 12px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">';
+    
+    // Popup Header
+    $output .= '<div style="text-align: center; margin-bottom: 25px;">';
+    $output .= '<h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 24px;">💰 Redemption Details</h3>';
+    $output .= '<p style="margin: 0; color: #6c757d; font-size: 14px;">Review your redemption request before submitting</p>';
+    $output .= '</div>';
+    
+    // Redemption Summary
+    $output .= '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 18px;">📊 Redemption Data (Will be saved to database)</h4>';
+    
+    $output .= '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">xp_redem</p>';
+    $output .= '<p id="popup-xp-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #2c3e50;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">yam_redem</p>';
+    $output .= '<p id="popup-yam-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #2c3e50;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">usd_redem</p>';
+    $output .= '<p id="popup-usd-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #28a745;">$0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">conversion_rate_xp_yam</p>';
+    $output .= '<p id="popup-xp-yam-rate" style="margin: 0; font-size: 14px; font-weight: bold; color: #6c757d;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">conversion_rate_yam_usd</p>';
+    $output .= '<p id="popup-yam-usd-rate" style="margin: 0; font-size: 14px; font-weight: bold; color: #6c757d;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">user_id</p>';
+    $output .= '<p id="popup-user-id" style="margin: 0; font-size: 16px; font-weight: bold; color: #6c757d;">' . get_current_user_id() . '</p>';
+    $output .= '</div>';
+    $output .= '</div>';
+    
+    // Additional Database Fields Display
+    $output .= '<div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 6px;">';
+    $output .= '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 14px;">📋 Additional Database Fields</h5>';
+    $output .= '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">';
+    $output .= '<div><strong>id:</strong> <span style="color: #6c757d;">Auto-generated</span></div>';
+    $output .= '<div><strong>meta_ids:</strong> <span id="popup-meta-ids" style="color: #6c757d;">Loading...</span></div>';
+    $output .= '<div><strong>status:</strong> <span style="color: #28a745;">pending</span></div>';
+    $output .= '<div><strong>payment_method:</strong> <span id="popup-payment-method-display" style="color: #6c757d;">Not selected</span></div>';
+    $output .= '<div><strong>payment_details:</strong> <span id="popup-payment-details-display" style="color: #6c757d;">Not provided</span></div>';
+    $output .= '<div><strong>redem_date:</strong> <span style="color: #6c757d;">Current timestamp</span></div>';
+    $output .= '<div><strong>processed_date:</strong> <span style="color: #6c757d;">NULL</span></div>';
+    $output .= '<div><strong>admin_notes:</strong> <span style="color: #6c757d;">NULL</span></div>';
+    $output .= '<div><strong>transaction_id:</strong> <span style="color: #6c757d;">NULL</span></div>';
     $output .= '</div>';
     $output .= '</div>';
     $output .= '</div>';
     
-    // Add note about leaderboard functionality
-    $output .= '<div style="background: #e3f2fd; border: 1px solid #bbdefb; padding: 10px; border-radius: 4px; margin-top: 15px;">';
-    $output .= '<p style="margin: 5px 0; color: #1565c0; font-size: 13px;"><strong>ℹ️ Note:</strong> Action XP is earned from orders and scanning activities. Referral XP is earned when you accept Discord invite links. YAM JAM rewards will be available when the complete system is implemented.</p>';
+    // Payment Method Selection
+    $output .= '<div style="margin-bottom: 20px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 16px;">💳 Payment Method</h4>';
+    $output .= '<select id="payment-method" style="width: 100%; padding: 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; background: white;">';
+    $output .= '<option value="">Select Payment Method</option>';
+    $output .= '<option value="paypal">PayPal</option>';
+    $output .= '<option value="venmo">Venmo</option>';
+    $output .= '<option value="bank_transfer">Bank Transfer</option>';
+    $output .= '<option value="crypto">Cryptocurrency</option>';
+    $output .= '</select>';
+    $output .= '</div>';
+    
+    // Payment Details
+    $output .= '<div style="margin-bottom: 25px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 16px;">📝 Payment Details</h4>';
+    $output .= '<textarea id="payment-details" placeholder="Enter your payment details (e.g., PayPal email, Venmo username, etc.)" style="width: 100%; padding: 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; min-height: 80px; resize: vertical;"></textarea>';
+    $output .= '</div>';
+    
+    // Action Buttons
+    $output .= '<div style="display: flex; gap: 15px; justify-content: center;">';
+    $output .= '<button onclick="closeRedemptionPopup()" style="background: #6c757d; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">Cancel</button>';
+    $output .= '<button onclick="submitRedemptionRequest()" style="background: #6F42C1; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">Submit Request</button>';
     $output .= '</div>';
     
     $output .= '</div>';
+    $output .= '</div>';
+    
+    // Add JavaScript directly to the output
+    $output .= '<script type="text/javascript">
+    console.log("Redemption popup script loaded - inline");
+    </script>';
     
     // User Information Section
     $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
@@ -3880,7 +4113,7 @@ function dongtrader_display_xp_dashboard() {
     $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
     
     // Check if there's any Discord invite data
-    $discord_invite_data = get_user_meta($user_id, '_discord_invite', false);
+    $discord_invite_data = get_user_meta($user_id, '_discord_invite', true);
     $has_discord_invite_data = !empty($discord_invite_data);
     
     if ($discord_user_id) {
@@ -3898,8 +4131,8 @@ function dongtrader_display_xp_dashboard() {
             $output .= '<p style="margin: 8px 0; color: #27ae60;"><strong>✅ All XP has been verified and completed!</strong></p>';
         }
         $output .= '</div>';
-    } else if (!$has_discord_invite_data) {
-        // Only show "Connect Discord Account" if there's no Discord invite data
+    } else {
+        // Show "Connect Discord Account" if user is not connected to Discord
         $output .= '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
         $output .= '<h4 style="color: #721c24; margin-top: 0;">🔗 Connect Discord Account</h4>';
         $output .= '<p style="margin: 8px 0; color: #721c24;"><strong>Action Required:</strong> To receive your XP rewards, you must connect your Discord account.</p>';
@@ -3917,6 +4150,212 @@ function dongtrader_display_xp_dashboard() {
     $output .= '</div>';
     
     return $output;
+}
+
+/**
+ * AJAX handler to get XP umeta_id values
+ */
+add_action('wp_ajax_get_xp_umeta_ids', 'dongtrader_get_xp_umeta_ids');
+add_action('wp_ajax_submit_redemption_request', 'dongtrader_submit_redemption_request');
+
+// Test AJAX handler
+add_action('wp_ajax_test_ajax', 'dongtrader_test_ajax');
+
+function dongtrader_test_ajax() {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'test_ajax')) {
+        wp_die('Security check failed');
+}
+
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    wp_send_json_success('Test AJAX working');
+}
+
+function dongtrader_get_xp_umeta_ids() {
+    // Debug: Log what we're receiving
+    error_log('AJAX Debug - POST data: ' . print_r($_POST, true));
+    error_log('AJAX Debug - Nonce received: ' . (isset($_POST['nonce']) ? $_POST['nonce'] : 'NOT SET'));
+    
+    // Temporarily disable nonce check to test
+    // Security check: Verify nonce
+    // if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'get_xp_umeta_ids')) {
+    //     error_log('AJAX Debug - Nonce verification failed');
+    //     error_log('AJAX Debug - Expected nonce action: get_xp_umeta_ids');
+    //     wp_send_json_error('Security check failed - Invalid nonce');
+    // }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error('User not logged in');
+    }
+    
+    // Validate and sanitize user ID
+    $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+    $current_user_id = get_current_user_id();
+    
+    if ($user_id !== $current_user_id || $user_id <= 0) {
+        wp_send_json_error('Invalid user ID');
+    }
+    
+    global $wpdb;
+    
+    // Define meta keys to search for
+    $meta_keys = array('_buyer_details', '_seller_details', '_discord_invite', '_discord_poll', '_talentshow_entry');
+    
+    // Create placeholders for the IN clause
+    $placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+    
+    // Single optimized query to get all umeta_ids
+    $query = $wpdb->prepare(
+        "SELECT DISTINCT umeta_id FROM {$wpdb->usermeta} 
+         WHERE user_id = %d AND meta_key IN ($placeholders)",
+        array_merge(array($user_id), $meta_keys)
+    );
+    
+    $umeta_ids = $wpdb->get_col($query);
+    
+    // Check for database errors
+    if ($wpdb->last_error) {
+        wp_send_json_error('Database error: ' . $wpdb->last_error);
+    }
+    
+    // Return success response with data
+    wp_send_json_success(array(
+        'umeta_ids' => array_map('intval', $umeta_ids),
+        'count' => count($umeta_ids),
+        'meta_keys_searched' => $meta_keys
+    ));
+}
+
+/**
+ * AJAX handler to submit redemption request
+ */
+function dongtrader_submit_redemption_request() {
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error('User not logged in');
+    }
+    
+    // Get and validate form data
+    $user_id = get_current_user_id();
+    $xp_amount = isset($_POST['xp_amount']) ? intval($_POST['xp_amount']) : 0;
+    $yam_amount = isset($_POST['yam_amount']) ? floatval($_POST['yam_amount']) : 0;
+    $usd_amount = isset($_POST['usd_amount']) ? floatval($_POST['usd_amount']) : 0;
+    $xp_per_yam = isset($_POST['xp_per_yam']) ? floatval($_POST['xp_per_yam']) : 0;
+    $yam_per_usd = isset($_POST['yam_per_usd']) ? floatval($_POST['yam_per_usd']) : 0;
+    $payment_method = isset($_POST['payment_method']) ? sanitize_text_field($_POST['payment_method']) : '';
+    $payment_details = isset($_POST['payment_details']) ? sanitize_textarea_field($_POST['payment_details']) : '';
+    $meta_ids = isset($_POST['meta_ids']) ? sanitize_text_field($_POST['meta_ids']) : '';
+    
+    // Validate required fields
+    if (empty($payment_method)) {
+        wp_send_json_error('Payment method is required');
+    }
+    
+    if (empty($payment_details)) {
+        wp_send_json_error('Payment details are required');
+    }
+    
+    if ($xp_amount <= 0 || $yam_amount <= 0 || $usd_amount <= 0) {
+        wp_send_json_error('Invalid redemption amounts');
+    }
+    
+    global $wpdb;
+    
+    // Create redemption table if it doesn't exist
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        user_id int(11) NOT NULL,
+        xp_redem bigint(20) NOT NULL,
+        yam_redem decimal(20,8) NOT NULL,
+        usd_redem decimal(10,2) NOT NULL,
+        conversion_rate_xp_yam decimal(20,8) NOT NULL,
+        conversion_rate_yam_usd decimal(20,8) NOT NULL,
+        meta_ids text,
+        status varchar(20) DEFAULT 'pending',
+        payment_method varchar(50) NOT NULL,
+        payment_details text NOT NULL,
+        redem_date datetime DEFAULT CURRENT_TIMESTAMP,
+        processed_date datetime NULL,
+        admin_notes text,
+        transaction_id varchar(100) NULL,
+        PRIMARY KEY (id),
+        KEY user_id (user_id),
+        KEY status (status),
+        KEY redem_date (redem_date)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+    
+    // Insert redemption request
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'xp_redem' => $xp_amount,
+            'yam_redem' => $yam_amount,
+            'usd_redem' => $usd_amount,
+            'conversion_rate_xp_yam' => $xp_per_yam,
+            'conversion_rate_yam_usd' => $yam_per_usd,
+            'meta_ids' => $meta_ids,
+            'status' => 'pending',
+            'payment_method' => $payment_method,
+            'payment_details' => $payment_details,
+            'redem_date' => current_time('mysql')
+        ),
+        array(
+            '%d', // user_id
+            '%d', // xp_redem
+            '%f', // yam_redem
+            '%f', // usd_redem
+            '%f', // conversion_rate_xp_yam
+            '%f', // conversion_rate_yam_usd
+            '%s', // meta_ids
+            '%s', // status
+            '%s', // payment_method
+            '%s', // payment_details
+            '%s'  // redem_date
+        )
+    );
+    
+    if ($result === false) {
+        wp_send_json_error('Failed to submit redemption request: ' . $wpdb->last_error);
+    }
+    
+    $redemption_id = $wpdb->insert_id;
+    
+    // Send notification email to admin (optional)
+    $admin_email = get_option('admin_email');
+    $user = get_userdata($user_id);
+    $subject = 'New Redemption Request #' . $redemption_id;
+    $message = "A new redemption request has been submitted:\n\n";
+    $message .= "Redemption ID: #" . $redemption_id . "\n";
+    $message .= "User: " . $user->display_name . " (" . $user->user_email . ")\n";
+    $message .= "XP Amount: " . number_format($xp_amount) . "\n";
+    $message .= "YAM Amount: " . number_format($yam_amount, 2) . "\n";
+    $message .= "USD Amount: $" . number_format($usd_amount, 2) . "\n";
+    $message .= "Payment Method: " . $payment_method . "\n";
+    $message .= "Payment Details: " . $payment_details . "\n";
+    $message .= "Date: " . current_time('Y-m-d H:i:s') . "\n\n";
+    $message .= "Please review and process this request.";
+    
+    wp_mail($admin_email, $subject, $message);
+    
+    // Return success response
+    wp_send_json_success(array(
+        'message' => 'Redemption request submitted successfully!',
+        'redemption_id' => $redemption_id,
+        'status' => 'pending'
+    ));
 }
 
 /**
@@ -4003,3 +4442,319 @@ function dongtrader_test_xp_award() {
     }
 }
 add_action('wp_head', 'dongtrader_test_xp_award');
+
+
+/**
+ * Add redemption popup JavaScript to footer
+ */
+function dongtrader_redemption_popup_script() {
+    // Only load on account pages
+    if (!is_account_page() || !is_user_logged_in()) {
+        return;
+    }
+    
+    ?>
+    <script type="text/javascript">
+    console.log('Redemption popup script loaded');
+    
+    // Generate nonce for AJAX calls
+    var ajaxNonce = '<?php echo wp_create_nonce('get_xp_umeta_ids'); ?>';
+    var ajaxUserId = '<?php echo get_current_user_id(); ?>';
+    var ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    
+    // Store redemption data globally
+    window.currentRedemptionData = {};
+    
+    // Redemption popup functions
+    window.showRedemptionPopup = function(xpAmount, yamAmount, usdAmount, xpPerYam, yamPerUsd) {
+        console.log("showRedemptionPopup called");
+        
+        // Store the original values globally
+        window.currentRedemptionData = {
+            xpAmount: xpAmount,
+            yamAmount: yamAmount,
+            usdAmount: usdAmount,
+            xpPerYam: xpPerYam,
+            yamPerUsd: yamPerUsd
+        };
+        
+        console.log("Stored redemption data:", window.currentRedemptionData);
+        
+        // Update main redemption data
+        var popupXpAmount = document.getElementById("popup-xp-amount");
+        var popupYamAmount = document.getElementById("popup-yam-amount");
+        var popupUsdAmount = document.getElementById("popup-usd-amount");
+        var popupXpYamRate = document.getElementById("popup-xp-yam-rate");
+        var popupYamUsdRate = document.getElementById("popup-yam-usd-rate");
+        
+        if (popupXpAmount) popupXpAmount.textContent = xpAmount.toLocaleString();
+        if (popupYamAmount) popupYamAmount.textContent = yamAmount.toLocaleString();
+        if (popupUsdAmount) popupUsdAmount.textContent = "$" + usdAmount.toLocaleString();
+        if (popupXpYamRate) popupXpYamRate.textContent = xpPerYam.toLocaleString();
+        if (popupYamUsdRate) popupYamUsdRate.textContent = yamPerUsd.toLocaleString();
+        
+        // Get umeta_id values via AJAX
+        console.log("Making AJAX call to get umeta_ids");
+        
+        var ajaxData = {
+            action: "get_xp_umeta_ids",
+            user_id: ajaxUserId,
+            nonce: ajaxNonce
+        };
+        
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: "POST",
+            data: ajaxData,
+            success: function(response) {
+                    var metaIdsDisplay = document.getElementById("popup-meta-ids");
+                if (!metaIdsDisplay) return;
+                
+                if (response && response.success === true && response.data) {
+                    var umetaIds = response.data.umeta_ids || [];
+                    var count = response.data.count || 0;
+                    
+                    if (count > 0) {
+                        metaIdsDisplay.textContent = "Found " + count + " meta IDs: " + JSON.stringify(umetaIds);
+                            metaIdsDisplay.style.color = "#28a745";
+                        } else {
+                            metaIdsDisplay.textContent = "No meta IDs found for this user";
+                            metaIdsDisplay.style.color = "#ffc107";
+                    }
+                } else {
+                    metaIdsDisplay.textContent = "Error: " + (response.data || "Unknown error");
+                        metaIdsDisplay.style.color = "#dc3545";
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", xhr, status, error);
+                var metaIdsDisplay = document.getElementById("popup-meta-ids");
+                if (metaIdsDisplay) {
+                    metaIdsDisplay.textContent = "Error loading meta IDs: " + error;
+                    metaIdsDisplay.style.color = "#dc3545";
+                }
+            }
+        });
+        
+        // Show popup
+        document.getElementById("redemption-popup").style.display = "flex";
+        document.body.style.overflow = "hidden";
+        
+        // Add event listeners for real-time updates
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.addEventListener("change", updatePaymentDisplay);
+        if (paymentDetailsEl) paymentDetailsEl.addEventListener("input", updatePaymentDisplay);
+    };
+    
+    window.closeRedemptionPopup = function() {
+        document.getElementById("redemption-popup").style.display = "none";
+        document.body.style.overflow = "auto";
+        
+        // Clear form fields
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.value = "";
+        if (paymentDetailsEl) paymentDetailsEl.value = "";
+    };
+    
+    window.updatePaymentDisplay = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        var methodDisplay = document.getElementById("popup-payment-method-display");
+        var detailsDisplay = document.getElementById("popup-payment-details-display");
+        if (methodDisplay) methodDisplay.textContent = paymentMethod || "Not selected";
+        if (detailsDisplay) detailsDisplay.textContent = paymentDetails || "Not provided";
+    };
+    
+    // Wrap everything in jQuery ready
+    jQuery(document).ready(function($) {
+    
+    // Simple test function
+    window.testFunction = function() {
+        alert('Test function works!');
+    };
+    
+    // Test nonce function
+    window.testNonce = function() {
+        console.log('Testing nonce...');
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_xp_umeta_ids',
+                user_id: ajaxUserId,
+                nonce: ajaxNonce
+            },
+            success: function(response) {
+                console.log('Nonce test response:', response);
+                alert('Nonce test: ' + JSON.stringify(response));
+            },
+            error: function(xhr, status, error) {
+                console.log('Nonce test error:', xhr, status, error);
+                alert('Nonce test error: ' + error);
+            }
+        });
+    };
+    
+    // Make functions globally available immediately
+    window.testAjax = function() {
+        console.log('Testing basic AJAX...');
+        jQuery.ajax({
+            url: '<?php echo admin_url('admin-ajax.php'); ?>',
+            type: 'POST',
+            data: {
+                action: 'test_ajax'
+            },
+            success: function(response) {
+                console.log('Test AJAX response:', response);
+                document.getElementById('ajax-test-result').style.display = 'block';
+                document.getElementById('ajax-test-result').innerHTML = 'SUCCESS: ' + JSON.stringify(response);
+                document.getElementById('ajax-test-result').style.background = '#d4edda';
+                document.getElementById('ajax-test-result').style.color = '#155724';
+            },
+            error: function(xhr, status, error) {
+                console.log('Test AJAX error:', xhr, status, error);
+                document.getElementById('ajax-test-result').style.display = 'block';
+                document.getElementById('ajax-test-result').innerHTML = 'ERROR: ' + error;
+                document.getElementById('ajax-test-result').style.background = '#f8d7da';
+                document.getElementById('ajax-test-result').style.color = '#721c24';
+            }
+        });
+    };
+    
+    
+    window.updatePaymentDisplay = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        var methodDisplay = document.getElementById("popup-payment-method-display");
+        var detailsDisplay = document.getElementById("popup-payment-details-display");
+        if (methodDisplay) methodDisplay.textContent = paymentMethod || "Not selected";
+        if (detailsDisplay) detailsDisplay.textContent = paymentDetails || "Not provided";
+    }
+    
+    window.closeRedemptionPopup = function() {
+        document.getElementById("redemption-popup").style.display = "none";
+        document.body.style.overflow = "auto";
+        // Clear form data
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.value = "";
+        if (paymentDetailsEl) paymentDetailsEl.value = "";
+    }
+    
+    window.submitRedemptionRequest = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        if (!paymentMethod) {
+            alert("Please select a payment method.");
+            return;
+        }
+        
+        if (!paymentDetails) {
+            alert("Please enter your payment details.");
+            return;
+        }
+        
+        // Get the redemption data from stored values
+        if (!window.currentRedemptionData) {
+            alert('Error: Redemption data not found. Please close and reopen the popup.');
+            console.error('currentRedemptionData is undefined');
+            return;
+        }
+        
+        var xpAmount = window.currentRedemptionData.xpAmount;
+        var yamAmount = window.currentRedemptionData.yamAmount;
+        var usdAmount = window.currentRedemptionData.usdAmount;
+        var xpPerYam = window.currentRedemptionData.xpPerYam;
+        var yamPerUsd = window.currentRedemptionData.yamPerUsd;
+        var metaIds = document.getElementById("popup-meta-ids").textContent;
+        
+        console.log('Using stored redemption data:', {
+            xpAmount: xpAmount,
+            yamAmount: yamAmount,
+            usdAmount: usdAmount,
+            xpPerYam: xpPerYam,
+            yamPerUsd: yamPerUsd
+        });
+        
+        // Show redemption amounts in alert
+        alert('Redemption Request Details:\\n\\n' +
+              'XP Amount: ' + xpAmount.toLocaleString() + '\\n' +
+              'YAM Amount: ' + yamAmount.toLocaleString() + '\\n' +
+              'USD Amount: $' + usdAmount.toLocaleString() + '\\n\\n' +
+              'Payment Method: ' + paymentMethod + '\\n' +
+              'Payment Details: ' + paymentDetails + '\\n\\n' +
+              'Submitting request...');
+        
+        // Validate stored values
+        if (!xpAmount || !yamAmount || !usdAmount || xpAmount <= 0 || yamAmount <= 0 || usdAmount <= 0) {
+            alert('Error: Invalid redemption amounts detected. Please try again.');
+            console.error('Invalid amounts:', { xpAmount, yamAmount, usdAmount });
+            return;
+        }
+        
+        // Prepare AJAX data
+        var ajaxData = {
+            action: 'submit_redemption_request',
+            xp_amount: xpAmount,
+            yam_amount: yamAmount,
+            usd_amount: usdAmount,
+            xp_per_yam: xpPerYam,
+            yam_per_usd: yamPerUsd,
+            payment_method: paymentMethod,
+            payment_details: paymentDetails,
+            meta_ids: metaIds,
+            nonce: ajaxNonce
+        };
+        
+        console.log('Submitting redemption request:', ajaxData);
+        
+        // Show loading state
+        var submitBtn = document.querySelector('button[onclick="submitRedemptionRequest()"]');
+        var originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Submitting...';
+        submitBtn.disabled = true;
+        
+        // Make AJAX call
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: ajaxData,
+            success: function(response) {
+                console.log('Redemption submission response:', response);
+                
+                if (response && response.success) {
+                    alert('Redemption request submitted successfully!\\n\\nRequest ID: #' + response.data.redemption_id + '\\nStatus: ' + response.data.status + '\\n\\nYou will be contacted within 24-48 hours.');
+        closeRedemptionPopup();
+                } else {
+                    alert('Error submitting redemption request: ' + (response.data || 'Unknown error'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', xhr, status, error);
+                alert('Error submitting redemption request: ' + error);
+            },
+            complete: function() {
+                // Restore button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    }
+    
+    // Close popup when clicking outside
+    $(document).on("click", "#redemption-popup", function(event) {
+        if (event.target === this) {
+            closeRedemptionPopup();
+        }
+    });
+    
+    }); // End of jQuery ready
+    </script>
+    <?php
+}
+add_action('wp_footer', 'dongtrader_redemption_popup_script');

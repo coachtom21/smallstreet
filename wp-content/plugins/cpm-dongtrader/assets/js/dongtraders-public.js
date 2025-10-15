@@ -18,9 +18,14 @@ function dong_traders_url_copy(element) {
       $(".qr-tiger-vcard-code-generator").css("display", "block");
     }); // END OF DOCUMENT READY
 
-    print_country("country");
-    jQuery("#country").val("USA");
-    print_state("state", jQuery("#country")[0].selectedIndex);
+    // Only initialize country/state dropdowns if elements exist
+    if (document.getElementById("country")) {
+        print_country("country");
+        jQuery("#country").val("USA");
+        if (document.getElementById("state")) {
+            print_state("state", jQuery("#country")[0].selectedIndex);
+        }
+    }
 
     jQuery(".select-product").change(function () {
       var get_p_id = jQuery(this).val();

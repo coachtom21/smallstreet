@@ -281,6 +281,10 @@ s_a[252]="Bulawayo|Harare|ManicalandMashonaland Central|Mashonaland East|Mashona
 function print_country(country_id){
 	// given the id of the <select> tag as function argument, it inserts <option> tags
 	var option_str = document.getElementById(country_id);
+	if (!option_str) {
+		console.log('Country element not found:', country_id);
+		return;
+	}
 	var x, i=0;
 	for(x in country_arr){
 		option_str.options[i++] = new Option(country_arr[x],country_arr[x]);
@@ -289,6 +293,10 @@ function print_country(country_id){
 
 function print_state(state_id, state_index){
 	var option_str = document.getElementById(state_id);
+	if (!option_str) {
+		console.log('State element not found:', state_id);
+		return;
+	}
 	var x, i=0; state_index++;
 	var state_arr = s_a[state_index].split("|");
 	for(x in state_arr){
