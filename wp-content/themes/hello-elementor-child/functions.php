@@ -825,7 +825,1178 @@ function make_quantity_readonly_for_mordern_piggy_bank_product()
     }
 }
 
+/**
+ * Add Redemption Requests admin menu
+ */
+add_action('admin_menu', 'dongtrader_add_redemption_admin_menu');
 
+function dongtrader_add_redemption_admin_menu() {
+    add_menu_page(
+        'Redemption Requests',           // Page title
+        'Redemption Requests',           // Menu title
+        'manage_options',                // Capability
+        'redemption-requests',           // Menu slug
+        'dongtrader_redemption_admin_page', // Function to display page
+        'dashicons-money-alt',          // Icon
+        30                              // Position
+    );
+}
 
+/**
+ * Get payment gateway URL for redemption processing
+ * Returns array with URL and recipient info
+ */
+function dongtrader_get_payment_gateway_url($redemption) {
+    $payment_method = strtolower($redemption->payment_method);
+    $payment_details = $redemption->payment_details;
+    $usd_amount = $redemption->usd_redem;
+    $user_id = $redemption->user_id;
+    $redemption_id = $redemption->id;
+    
+    // Get user information
+    $user = get_userdata($user_id);
+    if (!$user) {
+        return false;
+    }
+    
+    // Process based on payment method
+    if ($payment_method === 'paypal' || $payment_method === 'paypal payments') {
+        // Get PayPal payment URL
+        $paypal_url = dongtrader_create_paypal_payment($usd_amount, $user, $redemption_id, $payment_details);
+        if ($paypal_url) {
+            // Get PayPal email for display
+            $paypal_email = '';
+            if (!empty($payment_details) && filter_var($payment_details, FILTER_VALIDATE_EMAIL)) {
+                $paypal_email = $payment_details;
+            } else {
+                $paypal_email = get_user_meta($user->ID, 'paypal_email', true);
+                if (empty($paypal_email)) {
+                    $paypal_email = $user->user_email;
+                }
+            }
+            
+            return array(
+                'url' => $paypal_url,
+                'recipient' => $paypal_email,
+                'method' => 'PayPal'
+            );
+        }
+    } elseif ($payment_method === 'venmo' || $payment_method === 'venmo-pay') {
+        // Get Venmo payment URL
+        $venmo_url = dongtrader_create_venmo_payment($usd_amount, $user, $redemption_id, $payment_details);
+        if ($venmo_url) {
+            // Get Venmo username/phone for display
+            $venmo_username = '';
+            if (!empty($payment_details)) {
+                $venmo_username = trim($payment_details);
+                $venmo_username = str_replace('@', '', $venmo_username);
+            }
+            if (empty($venmo_username)) {
+                $venmo_username = get_user_meta($user->ID, 'venmo_username', true);
+            }
+            
+            $venmo_display = !empty($venmo_username) ? '@' . $venmo_username : 'user';
+            
+            return array(
+                'url' => $venmo_url,
+                'recipient' => $venmo_display,
+                'method' => 'Venmo'
+            );
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Create PayPal payment link (for sending money to user)
+ */
+function dongtrader_create_paypal_payment($amount, $user, $redemption_id, $payment_details) {
+    // Extract PayPal email from payment_details if provided
+    $paypal_email = '';
+    if (!empty($payment_details)) {
+        // Check if payment_details contains an email address
+        if (filter_var($payment_details, FILTER_VALIDATE_EMAIL)) {
+            $paypal_email = $payment_details;
+        } else {
+            // Try to extract email from payment_details text
+            preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $payment_details, $matches);
+            if (!empty($matches[0])) {
+                $paypal_email = $matches[0];
+            }
+        }
+    }
+    
+    // If no email in payment_details, check user meta or use user email
+    if (empty($paypal_email)) {
+        $paypal_email = get_user_meta($user->ID, 'paypal_email', true);
+    }
+    
+    // Fallback to user's account email
+    if (empty($paypal_email)) {
+        $paypal_email = $user->user_email;
+    }
+    
+    // Create PayPal "Send Money" URL with amount and recipient pre-filled
+    // Try PayPal.me first (best option - opens directly with amount)
+    $paypal_me_username = get_option('dongtrader_paypal_me_username', '');
+    if (!empty($paypal_me_username) && !empty($paypal_email)) {
+        // PayPal.me format: https://www.paypal.com/paypalme/{username}/{amount}?email={email}
+        return 'https://www.paypal.com/paypalme/' . urlencode($paypal_me_username) . '/' . 
+               urlencode(number_format($amount, 2, '.', '')) . 
+               (filter_var($paypal_email, FILTER_VALIDATE_EMAIL) ? '?email=' . urlencode($paypal_email) : '');
+    }
+    
+    // Alternative: PayPal Send Money page URL with amount pre-filled
+    // This URL format opens PayPal and after login shows the send money form with amount pre-filled
+    $amount_formatted = number_format($amount, 2, '.', '');
+    
+    // PayPal send money URL - this will show login first, then form with amount pre-filled
+    $paypal_url = 'https://www.paypal.com/sendmoney?';
+    $params = array();
+    
+    // Add amount
+    $params['amount'] = $amount_formatted;
+    
+    // Add currency
+    $params['currency_code'] = 'USD';
+    
+    // Add recipient email if available (some PayPal versions support this)
+    if (!empty($paypal_email) && filter_var($paypal_email, FILTER_VALIDATE_EMAIL)) {
+        $params['email'] = $paypal_email;
+    }
+    
+    $paypal_url .= http_build_query($params);
+    
+    return $paypal_url;
+}
+
+/**
+ * Create Venmo payment link
+ */
+function dongtrader_create_venmo_payment($amount, $user, $redemption_id, $payment_details) {
+    // Check if WooCommerce Venmo gateway is available
+    if (class_exists('WC_Gateway_Venmo') || class_exists('WooCommerce_Gateway_Venmo')) {
+        // Use WooCommerce Venmo gateway if available
+        // Implementation depends on your Venmo gateway plugin
+    }
+    
+    // Venmo payment URL format: https://venmo.com/{username}?amount={amount}&note={note}
+    // Extract Venmo username from payment_details if provided
+    $venmo_username = '';
+    if (!empty($payment_details)) {
+        // Try to extract Venmo username/phone from payment_details
+        // Format might be: username, @username, phone number, etc.
+        $venmo_username = trim($payment_details);
+        // Remove @ if present
+        $venmo_username = str_replace('@', '', $venmo_username);
+    }
+    
+    // If no username in payment_details, you might want to check user meta for Venmo username
+    if (empty($venmo_username)) {
+        $venmo_username = get_user_meta($user->ID, 'venmo_username', true);
+    }
+    
+    if (!empty($venmo_username)) {
+        // Create Venmo payment URL
+        $venmo_url = 'https://venmo.com/' . urlencode($venmo_username) . '?amount=' . urlencode($amount);
+        $venmo_url .= '&note=' . urlencode('Redemption #' . $redemption_id);
+        return $venmo_url;
+    } else {
+        // If no Venmo username, return Venmo app link
+        $venmo_url = 'venmo://paycharge?txn=pay&amount=' . urlencode($amount) . '&note=' . urlencode('Redemption #' . $redemption_id);
+        // Also provide web fallback
+        return 'https://venmo.com/?amount=' . urlencode($amount) . '&note=' . urlencode('Redemption #' . $redemption_id);
+    }
+}
+
+/**
+ * Display redemption requests admin page
+ */
+function dongtrader_redemption_admin_page() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    // Handle status updates
+    // Check if this is a payment confirmation (after payment gateway)
+    if (isset($_POST['confirm_payment']) && isset($_POST['redemption_id']) && isset($_POST['new_status'])) {
+        // This is a payment confirmation - proceed with status update
+        $redemption_id = intval($_POST['redemption_id']);
+        $admin_status = sanitize_text_field($_POST['new_status']);
+        $admin_notes = isset($_POST['admin_notes']) ? sanitize_textarea_field($_POST['admin_notes']) : '';
+        
+        // Map admin status to usermeta status
+        $status_mapping = array(
+            'completed' => 'redeemed',
+            'rejected' => 'released',
+            'pending' => 'requested',
+            'processing' => 'processing'
+        );
+        
+        // Get usermeta status from admin status
+        $usermeta_status = isset($status_mapping[$admin_status]) ? $status_mapping[$admin_status] : $admin_status;
+        
+        // Get the redemption record to access meta_ids
+        $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+        
+        $result = $wpdb->update(
+            $table_name,
+            array(
+                'status' => $admin_status,
+                'admin_notes' => $admin_notes,
+                'processed_date' => current_time('mysql')
+            ),
+            array('id' => $redemption_id),
+            array('%s', '%s', '%s'),
+            array('%d')
+        );
+        
+        if ($result !== false) {
+            // Update usermeta table rows for all meta_ids in this redemption
+            if ($redemption && !empty($redemption->meta_ids)) {
+                $meta_ids = json_decode($redemption->meta_ids, true);
+                if (is_array($meta_ids) && !empty($meta_ids)) {
+                    $meta_ids_to_update = array_map('intval', $meta_ids);
+                    $placeholders = implode(',', array_fill(0, count($meta_ids_to_update), '%d'));
+                    
+                    // Get all usermeta rows that need to be updated
+                    $query = $wpdb->prepare(
+                        "SELECT umeta_id, meta_key, meta_value, user_id FROM {$wpdb->usermeta} WHERE umeta_id IN ($placeholders)",
+                        ...$meta_ids_to_update
+                    );
+                    $usermeta_rows = $wpdb->get_results($query);
+                    
+                    $updated_count = 0;
+                    foreach ($usermeta_rows as $meta_row) {
+                        // Try JSON first, then PHP serialized
+                        $meta_data = json_decode($meta_row->meta_value, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $meta_data = @unserialize($meta_row->meta_value);
+                        }
+                        
+                        if ($meta_data !== false && is_array($meta_data)) {
+                            // Check if this is an array of transactions
+                            $is_array_of_transactions = isset($meta_data[0]) && is_array($meta_data[0]) && !isset($meta_data['status']);
+                            
+                            if ($is_array_of_transactions) {
+                                // Update all transactions in the array
+                                $modified = false;
+                                foreach ($meta_data as &$transaction) {
+                                    if (isset($transaction['status'])) {
+                                        $transaction['status'] = $usermeta_status;
+                                        $transaction['redemption_processed'] = current_time('mysql');
+                                        $modified = true;
+                                    }
+                                }
+                                unset($transaction);
+                                
+                                if ($modified) {
+                                    $updated_value = serialize($meta_data);
+                                    $wpdb->update(
+                                        $wpdb->usermeta,
+                                        array('meta_value' => $updated_value),
+                                        array('umeta_id' => $meta_row->umeta_id),
+                                        array('%s'),
+                                        array('%d')
+                                    );
+                                    $updated_count++;
+                                }
+                            } else {
+                                // Single transaction
+                                if (isset($meta_data['status'])) {
+                                    $meta_data['status'] = $usermeta_status;
+                                    $meta_data['redemption_processed'] = current_time('mysql');
+                                    
+                                    // Save in same format as original
+                                    $was_serialized = (strpos($meta_row->meta_value, 'a:') === 0);
+                                    $updated_value = $was_serialized ? serialize($meta_data) : json_encode($meta_data);
+                                    
+                                    $wpdb->update(
+                                        $wpdb->usermeta,
+                                        array('meta_value' => $updated_value),
+                                        array('umeta_id' => $meta_row->umeta_id),
+                                        array('%s'),
+                                        array('%d')
+                                    );
+                                    $updated_count++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            wp_send_json_success(array('message' => 'Status updated successfully', 'updated_count' => isset($updated_count) ? $updated_count : 0));
+        } else {
+            wp_send_json_error('Failed to update status');
+        }
+        return; // Exit - this is an AJAX call
+    } elseif (isset($_POST['update_status']) && isset($_POST['redemption_id']) && isset($_POST['new_status'])) {
+        $redemption_id = intval($_POST['redemption_id']);
+        $admin_status = sanitize_text_field($_POST['new_status']);
+        
+        // If status is "completed" and has payment method, DON'T update database - payment gateway will handle it
+        if ($admin_status === 'completed') {
+            $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+            if ($redemption && !empty($redemption->payment_method)) {
+                // Don't update database, payment gateway modal will handle it via JavaScript/AJAX
+                // The form submission is intercepted by JavaScript to show payment gateway
+                return; // Exit early - let JavaScript handle payment gateway
+            }
+        }
+        
+        // For non-completed statuses, proceed normally
+        $admin_notes = isset($_POST['admin_notes']) ? sanitize_textarea_field($_POST['admin_notes']) : '';
+        
+        // Map admin status to usermeta status
+        $status_mapping = array(
+            'completed' => 'redeemed',
+            'rejected' => 'released',
+            'pending' => 'requested',
+            'processing' => 'processing'
+        );
+        
+        // Get usermeta status from admin status
+        $usermeta_status = isset($status_mapping[$admin_status]) ? $status_mapping[$admin_status] : $admin_status;
+        
+        // Get the redemption record to access meta_ids
+        $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+        
+        $result = $wpdb->update(
+            $table_name,
+            array(
+                'status' => $admin_status,
+                'admin_notes' => $admin_notes,
+                'processed_date' => current_time('mysql')
+            ),
+            array('id' => $redemption_id),
+            array('%s', '%s', '%s'),
+            array('%d')
+        );
+        
+        if ($result !== false) {
+            // Update usermeta table rows for all meta_ids in this redemption
+            if ($redemption && !empty($redemption->meta_ids)) {
+                $meta_ids = json_decode($redemption->meta_ids, true);
+                if (is_array($meta_ids) && !empty($meta_ids)) {
+                    $meta_ids_to_update = array_map('intval', $meta_ids);
+                    $placeholders = implode(',', array_fill(0, count($meta_ids_to_update), '%d'));
+                    
+                    // Get all usermeta rows that need to be updated
+                    $query = $wpdb->prepare(
+                        "SELECT umeta_id, meta_key, meta_value, user_id FROM {$wpdb->usermeta} WHERE umeta_id IN ($placeholders)",
+                        ...$meta_ids_to_update
+                    );
+                    $usermeta_rows = $wpdb->get_results($query);
+                    
+                    $updated_count = 0;
+                    foreach ($usermeta_rows as $meta_row) {
+                        // Try JSON first, then PHP serialized
+                        $meta_data = json_decode($meta_row->meta_value, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $meta_data = @unserialize($meta_row->meta_value);
+                        }
+                        
+                        if ($meta_data !== false && is_array($meta_data)) {
+                            // Check if this is an array of transactions
+                            $is_array_of_transactions = isset($meta_data[0]) && is_array($meta_data[0]) && !isset($meta_data['status']);
+                            
+                            if ($is_array_of_transactions) {
+                                // Update all transactions in the array
+                                $modified = false;
+                                foreach ($meta_data as &$transaction) {
+                                    if (isset($transaction['status'])) {
+                                        $transaction['status'] = $usermeta_status;
+                                        $transaction['redemption_processed'] = current_time('mysql');
+                                        $modified = true;
+                                    }
+                                }
+                                unset($transaction);
+                                
+                                if ($modified) {
+                                    $updated_value = serialize($meta_data);
+                                    $wpdb->update(
+                                        $wpdb->usermeta,
+                                        array('meta_value' => $updated_value),
+                                        array('umeta_id' => $meta_row->umeta_id),
+                                        array('%s'),
+                                        array('%d')
+                                    );
+                                    $updated_count++;
+                                }
+                            } else {
+                                // Single transaction
+                                if (isset($meta_data['status'])) {
+                                    $meta_data['status'] = $usermeta_status;
+                                    $meta_data['redemption_processed'] = current_time('mysql');
+                                    
+                                    // Save in same format as original
+                                    $was_serialized = (strpos($meta_row->meta_value, 'a:') === 0);
+                                    $updated_value = $was_serialized ? serialize($meta_data) : json_encode($meta_data);
+                                    
+                                    $wpdb->update(
+                                        $wpdb->usermeta,
+                                        array('meta_value' => $updated_value),
+                                        array('umeta_id' => $meta_row->umeta_id),
+                                        array('%s'),
+                                        array('%d')
+                                    );
+                                    $updated_count++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    echo '<div class="notice notice-success"><p>Status updated successfully! Updated ' . $updated_count . ' usermeta records.</p></div>';
+                } else {
+                    echo '<div class="notice notice-success"><p>Status updated successfully!</p></div>';
+                }
+            } else {
+                echo '<div class="notice notice-success"><p>Status updated successfully!</p></div>';
+            }
+            
+            // Payment gateway was handled by JavaScript, no need to do anything here
+        } else {
+            echo '<div class="notice notice-error"><p>Failed to update status.</p></div>';
+        }
+    }
+    
+    // Get all redemption requests
+    $redemptions = $wpdb->get_results("SELECT * FROM $table_name ORDER BY redem_date DESC");
+    
+    ?>
+    <div class="wrap">
+        <h1>Redemption Requests</h1>
+        
+        <div class="tablenav top">
+            <div class="alignleft actions">
+                <select name="status_filter" id="status_filter">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <button type="button" class="button" onclick="filterByStatus()">Filter</button>
+            </div>
+        </div>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>XP Amount</th>
+                    <th>YAM Amount</th>
+                    <th>USD Amount</th>
+                    <th>Payment Method</th>
+                    <th>Payment Details</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($redemptions)): ?>
+                    <tr>
+                        <td colspan="10" style="text-align: center; padding: 20px;">No redemption requests found.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($redemptions as $redemption): ?>
+                        <?php 
+                        $user = get_userdata($redemption->user_id);
+                        $user_name = $user ? $user->display_name : 'Unknown User';
+                        $user_email = $user ? $user->user_email : 'N/A';
+                        ?>
+                        <tr>
+                            <td><?php echo $redemption->id; ?></td>
+                            <td>
+                                <strong><?php echo esc_html($user_name); ?></strong><br>
+                                <small><?php echo esc_html($user_email); ?></small>
+                            </td>
+                            <td><?php echo number_format($redemption->xp_redem); ?></td>
+                            <td><?php echo number_format($redemption->yam_redem, 2); ?></td>
+                            <td>$<?php echo number_format($redemption->usd_redem, 2); ?></td>
+                            <td><?php echo esc_html($redemption->payment_method); ?></td>
+                            <td><?php echo esc_html($redemption->payment_details); ?></td>
+                            <td>
+                                <span class="status-<?php echo esc_attr($redemption->status); ?>">
+                                    <?php echo esc_html(ucfirst($redemption->status)); ?>
+                                </span>
+                            </td>
+                            <td><?php echo date('M j, Y g:i A', strtotime($redemption->redem_date)); ?></td>
+                            <td>
+                                <button type="button" class="button button-small" onclick="showRedemptionDetails(<?php echo $redemption->id; ?>)">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Redemption Details Modal -->
+    <div id="redemption-modal" class="redemption-modal" style="display: none;">
+        <div class="redemption-modal-content">
+            <span class="close" onclick="closeRedemptionModal()">&times;</span>
+            <div id="redemption-details"></div>
+        </div>
+    </div>
+    
+    <!-- Payment Gateway Modal -->
+    <div id="payment-gateway-modal" class="payment-gateway-modal" style="display: none;">
+        <div class="payment-gateway-modal-content">
+            <span class="close" onclick="closePaymentGatewayModal(); return false;">&times;</span>
+            <div class="payment-gateway-header">
+                <h3 id="payment-gateway-title">Payment Gateway</h3>
+                <p id="payment-header-info" style="margin: 10px 0; color: #666;"></p>
+            </div>
+            <div class="payment-gateway-body">
+                <div style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">💳</div>
+                    <p id="payment-info" style="font-size: 16px; color: #666; margin-bottom: 30px;"></p>
+                    <div style="margin: 30px 0;">
+                        <button id="payment-gateway-link" type="button" class="button button-primary" style="font-size: 16px; padding: 15px 30px; height: auto; min-width: 200px;">
+                            Payment Completed
+                        </button>
+                    </div>
+                </div>
+                <div style="margin-top: 30px; text-align: center; padding-top: 20px; border-top: 1px solid #eee;">
+                    <button type="button" class="button button-secondary" onclick="closePaymentGatewayModal(); return false;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .status-pending { color: #f56e28; font-weight: bold; }
+        .status-processing { color: #0073aa; font-weight: bold; }
+        .status-completed { color: #46b450; font-weight: bold; }
+        .status-rejected { color: #dc3232; font-weight: bold; }
+        
+        .redemption-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .redemption-modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 5px;
+            position: relative;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .redemption-details {
+            margin-top: 20px;
+        }
+        
+        .redemption-details h3 {
+            margin-top: 0;
+        }
+        
+        .redemption-details .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        
+        .redemption-details .detail-label {
+            font-weight: bold;
+            width: 150px;
+        }
+        
+        .redemption-details .detail-value {
+            flex: 1;
+        }
+        
+        .status-update-form {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        
+        .status-update-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .status-update-form select,
+        .status-update-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .status-update-form textarea {
+            height: 80px;
+        }
+        
+        .payment-gateway-modal {
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .payment-gateway-modal-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .payment-gateway-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+        }
+        
+        .payment-gateway-header h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 24px;
+        }
+        
+        .payment-gateway-body {
+            margin-top: 20px;
+        }
+    </style>
+    
+    <script>
+        function filterByStatus() {
+            var status = document.getElementById('status_filter').value;
+            var rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(function(row) {
+                if (status === '') {
+                    row.style.display = '';
+                } else {
+                    var statusCell = row.querySelector('.status-' + status);
+                    row.style.display = statusCell ? '' : 'none';
+                }
+            });
+        }
+        
+        function showRedemptionDetails(redemptionId) {
+            // AJAX call to get redemption details
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', ajaxurl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        document.getElementById('redemption-details').innerHTML = response.data.html;
+                        document.getElementById('redemption-modal').style.display = 'flex';
+                    } else {
+                        alert('Error loading redemption details: ' + response.data);
+                    }
+                }
+            };
+            xhr.send('action=get_redemption_details&redemption_id=' + redemptionId);
+        }
+        
+        function closeRedemptionModal() {
+            document.getElementById('redemption-modal').style.display = 'none';
+        }
+        
+        // Payment Gateway Modal Functions
+        function showPaymentGatewayModal(url, method, amount, recipient) {
+            // Open payment gateway directly in new tab
+            window.open(url, '_blank');
+            
+            // Show a message modal
+            var modal = document.getElementById('payment-gateway-modal');
+            var title = document.getElementById('payment-gateway-title');
+            var headerInfo = document.getElementById('payment-header-info');
+            var info = document.getElementById('payment-info');
+            var button = document.getElementById('payment-gateway-link');
+            
+            // Set modal content
+            title.textContent = method + ' Payment Gateway';
+            headerInfo.innerHTML = '<strong>Amount:</strong> $' + amount + ' | <strong>Recipient:</strong> ' + recipient;
+            info.innerHTML = '<strong style="color: #0073aa;">Payment gateway opened in new tab.</strong><br>' +
+                            'Complete the payment there, then click "Payment Completed" below to update the status.';
+            
+            // Set button handler
+            button.onclick = function(e) {
+                e.preventDefault();
+                confirmAndUpdateRedemptionStatus();
+                return false;
+            };
+            
+            // Show modal
+            modal.style.display = 'flex';
+        }
+        
+        // Function to confirm and update redemption status after payment
+        function confirmAndUpdateRedemptionStatus() {
+            if (window.pendingRedemptionUpdate) {
+                var confirmed = confirm('Have you successfully completed the payment? Click OK to update the redemption status to "completed".');
+                if (confirmed) {
+                    submitRedemptionUpdateAfterPayment();
+                }
+            } else {
+                alert('No pending redemption update found.');
+            }
+        }
+        
+        function closePaymentGatewayModal() {
+            var modal = document.getElementById('payment-gateway-modal');
+            
+            // Clear any pending updates when canceling
+            window.pendingRedemptionUpdate = null;
+            
+            // Hide modal - no alerts, no confirmations
+            modal.style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            var redemptionModal = document.getElementById('redemption-modal');
+            var paymentModal = document.getElementById('payment-gateway-modal');
+            
+            if (event.target === redemptionModal) {
+                redemptionModal.style.display = 'none';
+            }
+            
+            if (event.target === paymentModal) {
+                closePaymentGatewayModal();
+            }
+        }
+        
+        // Intercept form submission when status is "completed"
+        // Use event delegation on document to catch dynamically loaded forms
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            if (form && form.querySelector('button[name="update_status"]')) {
+                var statusSelect = form.querySelector('select[name="new_status"]');
+                var paymentMethodInput = form.querySelector('input[name="payment_method"]');
+                var redemptionIdInput = form.querySelector('input[name="redemption_id"]');
+                
+                // If status is "completed" and payment method exists, prevent submission and open payment gateway
+                if (statusSelect && statusSelect.value === 'completed' && paymentMethodInput && paymentMethodInput.value) {
+                    e.preventDefault(); // Prevent form submission
+                    e.stopPropagation();
+                    
+                    // Get payment gateway URL via AJAX
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', ajaxurl, true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4 && xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success && response.data && response.data.url) {
+                                    // Open payment gateway modal
+                                    showPaymentGatewayModal(
+                                        response.data.url,
+                                        response.data.method,
+                                        response.data.amount,
+                                        response.data.recipient
+                                    );
+                                    
+                                    // Store form data for later submission
+                                    var adminNotesTextarea = form.querySelector('textarea[name="admin_notes"]');
+                                    window.pendingRedemptionUpdate = {
+                                        form: form,
+                                        redemptionId: redemptionIdInput.value,
+                                        status: statusSelect.value,
+                                        adminNotes: adminNotesTextarea ? adminNotesTextarea.value : ''
+                                    };
+                                } else {
+                                    alert('Error: Could not get payment gateway URL. ' + (response.data || 'Unknown error'));
+                                }
+                            } catch (err) {
+                                alert('Error parsing response: ' + err.message);
+                            }
+                        }
+                    };
+                    xhr.send('action=get_payment_gateway_url&redemption_id=' + encodeURIComponent(redemptionIdInput.value));
+                    
+                    return false;
+                }
+            }
+        }, true); // Use capture phase to catch early
+        
+        // Function to submit redemption update after payment gateway is closed
+        function submitRedemptionUpdateAfterPayment() {
+            if (window.pendingRedemptionUpdate) {
+                var formData = new FormData();
+                formData.append('action', 'update_redemption_status');
+                formData.append('redemption_id', window.pendingRedemptionUpdate.redemptionId);
+                formData.append('new_status', window.pendingRedemptionUpdate.status);
+                formData.append('admin_notes', window.pendingRedemptionUpdate.adminNotes);
+                formData.append('confirm_payment', '1');
+                
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', ajaxurl, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                // Close payment gateway modal
+                                closePaymentGatewayModal();
+                                
+                                // Reload redemption details to show updated status and hide form
+                                var redemptionId = window.pendingRedemptionUpdate.redemptionId;
+                                showRedemptionDetails(redemptionId);
+                                
+                                // Reload the main page table to show updated status
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1000);
+                            } else {
+                                alert('Error updating status: ' + (response.data || 'Unknown error'));
+                            }
+                        } catch (err) {
+                            alert('Error parsing response: ' + err.message);
+                        }
+                    }
+                };
+                xhr.send(formData);
+                
+                window.pendingRedemptionUpdate = null;
+            }
+        }
+    </script>
+    <?php
+}
+
+/**
+ * AJAX handler to get redemption details
+ */
+add_action('wp_ajax_get_redemption_details', 'dongtrader_get_redemption_details');
+
+function dongtrader_get_redemption_details() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $redemption_id = intval($_POST['redemption_id']);
+    $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+    
+    if (!$redemption) {
+        wp_send_json_error('Redemption request not found');
+    }
+    
+    $user = get_userdata($redemption->user_id);
+    $user_name = $user ? $user->display_name : 'Unknown User';
+    $user_email = $user ? $user->user_email : 'N/A';
+    
+    $html = '<div class="redemption-details">';
+    $html .= '<h3>Redemption Request #' . $redemption->id . '</h3>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">User:</div>';
+    $html .= '<div class="detail-value">' . esc_html($user_name) . ' (' . esc_html($user_email) . ')</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">XP Amount:</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->xp_redem) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">YAM Amount:</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->yam_redem, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">USD Amount:</div>';
+    $html .= '<div class="detail-value">$' . number_format($redemption->usd_redem, 2) . '</div>';
+    $html .= '</div>';
+    
+    // HIDDEN FOR PRODUCTION - Debug info only
+    /*
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Conversion Rate (XP/YAM):</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->conversion_rate_xp_yam, 2) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Conversion Rate (YAM/USD):</div>';
+    $html .= '<div class="detail-value">' . number_format($redemption->conversion_rate_yam_usd, 2) . '</div>';
+    $html .= '</div>';
+    */
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Payment Method:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->payment_method) . '</div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Payment Details:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->payment_details) . '</div>';
+    $html .= '</div>';
+    
+    // HIDDEN FOR PRODUCTION - Debug info only
+    /*
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Meta IDs:</div>';
+    $html .= '<div class="detail-value">' . esc_html($redemption->meta_ids) . '</div>';
+    $html .= '</div>';
+    */
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Status:</div>';
+    $html .= '<div class="detail-value"><span class="status-' . esc_attr($redemption->status) . '">' . esc_html(ucfirst($redemption->status)) . '</span></div>';
+    $html .= '</div>';
+    
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Submission Date:</div>';
+    $html .= '<div class="detail-value">' . date('M j, Y g:i A', strtotime($redemption->redem_date)) . '</div>';
+    $html .= '</div>';
+    
+    if ($redemption->processed_date) {
+        $html .= '<div class="detail-row">';
+        $html .= '<div class="detail-label">Processed Date:</div>';
+        $html .= '<div class="detail-value">' . date('M j, Y g:i A', strtotime($redemption->processed_date)) . '</div>';
+        $html .= '</div>';
+    }
+    
+    if ($redemption->admin_notes) {
+        $html .= '<div class="detail-row">';
+        $html .= '<div class="detail-label">Admin Notes:</div>';
+        $html .= '<div class="detail-value">' . esc_html($redemption->admin_notes) . '</div>';
+        $html .= '</div>';
+    }
+    
+    // Status update form - only show if status is NOT completed
+    if ($redemption->status !== 'completed') {
+    $html .= '<div class="status-update-form">';
+    $html .= '<h4>Update Status</h4>';
+        $html .= '<form id="redemption-status-form-' . $redemption->id . '" method="post" action="">';
+    $html .= '<input type="hidden" name="redemption_id" value="' . $redemption->id . '">';
+        $html .= '<input type="hidden" name="payment_method" value="' . esc_attr($redemption->payment_method) . '">';
+        $html .= '<input type="hidden" name="payment_details" value="' . esc_attr($redemption->payment_details) . '">';
+        $html .= '<input type="hidden" name="usd_amount" value="' . esc_attr($redemption->usd_redem) . '">';
+    
+    $html .= '<label for="new_status">Status:</label>';
+    $html .= '<select name="new_status" id="new_status" required>';
+    $html .= '<option value="pending"' . ($redemption->status === 'pending' ? ' selected' : '') . '>Pending</option>';
+    $html .= '<option value="processing"' . ($redemption->status === 'processing' ? ' selected' : '') . '>Processing</option>';
+    $html .= '<option value="completed"' . ($redemption->status === 'completed' ? ' selected' : '') . '>Completed</option>';
+    $html .= '<option value="rejected"' . ($redemption->status === 'rejected' ? ' selected' : '') . '>Rejected</option>';
+    $html .= '</select>';
+    
+    $html .= '<label for="admin_notes">Admin Notes:</label>';
+    $html .= '<textarea name="admin_notes" id="admin_notes" placeholder="Add notes about this redemption request...">' . esc_textarea($redemption->admin_notes) . '</textarea>';
+    
+    $html .= '<button type="submit" name="update_status" class="button button-primary">Processed</button>';
+    $html .= '</form>';
+    $html .= '</div>';
+    } else {
+        // Show completion message instead of form
+        $html .= '<div class="status-update-form" style="background-color: #e7f5e7; padding: 20px; border-radius: 5px; border-left: 4px solid #46b450;">';
+        $html .= '<h4 style="color: #46b450; margin-top: 0;">✅ Status: Completed</h4>';
+        $html .= '<p style="margin: 10px 0; color: #2e7d32;">This redemption request has been processed and completed.</p>';
+        if ($redemption->processed_date) {
+            $html .= '<p style="margin: 10px 0; color: #666; font-size: 14px;"><strong>Processed:</strong> ' . date('M j, Y g:i A', strtotime($redemption->processed_date)) . '</p>';
+        }
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>';
+    
+    wp_send_json_success(array('html' => $html));
+}
+
+/**
+ * AJAX handler to get payment gateway URL
+ */
+add_action('wp_ajax_get_payment_gateway_url', 'dongtrader_ajax_get_payment_gateway_url');
+
+function dongtrader_ajax_get_payment_gateway_url() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $redemption_id = intval($_POST['redemption_id']);
+    $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+    
+    if (!$redemption) {
+        wp_send_json_error('Redemption request not found');
+    }
+    
+    if (empty($redemption->payment_method)) {
+        wp_send_json_error('No payment method specified');
+    }
+    
+    $payment_url = dongtrader_get_payment_gateway_url($redemption);
+    
+    if ($payment_url) {
+        wp_send_json_success(array(
+            'url' => $payment_url['url'],
+            'method' => $payment_url['method'],
+            'amount' => number_format($redemption->usd_redem, 2),
+            'recipient' => $payment_url['recipient']
+        ));
+    } else {
+        wp_send_json_error('Could not generate payment gateway URL');
+    }
+}
+
+/**
+ * AJAX handler to update redemption status (after payment gateway)
+ */
+add_action('wp_ajax_update_redemption_status', 'dongtrader_ajax_update_redemption_status');
+
+function dongtrader_ajax_update_redemption_status() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $redemption_id = intval($_POST['redemption_id']);
+    $admin_status = sanitize_text_field($_POST['new_status']);
+    $admin_notes = isset($_POST['admin_notes']) ? sanitize_textarea_field($_POST['admin_notes']) : '';
+    
+    // Map admin status to usermeta status
+    $status_mapping = array(
+        'completed' => 'redeemed',
+        'rejected' => 'released',
+        'pending' => 'requested',
+        'processing' => 'processing'
+    );
+    
+    // Get usermeta status from admin status
+    $usermeta_status = isset($status_mapping[$admin_status]) ? $status_mapping[$admin_status] : $admin_status;
+    
+    // Get the redemption record to access meta_ids
+    $redemption = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $redemption_id));
+    
+    if (!$redemption) {
+        wp_send_json_error('Redemption request not found');
+    }
+    
+    $result = $wpdb->update(
+        $table_name,
+        array(
+            'status' => $admin_status,
+            'admin_notes' => $admin_notes,
+            'processed_date' => current_time('mysql')
+        ),
+        array('id' => $redemption_id),
+        array('%s', '%s', '%s'),
+        array('%d')
+    );
+    
+    if ($result !== false) {
+        // Update usermeta table rows for all meta_ids in this redemption
+        $updated_count = 0;
+        if ($redemption && !empty($redemption->meta_ids)) {
+            $meta_ids = json_decode($redemption->meta_ids, true);
+            if (is_array($meta_ids) && !empty($meta_ids)) {
+                $meta_ids_to_update = array_map('intval', $meta_ids);
+                $placeholders = implode(',', array_fill(0, count($meta_ids_to_update), '%d'));
+                
+                // Get all usermeta rows that need to be updated
+                $query = $wpdb->prepare(
+                    "SELECT umeta_id, meta_key, meta_value, user_id FROM {$wpdb->usermeta} WHERE umeta_id IN ($placeholders)",
+                    ...$meta_ids_to_update
+                );
+                $usermeta_rows = $wpdb->get_results($query);
+                
+                foreach ($usermeta_rows as $meta_row) {
+                    // Try JSON first, then PHP serialized
+                    $meta_data = json_decode($meta_row->meta_value, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $meta_data = @unserialize($meta_row->meta_value);
+                    }
+                    
+                    if ($meta_data !== false && is_array($meta_data)) {
+                        // Check if this is an array of transactions
+                        $is_array_of_transactions = isset($meta_data[0]) && is_array($meta_data[0]) && !isset($meta_data['status']);
+                        
+                        if ($is_array_of_transactions) {
+                            // Update all transactions in the array
+                            $modified = false;
+                            foreach ($meta_data as &$transaction) {
+                                if (isset($transaction['status'])) {
+                                    $transaction['status'] = $usermeta_status;
+                                    $transaction['redemption_processed'] = current_time('mysql');
+                                    $modified = true;
+                                }
+                            }
+                            unset($transaction);
+                            
+                            if ($modified) {
+                                $updated_value = serialize($meta_data);
+                                $wpdb->update(
+                                    $wpdb->usermeta,
+                                    array('meta_value' => $updated_value),
+                                    array('umeta_id' => $meta_row->umeta_id),
+                                    array('%s'),
+                                    array('%d')
+                                );
+                                $updated_count++;
+                            }
+                        } else {
+                            // Single transaction
+                            if (isset($meta_data['status'])) {
+                                $meta_data['status'] = $usermeta_status;
+                                $meta_data['redemption_processed'] = current_time('mysql');
+                                
+                                // Save in same format as original
+                                $was_serialized = (strpos($meta_row->meta_value, 'a:') === 0);
+                                $updated_value = $was_serialized ? serialize($meta_data) : json_encode($meta_data);
+                                
+                                $wpdb->update(
+                                    $wpdb->usermeta,
+                                    array('meta_value' => $updated_value),
+                                    array('umeta_id' => $meta_row->umeta_id),
+                                    array('%s'),
+                                    array('%d')
+                                );
+                                $updated_count++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        wp_send_json_success(array('message' => 'Status updated successfully', 'updated_count' => $updated_count));
+    } else {
+        wp_send_json_error('Failed to update status');
+    }
+}
 
 

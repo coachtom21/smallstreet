@@ -101,7 +101,8 @@ function cpm_dong_my_membership_vcard_endpoint_content()
         $path = parse_url($url, PHP_URL_PATH);
         $lastPart = basename($path);
 
-
+        // QR Code display commented out for now
+        /*
         $image_url = 'https://qrtiger.com/media/qr/' . $lastPart . '?format=png&resolution=256';
 
         echo '<div class="qr_vcard_section">
@@ -121,6 +122,7 @@ function cpm_dong_my_membership_vcard_endpoint_content()
                 URL</a> <a class="update_card" href="JavaScript:Void(0);">Update Vcard</a>
         </div>
         <?php
+        */
     } else {
         echo '<style>
 	.qr-tiger-vcard-code-generator{

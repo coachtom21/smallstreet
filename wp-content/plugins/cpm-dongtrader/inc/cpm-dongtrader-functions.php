@@ -89,6 +89,382 @@ function dongtrader_yam_to_xp($yam_amount) {
     return intval($yam_amount * dongtrader_xp_per_yam());
 }
 
+/**
+ * ========================================
+ * MATURITY DATE TRACKING FUNCTIONS
+ * ========================================
+ */
+
+/**
+ * Get configured maturity weeks (default 10, range 8-12)
+ * @return int Number of weeks for maturity
+ */
+function dongtrader_get_maturity_weeks() {
+    $weeks = get_option('dongtrader_maturity_weeks', 10);
+    // Ensure weeks is between 8-12
+    return max(8, min(12, intval($weeks)));
+}
+
+/**
+ * Calculate maturity date based on delivery date
+ * @param string $delivery_date Delivery/earned date (Y-m-d H:i:s format)
+ * @param int|null $weeks Optional weeks override (default uses option value)
+ * @return string Maturity date in Y-m-d H:i:s format
+ */
+function dongtrader_calculate_maturity_date($delivery_date, $weeks = null) {
+    if (empty($delivery_date)) {
+        return null;
+    }
+    
+    if ($weeks === null) {
+        $weeks = dongtrader_get_maturity_weeks();
+    }
+    
+    // Ensure weeks is between 8-12
+    $weeks = max(8, min(12, intval($weeks)));
+    
+    try {
+        $delivery = new DateTime($delivery_date);
+        $delivery->modify("+{$weeks} weeks");
+        return $delivery->format('Y-m-d H:i:s');
+    } catch (Exception $e) {
+        error_log("Error calculating maturity date: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Check if XP entry is mature (8-12 weeks have passed)
+ * @param string $delivery_date Delivery/earned date
+ * @param string|null $current_date Optional current date (default: now)
+ * @return bool True if mature, false if still maturing
+ */
+function dongtrader_is_xp_entry_mature($delivery_date, $current_date = null) {
+    if (empty($delivery_date)) {
+        return false;
+    }
+    
+    if ($current_date === null) {
+        $current_date = current_time('mysql');
+    }
+    
+    $maturity_date = dongtrader_calculate_maturity_date($delivery_date);
+    
+    if (!$maturity_date) {
+        return false;
+    }
+    
+    // Check if current date is >= maturity date
+    return (strtotime($current_date) >= strtotime($maturity_date));
+}
+
+/**
+ * Get delivery date from XP transaction entry
+ * Tries multiple date fields to find when XP was earned
+ * @param array $transaction XP transaction array
+ * @return string|null Delivery date or null if not found
+ */
+function dongtrader_get_delivery_date_from_xp_entry($transaction) {
+    if (!is_array($transaction)) {
+        error_log("dongtrader_get_delivery_date_from_xp_entry: Transaction is not an array");
+        return null;
+    }
+    
+    // Debug: Log all transaction keys
+    error_log("dongtrader_get_delivery_date_from_xp_entry: Transaction keys: " . implode(', ', array_keys($transaction)));
+    
+    // Check various possible date fields (in order of priority)
+    $date_fields = array(
+        'delivery_date',
+        'earned_date',
+        'verification_date',
+        'order_date',
+        'order_datetime',
+        'date',
+        'created_at',
+        'timestamp',
+        'purchase_date', // Common in WooCommerce
+        'completed_date' // WooCommerce order completed date
+    );
+    
+    foreach ($date_fields as $field) {
+        if (isset($transaction[$field]) && !empty($transaction[$field])) {
+            $date_value = $transaction[$field];
+            error_log("dongtrader_get_delivery_date_from_xp_entry: Found date field '$field' = '$date_value'");
+            
+            // If it's a timestamp, convert to datetime
+            if (is_numeric($date_value)) {
+                $formatted_date = date('Y-m-d H:i:s', $date_value);
+                error_log("dongtrader_get_delivery_date_from_xp_entry: Converted timestamp to: $formatted_date");
+                return $formatted_date;
+            }
+            
+            // Try to parse as date string
+            try {
+                $date = new DateTime($date_value);
+                $formatted_date = $date->format('Y-m-d H:i:s');
+                error_log("dongtrader_get_delivery_date_from_xp_entry: Parsed date string to: $formatted_date");
+                return $formatted_date;
+            } catch (Exception $e) {
+                error_log("dongtrader_get_delivery_date_from_xp_entry: Failed to parse '$field' as date: " . $e->getMessage());
+                continue;
+            }
+        }
+    }
+    
+    // Additional fallback: Check if there's an order_id and try to get date from WooCommerce order
+    if (isset($transaction['order_id']) && !empty($transaction['order_id'])) {
+        $order_id = intval($transaction['order_id']);
+        if ($order_id > 0) {
+            $woocommerce_order = wc_get_order($order_id);
+            if ($woocommerce_order && is_a($woocommerce_order, 'WC_Order')) {
+                // Try to get order date
+                $order_date = $woocommerce_order->get_date_created();
+                if ($order_date) {
+                    $formatted_date = $order_date->format('Y-m-d H:i:s');
+                    error_log("dongtrader_get_delivery_date_from_xp_entry: Retrieved date from WooCommerce order #$order_id: $formatted_date");
+                    return $formatted_date;
+                }
+            }
+        }
+    }
+    
+    // Fallback: If no date found, return null
+    error_log("dongtrader_get_delivery_date_from_xp_entry: No date field found in transaction. Available fields: " . implode(', ', array_keys($transaction)));
+    return null;
+}
+
+/**
+ * Calculate days until maturity
+ * @param string $delivery_date Delivery/earned date
+ * @return int|null Days until maturity (negative if already mature), null if error
+ */
+function dongtrader_days_until_maturity($delivery_date) {
+    if (empty($delivery_date)) {
+        return null;
+    }
+    
+    $maturity_date = dongtrader_calculate_maturity_date($delivery_date);
+    if (!$maturity_date) {
+        return null;
+    }
+    
+    $current_time = current_time('timestamp');
+    $maturity_timestamp = strtotime($maturity_date);
+    
+    $diff_seconds = $maturity_timestamp - $current_time;
+    $days = floor($diff_seconds / (60 * 60 * 24));
+    
+    return $days;
+}
+
+/**
+ * ========================================
+ * MONTHLY REDEMPTION WINDOW FUNCTIONS
+ * ========================================
+ */
+
+/**
+ * Get monthly redemption window dates
+ * Default: 1st through 7th of each month
+ * @param int|null $month Optional month (1-12), default current month
+ * @param int|null $year Optional year, default current year
+ * @return array Array with 'start' and 'end' dates
+ */
+function dongtrader_get_monthly_redemption_window($month = null, $year = null) {
+    if ($month === null) {
+        $month = (int)date('n');
+    }
+    if ($year === null) {
+        $year = (int)date('Y');
+    }
+    
+    // Get window start and end day from options (default: 1st to 7th)
+    $window_start_day = get_option('dongtrader_redemption_window_start', 1);
+    $window_end_day = get_option('dongtrader_redemption_window_end', 7);
+    
+    $start_date = new DateTime("{$year}-{$month}-{$window_start_day} 00:00:00");
+    $end_date = new DateTime("{$year}-{$month}-{$window_end_day} 23:59:59");
+    
+    return array(
+        'start' => $start_date->format('Y-m-d H:i:s'),
+        'end' => $end_date->format('Y-m-d H:i:s')
+    );
+}
+
+/**
+ * Check if current date is within a monthly redemption window
+ * @param string|null $current_date Optional date to check (default: now)
+ * @return bool True if within window, false otherwise
+ */
+function dongtrader_is_within_redemption_window($current_date = null) {
+    if ($current_date === null) {
+        $current_date = current_time('mysql');
+    }
+    
+    $current_timestamp = strtotime($current_date);
+    $current_date_obj = new DateTime($current_date);
+    $current_day = (int)$current_date_obj->format('d');
+    
+    // Check if it's September 1st (no redemptions allowed)
+    if ($current_date_obj->format('m-d') === '09-01') {
+        return false;
+    }
+    
+    $window = dongtrader_get_monthly_redemption_window();
+    $window_start = strtotime($window['start']);
+    $window_end = strtotime($window['end']);
+    
+    // Check if current date is within the window
+    return ($current_timestamp >= $window_start && $current_timestamp <= $window_end);
+}
+
+/**
+ * Get next redemption window date
+ * @return array Array with 'date', 'start', and 'end' for next window
+ */
+function dongtrader_get_next_redemption_window() {
+    $current_date = new DateTime(current_time('mysql'));
+    $current_month = (int)$current_date->format('n');
+    $current_year = (int)$current_date->format('Y');
+    
+    // Get current month's window
+    $current_window = dongtrader_get_monthly_redemption_window($current_month, $current_year);
+    $window_end_timestamp = strtotime($current_window['end']);
+    $current_timestamp = $current_date->getTimestamp();
+    
+    // If current time is past this month's window, get next month's window
+    if ($current_timestamp > $window_end_timestamp || $current_date->format('m-d') === '09-01') {
+        // Move to next month
+        $next_month = $current_month + 1;
+        $next_year = $current_year;
+        
+        if ($next_month > 12) {
+            $next_month = 1;
+            $next_year++;
+        }
+        
+        $window = dongtrader_get_monthly_redemption_window($next_month, $next_year);
+    } else {
+        // Current window is still active
+        $window = $current_window;
+    }
+    
+    return array(
+        'date' => date('F Y', strtotime($window['start'])),
+        'start' => $window['start'],
+        'end' => $window['end']
+    );
+}
+
+/**
+ * Check if user is eligible to redeem XP
+ * Validates all requirements: minimum amount, matured XP, redemption window, active requests
+ * @param float $total_usd Total USD value of completed XP
+ * @param int $total_completed_xp Total completed/matured XP
+ * @param bool $has_active_redemption Whether user has pending/processing redemptions
+ * @return array Array with 'eligible' bool and 'reason' string if not eligible
+ */
+function dongtrader_check_redemption_button_eligibility($total_usd, $total_completed_xp, $has_active_redemption) {
+    $min_redemption_amount = 1.0; // Minimum $1.00 USD required
+    
+    // Validation 1: Check for active redemption requests
+    if ($has_active_redemption) {
+        return array(
+            'eligible' => false,
+            'reason' => 'active_redemption',
+            'message' => 'You have a pending redemption request. Please wait for it to be processed.'
+        );
+    }
+    
+    // Validation 2: Check minimum USD amount (STRICT: Must be >= $1.00)
+    $total_usd_numeric = floatval($total_usd);
+    // Use strict comparison - button only shows if amount is >= $1.00 exactly
+    if ($total_usd_numeric < $min_redemption_amount) {
+        return array(
+            'eligible' => false,
+            'reason' => 'minimum_amount',
+            'message' => 'You need at least $1.00 USD worth of matured XP to redeem. Current value: $' . number_format($total_usd_numeric, 2),
+            'current_amount' => $total_usd_numeric,
+            'required_amount' => $min_redemption_amount,
+            'debug_info' => 'USD: ' . $total_usd_numeric . ' | Required: ' . $min_redemption_amount . ' | Check: ' . ($total_usd_numeric < $min_redemption_amount ? 'FAIL' : 'PASS')
+        );
+    }
+    
+    // Validation 3: Check if user has matured/completed XP (not just pending)
+    if ($total_completed_xp <= 0) {
+        return array(
+            'eligible' => false,
+            'reason' => 'no_matured_xp',
+            'message' => 'You need matured XP credits (8-12 weeks old) to redeem. Your XP is still pending maturity.'
+        );
+    }
+    
+    // Validation 4: Check if within redemption window
+    if (!dongtrader_is_within_redemption_window()) {
+        $current_date_obj = new DateTime(current_time('mysql'));
+        $is_september_1st = ($current_date_obj->format('m-d') === '09-01');
+        $days_until = dongtrader_days_until_next_redemption_window();
+        $next_window = dongtrader_get_next_redemption_window();
+        
+        if ($is_september_1st) {
+            return array(
+                'eligible' => false,
+                'reason' => 'september_1st_block',
+                'message' => 'No redemptions allowed on September 1st (Let It Ride Day).',
+                'next_window_date' => date('F j, Y', strtotime($next_window['start'])),
+                'days_until_window' => $days_until
+            );
+        } else {
+            return array(
+                'eligible' => false,
+                'reason' => 'outside_window',
+                'message' => 'Redemption window is currently closed.',
+                'next_window_date' => date('F j, Y', strtotime($next_window['start'])),
+                'days_until_window' => $days_until,
+                'window_range' => date('F j', strtotime($next_window['start'])) . ' - ' . date('F j', strtotime($next_window['end']))
+            );
+        }
+    }
+    
+    // All validations passed
+    return array(
+        'eligible' => true,
+        'reason' => 'all_checks_passed'
+    );
+}
+
+/**
+ * Get days until next redemption window
+ * @return int|null Days until next window (0 if currently in window)
+ */
+function dongtrader_days_until_next_redemption_window() {
+    $current_date = current_time('mysql');
+    
+    // If currently in window, return 0
+    if (dongtrader_is_within_redemption_window($current_date)) {
+        return 0;
+    }
+    
+    // Check if it's September 1st
+    $current_date_obj = new DateTime($current_date);
+    if ($current_date_obj->format('m-d') === '09-01') {
+        // Next window is October 1-7
+        $next_window = dongtrader_get_monthly_redemption_window(10, (int)$current_date_obj->format('Y'));
+        $window_start_timestamp = strtotime($next_window['start']);
+        $current_timestamp = $current_date_obj->getTimestamp();
+        $diff_seconds = $window_start_timestamp - $current_timestamp;
+        return max(0, floor($diff_seconds / (60 * 60 * 24)));
+    }
+    
+    $next_window = dongtrader_get_next_redemption_window();
+    $window_start_timestamp = strtotime($next_window['start']);
+    $current_timestamp = strtotime($current_date);
+    $diff_seconds = $window_start_timestamp - $current_timestamp;
+    
+    return max(0, floor($diff_seconds / (60 * 60 * 24)));
+}
+
 /*This function is used to make the Qrtiger API requests.
  *These are valid urls . Requests might be  costly so plz use mock url from stoplight api
  *GET URL : https://qrtiger.com/data/6BF7
@@ -134,10 +510,16 @@ function qrtiger_api_request($endpoint = '', $bodyParams = array(), $method = "G
 
     /* A ternary operator to check get or post parameter and use functions accordingly*/
     $response_received = $method == 'POST' ? wp_remote_post($build_url, $options) : wp_remote_get($build_url, $options);
+    
+    // Check for WP_Error
+    if (is_wp_error($response_received)) {
+        return false;
+    }
+    
     /* Get the response code from the response received. */
     $response_status = wp_remote_retrieve_response_code($response_received);
     /* Checking if the response status is 200 or not. If it is 200 then it will return the body of the response. */
-    $response_body = $response_status == '200' ? wp_remote_retrieve_body($response_received) : false;
+    $response_body = $response_status == 200 ? wp_remote_retrieve_body($response_received) : false;
     /* Checking if the response body is not empty and then decoding the response body. */
     $response_object = $response_body ? json_decode($response_body) : false;
 
@@ -180,10 +562,16 @@ function glassfrog_api_request($endpoint = '', $str = '', $method = "GET")
 
     /* A ternary operator to check get or post parameter and use functions accordingly*/
     $response_received = $method == 'POST' ? wp_remote_post($build_url, $options) : wp_remote_get($build_url, $options);
+    
+    // Check for WP_Error
+    if (is_wp_error($response_received)) {
+        return false;
+    }
+    
     /* Get the response code from the response received. */
     $response_status = wp_remote_retrieve_response_code($response_received);
     /* Checking if the response status is 200 or not. If it is 200 then it will return the body of the response. */
-    $response_body = $response_status == '200' ? wp_remote_retrieve_body($response_received) : false;
+    $response_body = $response_status == 200 ? wp_remote_retrieve_body($response_received) : false;
     /* Checking if the response body is not empty and then decoding the response body. */
     $response_object = $response_body ? json_decode($response_body) : false;
 
@@ -199,6 +587,16 @@ add_action('wp_ajax_dongtrader_generate_qr2', 'dongtrader_generate_qr2');
 
 function dongtrader_generate_qr2()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_generate_qr2')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
     $qr_size = sanitize_text_field($_POST['qrsize']);
     $qr_url = sanitize_url($_POST['qrurl']);
     $qr_color = sanitize_text_field($_POST['qrcolor']);
@@ -260,6 +658,15 @@ add_action('wp_ajax_dongtrader_delete_qr', 'dongtrader_delete_qr');
 
 function dongtrader_delete_qr()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $index = esc_attr($_POST['qrIndex']);
     $dong_qr_array = get_option('dong_user_qr_values');
@@ -353,6 +760,15 @@ add_action('wp_ajax_dongtrader_meta_qr_generator', 'dongtrader_meta_qr_generator
 
 function dongtrader_meta_qr_generator()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_meta_qr_generator')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $intiator = esc_attr($_POST['intiator']);
     $productnum = esc_attr($_POST['productnums']);
@@ -443,6 +859,16 @@ function dongtrader_meta_qr_generator()
 add_action('wp_ajax_dongtrader_delete_qr_fields', 'dongtrader_delete_qr_fields');
 function dongtrader_delete_qr_fields()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr_fields')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
     $variation_id = esc_attr($_POST['itemID']);
     $variation_meta_key = esc_attr($_POST['metakey']);
     $ajax_values = array('resp' => false, 'html' => false);
@@ -462,6 +888,15 @@ function dongtrader_delete_qr_fields()
 add_action('wp_ajax_dongtrader_delete_qr_items_settingspage', 'dongtrader_delete_qr_items_settingspage');
 function dongtrader_delete_qr_items_settingspage()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_qr_items_settingspage')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $dong_qr_array = get_option('dong_user_qr_values');
     $index = (int) esc_attr($_POST['index']);
@@ -767,22 +1202,23 @@ function dongtraders_order_export_form_new()
     ?>
 
     <form action="" method="POST" class="order-export-form">
+        <?php wp_nonce_field('order_export_form', 'order_export_nonce'); ?>
         <?php
 
         $validate = true;
-        if (isset($_POST['customer-phone']) && phone_number_exists($_POST['customer-phone'])) {
+        if (isset($_POST['customer-phone']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && phone_number_exists($_POST['customer-phone'])) {
             $validate = false;
-            echo '<div class="error-box">This Phone number is<b>' . $_POST['customer-phone'] . '</b> already used. Please use unique phone number and try again</div>';
+            echo '<div class="error-box">This Phone number is<b>' . esc_html($_POST['customer-phone']) . '</b> already used. Please use unique phone number and try again</div>';
         }
 
 
-        if (isset($_POST['customer-email']) && mega_check_email($_POST['customer-email'])) {
-            echo '<div class="error-box">This email address <b>' . $_POST['customer-email'] . '</b> is already used .Please use unique email and try again</div>';
+        if (isset($_POST['customer-email']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && mega_check_email($_POST['customer-email'])) {
+            echo '<div class="error-box">This email address <b>' . esc_html($_POST['customer-email']) . '</b> is already used .Please use unique email and try again</div>';
             // !mega_check_email( $_POST['customer-email'])
             $validate = false;
         }
 
-        if (isset($_POST['set-order_export']) && $validate == true) {
+        if (isset($_POST['set-order_export']) && wp_verify_nonce($_POST['order_export_nonce'], 'order_export_form') && $validate == true) {
 
             echo '<div class="success-box">Affiliate Order Data inserted Sucessfully</div>';
         }
@@ -1178,6 +1614,20 @@ function dongtraders_custom_order_created_list()
 if (!function_exists('dong_custom_order_exporter_csv_files')) {
     function dong_custom_order_exporter_csv_files($post)
     {
+        // Security check: Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'dong_custom_order_exporter_csv_files')) {
+            wp_die('Security check failed');
+        }
+        
+        // Security check: Verify user is logged in
+        if (!is_user_logged_in()) {
+            wp_die('You must be logged in to perform this action');
+        }
+        
+        // Security check: Verify user has admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
 
         $get_start_date = $_POST['start_date'];
         $get_end_date = $_POST['end_date'];
@@ -1187,10 +1637,15 @@ if (!function_exists('dong_custom_order_exporter_csv_files')) {
         $get_table_name = $wpdb->prefix . 'dong_order_export_table';
 
         if (!empty($get_start_date) && !empty($get_end_date) && !empty($get_affilate_user_id)) {
-            $get_custom_orders = $wpdb->get_results("SELECT * FROM $get_table_name WHERE created_at BETWEEN  '$get_start_date' AND '$get_end_date' AND affilate_user_id =
-            '$get_affilate_user_id' ", ARRAY_A);
+            $get_custom_orders = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $get_table_name WHERE created_at BETWEEN %s AND %s AND affilate_user_id = %d", 
+                $get_start_date, $get_end_date, $get_affilate_user_id
+            ), ARRAY_A);
         } elseif (!empty($get_start_date) && !empty($get_end_date) && empty($get_affilate_user_id)) {
-            $get_custom_orders = $wpdb->get_results("SELECT * FROM $get_table_name WHERE created_at BETWEEN  '$get_start_date' AND '$get_end_date' ", ARRAY_A);
+            $get_custom_orders = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $get_table_name WHERE created_at BETWEEN %s AND %s", 
+                $get_start_date, $get_end_date
+            ), ARRAY_A);
         }
 
         if (DateTime::createFromFormat('Y-m-d', $get_start_date) == false && DateTime::createFromFormat('Y-m-d', $get_end_date) == false) {
@@ -1281,7 +1736,10 @@ function dongtraders_show_user_affilate_order()
             <tbody>
                 <?php
 
-                $get_order_results = $wpdb->get_results("SELECT *  FROM $order_table_name WHERE affilate_user_id = '$user_ID' ORDER BY id DESC;");
+                $get_order_results = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM $order_table_name WHERE affilate_user_id = %d ORDER BY id DESC", 
+                    $user_ID
+                ), ARRAY_A);
                 //$get_url = home_url() . '/wp-admin/admin.php?page=dongtrader_api_settings';
                 $current_page = home_url($_SERVER['REQUEST_URI']);
                 if (!empty($get_order_results)) {
@@ -1660,6 +2118,21 @@ function dongtrader_release_funds_tablelist()
 add_action('wp_ajax_dongtrader_delete_funds', 'dongtrader_delete_funds');
 function dongtrader_delete_funds()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_delete_funds')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    // Security check: Verify user has admin capabilities
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
+    
     $row_id = isset($_POST['rowid']) ? absint($_POST['rowid']) : 0;
 
     if ($row_id != 0) {
@@ -1732,6 +2205,20 @@ function dongtrader_compare_released_funds($group_id, $current_releasing_amount)
 add_action('wp_ajax_dongtrader_release_funds', 'dongtrader_release_funds');
 function dongtrader_release_funds()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dongtrader_release_funds')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    // Security check: Verify user has admin capabilities
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
 
     global $wpdb;
 
@@ -2552,10 +3039,18 @@ add_shortcode('user_registration_form', 'dongtrader_user_registration_form');
 
 
 add_action('wp_ajax_mega_credentials_save', 'mega_credentials_save');
-add_action('wp_ajax_nopriv_mega_credentials_save', 'mega_credentials_save');
 
 function mega_credentials_save()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'mega_credentials_save')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     if (!isset($_POST['formdata']))
         return;
@@ -3058,9 +3553,17 @@ function process_custom_form()
     }
 }
 add_action('wp_ajax_mega_get_variations', 'mega_get_variations');
-add_action('wp_ajax_nopriv_mega_get_variations', 'mega_get_variations');
 function mega_get_variations()
 {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'mega_get_variations')) {
+        wp_die('Security check failed');
+    }
+    
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
 
     $postid = sanitize_text_field($_POST['proid']);
     $product = wc_get_product($postid);
@@ -3136,7 +3639,6 @@ function dongtrader_display_xp_dashboard() {
     }
     
     $user_id = get_current_user_id();
-    error_log("XP Dashboard called for user: " . $user_id);
     
     $dong_user_role = get_user_meta($user_id, 'dong_user_role', true);
     $is_seller = in_array($dong_user_role, array('Planning', 'Budget', 'Media', 'Distribution', 'Membership'));
@@ -3147,6 +3649,12 @@ function dongtrader_display_xp_dashboard() {
     $talentshow_entry = get_user_meta($user_id, '_talentshow_entry', false);
     // Get buyer details from usermeta for XP calculation
     $buyer_details = get_user_meta($user_id, '_buyer_details', true);
+    // Log for debugging
+    error_log("=== FETCHING BUYER DETAILS ===");
+    error_log("Buyer details type: " . gettype($buyer_details));
+    error_log("Buyer details is array: " . (is_array($buyer_details) ? 'yes' : 'no'));
+    error_log("Buyer details count: " . (is_array($buyer_details) ? count($buyer_details) : '0'));
+    error_log("Buyer details content: " . print_r($buyer_details, true));
     
     // Initialize XP counters with detailed breakdown
     $total_earned_xp = 0;
@@ -3388,6 +3896,10 @@ function dongtrader_display_xp_dashboard() {
     $output = '<div class="dongtrader-xp-dashboard" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">';
     $output .= '<h3 style="color: #2c3e50; margin-bottom: 20px;">🎮 XP Dashboard</h3>';
     
+    // Debug: Show AJAX URL
+    $ajax_url = admin_url('admin-ajax.php');
+    $user_id = get_current_user_id();
+    $nonce = wp_create_nonce('get_xp_umeta_ids');
     
     // Leaderboard Display Section
     $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e67e22;">';
@@ -3402,6 +3914,7 @@ function dongtrader_display_xp_dashboard() {
     $output .= '<th style="padding: 12px; border: 1px solid #ddd; text-align: left; font-weight: 600; color: #495057;">Order Details</th>';
     $output .= '<th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #495057;">XP Awarded</th>';
     $output .= '<th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #495057;">Status</th>';
+    $output .= '<th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #495057;">Maturity Status</th>';
     $output .= '</tr>';
     
     // Display seller transactions (scanning/OTP)
@@ -3418,14 +3931,36 @@ function dongtrader_display_xp_dashboard() {
             $funding_xp = 0; // Placeholder for funding XP
             $total_xp = $xp_amount + $referral_xp + $funding_xp;
             
-            // Check XP status - if Discord invite exists, all XP is released
-            $is_discord_member = isset($transaction['discord_member']) && $transaction['discord_member'];
-            if ($has_discord_invite) {
+            // Check XP status - first check the transaction's actual status field
+            $txn_status = isset($transaction['status']) ? $transaction['status'] : 'none';
+            
+            // If transaction has been marked for redemption, show that
+            if ($txn_status === 'requested') {
+                $status_text = 'Requested';
+                $status_color = '#6f42c1';
+            } elseif ($txn_status === 'redeemed') {
+                $status_text = 'Redeemed';
+                $status_color = '#28a745';
+            } elseif ($txn_status === 'released') {
                 $status_text = 'Released';
                 $status_color = '#17a2b8';
+            } elseif ($txn_status === 'completed') {
+                // Legacy status for backward compatibility
+                $status_text = 'Released';
+                $status_color = '#17a2b8';
+            } elseif ($txn_status === 'processing') {
+                $status_text = 'Processing';
+                $status_color = '#007cba';
             } else {
-                $status_text = $is_discord_member ? 'Completed' : 'Pending';
-                $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                // Fallback to old logic for backwards compatibility
+                $is_discord_member = isset($transaction['discord_member']) && $transaction['discord_member'];
+                if ($has_discord_invite) {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } else {
+                    $status_text = $is_discord_member ? 'Completed' : 'Pending';
+                    $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                }
             }
             
             // Format order details for seller transactions
@@ -3437,22 +3972,96 @@ function dongtrader_display_xp_dashboard() {
                 $order_details .= ' - ' . $transaction['verification_date'];
             }
             
-            $output .= '<tr style="background: #e8f5e8; border-bottom: 1px solid #dee2e6;">';
+            // Calculate maturity status for seller transaction
+            $delivery_date = dongtrader_get_delivery_date_from_xp_entry($transaction);
+            $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+            $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+            $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+            
+            // Format maturity status display with debug info
+            $maturity_status = '';
+            $maturity_color = '#6c757d';
+            $debug_info = '';
+            
+            if ($is_mature) {
+                $maturity_status = '✅ Mature';
+                $maturity_color = '#28a745';
+                $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+            } elseif ($days_until_maturity !== null) {
+                if ($days_until_maturity > 0) {
+                    $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                    $maturity_color = '#ffc107';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                } else {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                }
+            } else {
+                $maturity_status = '❓ Unknown';
+                $maturity_color = '#6c757d';
+                // Show debug info for unknown status
+                $available_fields = is_array($transaction) ? array_keys($transaction) : array();
+                $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+            }
+            
+            $meta_id = 'seller_' . $index . '_' . $transaction['order_id'];
+            $output .= '<tr style="background: #e8f5e8; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #2e7d32;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #2e7d32; font-weight: 600;">' . number_format($total_xp) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+            $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
             $output .= '</tr>';
         }
     }
     
     // Display buyer transactions from _buyer_details usermeta (not direct WooCommerce orders)
     $buyer_details = get_user_meta($user_id, '_buyer_details', true);
-    if (is_array($buyer_details) && !empty($buyer_details)) {
-        foreach ($buyer_details as $index => $transaction) {
+    
+    error_log("=== DISPLAY BUYER DETAILS ===");
+    error_log("Buyer details fetched: " . (is_array($buyer_details) ? 'yes' : 'no'));
+    error_log("Buyer details empty: " . (empty($buyer_details) ? 'yes' : 'no'));
+    error_log("Buyer details type: " . gettype($buyer_details));
+    
+    if (!empty($buyer_details)) {
+        error_log("Buyer details content (first 500 chars): " . substr(print_r($buyer_details, true), 0, 500));
+    }
+    
+    // Handle different data formats for _buyer_details
+    // Could be: array of transactions, or serialized string, or JSON string
+    $buyer_details_array = array();
+    
+    if (is_array($buyer_details)) {
+        // Already an array
+        $buyer_details_array = $buyer_details;
+        error_log("Buyer details is already an array with " . count($buyer_details_array) . " items");
+    } elseif (is_string($buyer_details)) {
+        // Try to decode if it's a JSON string or serialized
+        $decoded = json_decode($buyer_details, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $buyer_details_array = $decoded;
+            error_log("Buyer details was JSON string, decoded to " . count($buyer_details_array) . " items");
+        } else {
+            // Try unserialize
+            $decoded = @unserialize($buyer_details);
+            if ($decoded !== false && is_array($decoded)) {
+                $buyer_details_array = $decoded;
+                error_log("Buyer details was serialized, unserialized to " . count($buyer_details_array) . " items");
+            }
+        }
+    }
+    
+    if (!empty($buyer_details_array)) {
+        error_log("Processing " . count($buyer_details_array) . " buyer transactions");
+        
+        foreach ($buyer_details_array as $index => $transaction) {
             $xp_amount = isset($transaction['xp_awarded']) ? intval($transaction['xp_awarded']) : 0;
+            
+            error_log("Buyer transaction $index: XP = $xp_amount");
             
             // Skip transactions with no XP awarded
             if ($xp_amount <= 0) {
+                error_log("  Skipping transaction $index - no XP awarded");
                 continue;
             }
             
@@ -3460,7 +4069,27 @@ function dongtrader_display_xp_dashboard() {
             $funding_xp = 0; // Placeholder for funding XP
             $total_xp = $xp_amount + $referral_xp + $funding_xp;
             
-            // Check XP status - if Discord invite exists, all XP is released
+            // Check XP status - first check the transaction's actual status field
+            $txn_status = isset($transaction['status']) ? $transaction['status'] : 'none';
+            
+            if ($txn_status === 'requested') {
+                $status_text = 'Requested';
+                $status_color = '#6f42c1';
+            } elseif ($txn_status === 'redeemed') {
+                $status_text = 'Redeemed';
+                $status_color = '#28a745';
+            } elseif ($txn_status === 'released') {
+                $status_text = 'Released';
+                $status_color = '#17a2b8';
+            } elseif ($txn_status === 'completed') {
+                // Legacy status for backward compatibility
+                $status_text = 'Released';
+                $status_color = '#17a2b8';
+            } elseif ($txn_status === 'processing') {
+                $status_text = 'Processing';
+                $status_color = '#007cba';
+            } else {
+                // Fallback to old logic
             $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
             if ($has_discord_invite) {
                 $status_text = 'Released';
@@ -3468,6 +4097,7 @@ function dongtrader_display_xp_dashboard() {
             } else {
                 $status_text = $is_discord_member ? 'Completed' : 'Pending';
                 $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                }
             }
             
             // Format order details from _buyer_details transaction
@@ -3482,10 +4112,45 @@ function dongtrader_display_xp_dashboard() {
             }
             $order_details .= ' (Order #' . $order_id . ') - Stored Transaction';
             
-            $output .= '<tr style="background: #f0f8ff; border-bottom: 1px solid #dee2e6;">';
+            // Calculate maturity status for buyer transaction
+            $delivery_date = dongtrader_get_delivery_date_from_xp_entry($transaction);
+            $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+            $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+            $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+            
+            // Format maturity status display with debug info
+            $maturity_status = '';
+            $maturity_color = '#6c757d';
+            $debug_info = '';
+            
+            if ($is_mature) {
+                $maturity_status = '✅ Mature';
+                $maturity_color = '#28a745';
+                $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+            } elseif ($days_until_maturity !== null) {
+                if ($days_until_maturity > 0) {
+                    $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                    $maturity_color = '#ffc107';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                } else {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                }
+            } else {
+                $maturity_status = '❓ Unknown';
+                $maturity_color = '#6c757d';
+                // Show debug info for unknown status
+                $available_fields = is_array($transaction) ? array_keys($transaction) : array();
+                $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+            }
+            
+            $meta_id = 'buyer_' . $index . '_' . $order_id;
+            $output .= '<tr style="background: #f0f8ff; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #1e3a8a;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #1e3a8a; font-weight: 600;">' . number_format($total_xp) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+            $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
             $output .= '</tr>';
         }
     }
@@ -3508,9 +4173,29 @@ function dongtrader_display_xp_dashboard() {
             foreach ($discord_invite_data_for_display as $index => $invite_entry) {
                 $xp_amount = isset($invite_entry['xp_awarded']) ? intval($invite_entry['xp_awarded']) : 0;
                 
-                // Discord invite XP is always released when data exists
+                // Check actual status field
+                $invite_status = isset($invite_entry['status']) ? $invite_entry['status'] : 'completed';
+                
+                if ($invite_status === 'requested') {
+                    $status_text = 'Requested';
+                    $status_color = '#6f42c1';
+                } elseif ($invite_status === 'redeemed') {
+                    $status_text = 'Redeemed';
+                    $status_color = '#28a745';
+                } elseif ($invite_status === 'released') {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } elseif ($invite_status === 'completed') {
+                    // Legacy status for backward compatibility
                 $status_text = 'Released';
                 $status_color = '#17a2b8';
+                } elseif ($invite_status === 'processing') {
+                    $status_text = 'Processing';
+                    $status_color = '#007cba';
+                } else {
+                    $status_text = 'Released'; // Discord invites are completed by default
+                    $status_color = '#17a2b8';
+                }
                 
                 // Format order details for Discord invite
                 $order_details = 'Discord Join';
@@ -3521,10 +4206,45 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $invite_entry['verification_date'];
                 }
                 
-                $output .= '<tr style="background: #f3e5f5; border-bottom: 1px solid #dee2e6;">';
+                // Calculate maturity status for Discord invite transaction
+                $delivery_date = dongtrader_get_delivery_date_from_xp_entry($invite_entry);
+                $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+                $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+                $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+                
+                // Format maturity status display with debug info
+                $maturity_status = '';
+                $maturity_color = '#6c757d';
+                $debug_info = '';
+                
+                if ($is_mature) {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                } elseif ($days_until_maturity !== null) {
+                    if ($days_until_maturity > 0) {
+                        $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                        $maturity_color = '#ffc107';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                    } else {
+                        $maturity_status = '✅ Mature';
+                        $maturity_color = '#28a745';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                    }
+                } else {
+                    $maturity_status = '❓ Unknown';
+                    $maturity_color = '#6c757d';
+                    // Show debug info for unknown status
+                    $available_fields = is_array($invite_entry) ? array_keys($invite_entry) : array();
+                    $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+                }
+                
+                $meta_id = 'discord_invite_' . $index . '_' . $invite_entry['verification_date'];
+                $output .= '<tr style="background: #f3e5f5; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #7b1fa2;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #7b1fa2; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
                 $output .= '</tr>';
             }
         }
@@ -3540,14 +4260,35 @@ function dongtrader_display_xp_dashboard() {
                 continue;
             }
             
-            // Check XP status - if Discord invite exists, all XP is released
-            $is_discord_member = isset($discord_activity['discord_member']) && $discord_activity['discord_member'];
-            if ($has_discord_invite) {
+            // Check XP status - first check the transaction's actual status field
+            $discord_activity_status = isset($discord_activity['status']) ? $discord_activity['status'] : 'none';
+            
+            if ($discord_activity_status === 'requested') {
+                $status_text = 'Requested';
+                $status_color = '#6f42c1';
+            } elseif ($discord_activity_status === 'redeemed') {
+                $status_text = 'Redeemed';
+                $status_color = '#28a745';
+            } elseif ($discord_activity_status === 'released') {
                 $status_text = 'Released';
                 $status_color = '#17a2b8';
+            } elseif ($discord_activity_status === 'completed') {
+                // Legacy status for backward compatibility
+                $status_text = 'Released';
+                $status_color = '#17a2b8';
+            } elseif ($discord_activity_status === 'processing') {
+                $status_text = 'Processing';
+                $status_color = '#007cba';
             } else {
-                $status_text = $is_discord_member ? 'Completed' : 'Pending';
-                $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                // Fallback to old logic
+                $is_discord_member = isset($discord_activity['discord_member']) && $discord_activity['discord_member'];
+                if ($has_discord_invite) {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } else {
+                    $status_text = $is_discord_member ? 'Completed' : 'Pending';
+                    $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                }
             }
             
             // Format order details for Discord activities
@@ -3562,10 +4303,45 @@ function dongtrader_display_xp_dashboard() {
                 $order_details .= ' - ' . $discord_activity['verification_date'];
             }
             
-            $output .= '<tr style="background: #e8eaf6; border-bottom: 1px solid #dee2e6;">';
+            // Calculate maturity status for Discord activity transaction
+            $delivery_date = dongtrader_get_delivery_date_from_xp_entry($discord_activity);
+            $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+            $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+            $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+            
+            // Format maturity status display with debug info
+            $maturity_status = '';
+            $maturity_color = '#6c757d';
+            $debug_info = '';
+            
+            if ($is_mature) {
+                $maturity_status = '✅ Mature';
+                $maturity_color = '#28a745';
+                $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+            } elseif ($days_until_maturity !== null) {
+                if ($days_until_maturity > 0) {
+                    $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                    $maturity_color = '#ffc107';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                } else {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                }
+            } else {
+                $maturity_status = '❓ Unknown';
+                $maturity_color = '#6c757d';
+                // Show debug info for unknown status
+                $available_fields = is_array($discord_activity) ? array_keys($discord_activity) : array();
+                $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+            }
+            
+            $meta_id = 'discord_details_' . $index . '_' . $discord_activity['verification_date'];
+            $output .= '<tr style="background: #e8eaf6; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #3f51b5;">' . esc_html($order_details) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #3f51b5; font-weight: 600;">' . number_format($xp_amount) . '</td>';
             $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+            $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
             $output .= '</tr>';
         }
     }
@@ -3605,7 +4381,27 @@ function dongtrader_display_xp_dashboard() {
                     continue;
                 }
                 
-                // Check XP status - if Discord invite exists, all XP is released
+                // Check XP status - first check the transaction's actual status field
+                $poll_txn_status = isset($poll_entry['status']) ? $poll_entry['status'] : 'none';
+                
+                if ($poll_txn_status === 'requested') {
+                    $status_text = 'Requested';
+                    $status_color = '#6f42c1';
+                } elseif ($poll_txn_status === 'redeemed') {
+                    $status_text = 'Redeemed';
+                    $status_color = '#28a745';
+                } elseif ($poll_txn_status === 'released') {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } elseif ($poll_txn_status === 'completed') {
+                    // Legacy status for backward compatibility
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } elseif ($poll_txn_status === 'processing') {
+                    $status_text = 'Processing';
+                    $status_color = '#007cba';
+                } else {
+                    // Fallback to old logic
                 $is_discord_member = get_user_meta($user_id, 'discord_user_id', true) ? true : false;
                 if ($has_discord_invite) {
                     $status_text = 'Released';
@@ -3613,6 +4409,7 @@ function dongtrader_display_xp_dashboard() {
                 } else {
                     $status_text = $is_discord_member ? 'Completed' : 'Pending';
                     $status_color = $is_discord_member ? '#28a745' : '#ffc107';
+                    }
                 }
                 
                 // Format order details for Discord poll
@@ -3632,10 +4429,45 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $poll_entry['submitted_at'];
                 }
                 
-                $output .= '<tr style="background: #e1f5fe; border-bottom: 1px solid #dee2e6;">';
+                // Calculate maturity status for Discord poll transaction
+                $delivery_date = dongtrader_get_delivery_date_from_xp_entry($poll_entry);
+                $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+                $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+                $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+                
+                // Format maturity status display with debug info
+                $maturity_status = '';
+                $maturity_color = '#6c757d';
+                $debug_info = '';
+                
+                if ($is_mature) {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                } elseif ($days_until_maturity !== null) {
+                    if ($days_until_maturity > 0) {
+                        $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                        $maturity_color = '#ffc107';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                    } else {
+                        $maturity_status = '✅ Mature';
+                        $maturity_color = '#28a745';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                    }
+                } else {
+                    $maturity_status = '❓ Unknown';
+                    $maturity_color = '#6c757d';
+                    // Show debug info for unknown status
+                    $available_fields = is_array($poll_entry) ? array_keys($poll_entry) : array();
+                    $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+                }
+                
+                $meta_id = 'discord_poll_' . $index . '_' . $poll_entry['submitted_at'];
+                $output .= '<tr style="background: #e1f5fe; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #0277bd;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #0277bd; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
                 $output .= '</tr>';
             }
         }
@@ -3678,9 +4510,26 @@ function dongtrader_display_xp_dashboard() {
                 
                 // Check XP status for talent show entries - use status field
                 $status = isset($talent_entry['status']) ? $talent_entry['status'] : 'pending';
-                if ($status === 'submitted' || $status === 'completed') {
+                
+                if ($status === 'requested') {
+                    $status_text = 'Requested';
+                    $status_color = '#6f42c1';
+                } elseif ($status === 'redeemed') {
+                    $status_text = 'Redeemed';
+                    $status_color = '#28a745';
+                } elseif ($status === 'released') {
                     $status_text = 'Released';
                     $status_color = '#17a2b8';
+                } elseif ($status === 'completed') {
+                    // Legacy status for backward compatibility
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } elseif ($status === 'submitted') {
+                    $status_text = 'Released';
+                    $status_color = '#17a2b8';
+                } elseif ($status === 'processing') {
+                    $status_text = 'Processing';
+                    $status_color = '#007cba';
                 } else {
                     $status_text = 'Pending';
                     $status_color = '#ffc107';
@@ -3695,10 +4544,45 @@ function dongtrader_display_xp_dashboard() {
                     $order_details .= ' - ' . $talent_entry['submission_date'];
                 }
                 
-                $output .= '<tr style="background: #fff3e0; border-bottom: 1px solid #dee2e6;">';
+                // Calculate maturity status for Talent Show entry transaction
+                $delivery_date = dongtrader_get_delivery_date_from_xp_entry($talent_entry);
+                $is_mature = !empty($delivery_date) ? dongtrader_is_xp_entry_mature($delivery_date) : false;
+                $days_until_maturity = !empty($delivery_date) ? dongtrader_days_until_maturity($delivery_date) : null;
+                $maturity_date = !empty($delivery_date) ? dongtrader_calculate_maturity_date($delivery_date) : null;
+                
+                // Format maturity status display with debug info
+                $maturity_status = '';
+                $maturity_color = '#6c757d';
+                $debug_info = '';
+                
+                if ($is_mature) {
+                    $maturity_status = '✅ Mature';
+                    $maturity_color = '#28a745';
+                    $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                } elseif ($days_until_maturity !== null) {
+                    if ($days_until_maturity > 0) {
+                        $maturity_status = '⏳ Maturing (' . abs($days_until_maturity) . ' days)';
+                        $maturity_color = '#ffc107';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matures: ' . esc_html($maturity_date) . '</small>';
+                    } else {
+                        $maturity_status = '✅ Mature';
+                        $maturity_color = '#28a745';
+                        $debug_info = '<br><small style="font-size: 10px; color: #6c757d;">Earned: ' . esc_html($delivery_date) . '<br>Matured: ' . esc_html($maturity_date) . '</small>';
+                    }
+                } else {
+                    $maturity_status = '❓ Unknown';
+                    $maturity_color = '#6c757d';
+                    // Show debug info for unknown status
+                    $available_fields = is_array($talent_entry) ? array_keys($talent_entry) : array();
+                    $debug_info = '<br><small style="font-size: 10px; color: #dc3545;">No delivery date found<br>Available fields: ' . esc_html(implode(', ', $available_fields)) . '</small>';
+                }
+                
+                $meta_id = 'talentshow_' . $index . '_' . $talent_entry['submission_date'];
+                $output .= '<tr style="background: #fff3e0; border-bottom: 1px solid #dee2e6;" data-meta-id="' . $meta_id . '">';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; font-weight: 600; color: #f57c00;">' . esc_html($order_details) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: #f57c00; font-weight: 600;">' . number_format($xp_amount) . '</td>';
                 $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $status_color . '; font-weight: bold;">' . $status_text . '</td>';
+                $output .= '<td style="padding: 12px; border: 1px solid #ddd; text-align: center; color: ' . $maturity_color . '; font-weight: bold; font-size: 12px;">' . $maturity_status . $debug_info . '</td>';
                 $output .= '</tr>';
             }
         }
@@ -3834,20 +4718,247 @@ function dongtrader_display_xp_dashboard() {
     // XP to USD Conversion
     $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
     $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;">XP to USD</p>';
-    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 0) . '</p>';
+    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 2) . '</p>';
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 USD = ' . number_format($xp_per_usd, 0) . ' XP</p>';
+    // Debug: Show minimum requirement
+    $output .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: ' . ($total_usd >= 1.0 ? '#28a745' : '#dc3545') . '; font-weight: bold;">Minimum for redemption: $1.00 ' . ($total_usd >= 1.0 ? '✅' : '❌') . '</p>';
+    $output .= '</div>';
+    
+    // Check if user has any pending or processing redemption requests
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    $user_id = get_current_user_id();
+    
+    $existing_requests = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_name 
+         WHERE user_id = %d 
+         AND status IN ('pending', 'processing')",
+        $user_id
+    ));
+    
+    $has_active_redemption = ($existing_requests > 0);
+    
+    // Ensure USD amount is numeric and properly rounded for comparison
+    $total_usd_numeric = floatval($total_usd);
+    
+    // STRICT VALIDATION: Button ONLY displays if USD value >= $1.00
+    // Validate redemption button eligibility using comprehensive validation function
+    $eligibility_check = dongtrader_check_redemption_button_eligibility($total_usd_numeric, $total_completed_xp, $has_active_redemption);
+    
+    // Display redeem button ONLY if eligible (requires >= $1.00 USD worth of matured XP)
+    if ($eligibility_check['eligible']) {
+        $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center;">';
+        $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6c757d;">Redeem Rewards</p>';
+        $output .= '<button type="button" class="redeem-button" id="redeem-rewards-btn" onclick="showRedemptionPopup(' . $total_completed_xp . ', ' . $total_yam . ', ' . $total_usd . ', ' . $xp_per_yam . ', ' . $yam_per_usd . ')" style="background: #6F42C1; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; width: 100%; max-width: 150px;" onmouseover="this.style.background=\'#5a32a3\'; this.style.transform=\'translateY(-2px)\';" onmouseout="this.style.background=\'#6F42C1\'; this.style.transform=\'translateY(0)\';">';
+        $output .= 'Redeem';
+        $output .= '</button>';
+        $output .= '</div>';
+    } else {
+        // Show appropriate message based on reason
+        $reason = $eligibility_check['reason'];
+        $message = isset($eligibility_check['message']) ? $eligibility_check['message'] : 'Redemption not available.';
+        
+        if ($reason === 'active_redemption') {
+            // Active redemption request
+            $output .= '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #ffc107;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #856404; font-weight: bold;">🔄 Redemption in Progress</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #856404;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'minimum_amount') {
+            // Minimum $1 USD not met
+            $current_amount = isset($eligibility_check['current_amount']) ? $eligibility_check['current_amount'] : 0;
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #495057; font-weight: bold;">💰 Minimum Redemption Required</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'no_matured_xp') {
+            // No matured XP available
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #495057; font-weight: bold;">⏳ XP Still Maturing</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'september_1st_block') {
+            // September 1st block
+            $next_window = isset($eligibility_check['next_window_date']) ? $eligibility_check['next_window_date'] : '';
+            $output .= '<div style="text-align: center; padding: 10px; background: #f8d7da; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #dc3545;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #721c24; font-weight: bold;">🚫 September 1st - Let It Ride Day</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #721c24;">' . $message . '</p>';
+            if ($next_window) {
+                $output .= '<p style="margin: 8px 0 0 0; font-size: 11px; color: #856404;">Next window: ' . $next_window . '</p>';
+            }
+            $output .= '</div>';
+        } elseif ($reason === 'outside_window') {
+            // Outside redemption window
+            $next_window_date = isset($eligibility_check['next_window_date']) ? $eligibility_check['next_window_date'] : '';
+            $days_until = isset($eligibility_check['days_until_window']) ? $eligibility_check['days_until_window'] : 0;
+            $window_range = isset($eligibility_check['window_range']) ? $eligibility_check['window_range'] : '';
+            $output .= '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #ffc107;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #856404; font-weight: bold;">⏳ Redemption Window Closed</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #856404;">' . $message . '</p>';
+            if ($next_window_date && $days_until !== null) {
+                $output .= '<p style="margin: 8px 0 0 0; font-size: 11px; color: #856404;">Next window: ' . $next_window_date . ' (' . $days_until . ' days)</p>';
+                if ($window_range) {
+                    $output .= '<p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">Window: ' . $window_range . '</p>';
+                }
+            }
+            $output .= '</div>';
+        } else {
+            // Generic not eligible message
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        }
+    }
+    
     $output .= '</div>';
     
     $output .= '</div>';
     $output .= '</div>';
+    
+    // Redemption Popup HTML
+    $output .= '<div id="redemption-popup" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; min-width: 100%; min-height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; justify-content: center; align-items: center; margin: 0; padding: 0; overflow: hidden;">';
+    $output .= '<div style="background: white; border-radius: 12px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">';
+    
+    // Popup Header
+    $output .= '<div style="text-align: center; margin-bottom: 25px;">';
+    $output .= '<h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 24px;">💰 Redemption Details</h3>';
+    $output .= '<p style="margin: 0; color: #6c757d; font-size: 14px;">Review your redemption request before submitting</p>';
     $output .= '</div>';
     
-    // Add note about leaderboard functionality
-    $output .= '<div style="background: #e3f2fd; border: 1px solid #bbdefb; padding: 10px; border-radius: 4px; margin-top: 15px;">';
-    $output .= '<p style="margin: 5px 0; color: #1565c0; font-size: 13px;"><strong>ℹ️ Note:</strong> Action XP is earned from orders and scanning activities. Referral XP is earned when you accept Discord invite links. YAM JAM rewards will be available when the complete system is implemented.</p>';
+    // Redemption Window Status and Rules - Enhanced Display
+    $is_within_window = dongtrader_is_within_redemption_window();
+    $next_window = dongtrader_get_next_redemption_window();
+    $days_until_window = dongtrader_days_until_next_redemption_window();
+    
+    // Get current window dates
+    $current_window = dongtrader_get_monthly_redemption_window();
+    $current_window_start = date('F j, Y', strtotime($current_window['start']));
+    $current_window_end = date('F j, Y', strtotime($current_window['end']));
+    
+    // Format next window dates
+    $next_window_start = date('F j, Y', strtotime($next_window['start']));
+    $next_window_end = date('F j, Y', strtotime($next_window['end']));
+    
+    // Check if it's September 1st
+    $current_date_obj = new DateTime(current_time('mysql'));
+    $is_september_1st = ($current_date_obj->format('m-d') === '09-01');
+    
+    $window_status_color = $is_within_window ? '#28a745' : ($is_september_1st ? '#dc3545' : '#ffc107');
+    $window_status_text = $is_within_window 
+        ? '✅ Redemption Window Open' 
+        : ($is_september_1st ? '🚫 No Redemptions Allowed (September 1st)' : '⏳ Redemption Window Closed');
+    
+    $output .= '<div style="background: ' . ($is_within_window ? '#d4edda' : ($is_september_1st ? '#f8d7da' : '#fff3cd')) . '; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid ' . $window_status_color . ';">';
+    
+    // Status Header
+    $output .= '<h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; color: ' . ($is_within_window ? '#155724' : ($is_september_1st ? '#721c24' : '#856404')) . ';">📅 Redemption Window Status</h4>';
+    $output .= '<p style="margin: 0 0 15px 0; font-size: 14px; font-weight: bold; color: ' . ($is_within_window ? '#155724' : ($is_september_1st ? '#721c24' : '#856404')) . ';">' . $window_status_text . '</p>';
+    
+    // Current Status Details
+    if ($is_within_window) {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">Current Window:</p>';
+        $output .= '<p style="margin: 0; font-size: 13px; color: #155724;"><strong>' . $current_window_start . '</strong> to <strong>' . $current_window_end . '</strong></p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #6c757d;">You can submit redemption requests during this period.</p>';
+        $output .= '</div>';
+    } else if ($is_september_1st) {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #721c24;">September 1st - Let It Ride Day</p>';
+        $output .= '<p style="margin: 0; font-size: 12px; color: #721c24;">No redemptions are allowed on September 1st. This is the annual "Let It Ride Day" for reconciliation.</p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #856404;"><strong>Next available window:</strong> ' . $next_window_start . ' - ' . $next_window_end . ' (' . $days_until_window . ' days)</p>';
+        $output .= '</div>';
+    } else {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">Next Window:</p>';
+        $output .= '<p style="margin: 0; font-size: 13px; color: #856404;"><strong>' . $next_window_start . '</strong> to <strong>' . $next_window_end . '</strong></p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #6c757d;">Days remaining: <strong>' . $days_until_window . ' days</strong></p>';
+        $output .= '</div>';
+    }
+    
+    // Redemption Window Rules
+    $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 15px;">';
+    $output .= '<p style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">📋 Redemption Window Rules:</p>';
+    $output .= '<ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #495057; line-height: 1.8;">';
+    $output .= '<li><strong>Window Period:</strong> 1st through 7th of each month (00:00:00 to 23:59:59)</li>';
+    $output .= '<li><strong>September 1st:</strong> No redemptions allowed (Annual "Let It Ride Day")</li>';
+    $output .= '<li><strong>Next Window After Sept 1:</strong> October 1-7</li>';
+    $output .= '<li><strong>Request Timing:</strong> Redemption requests can only be submitted during open windows</li>';
+    $output .= '</ul>';
     $output .= '</div>';
     
     $output .= '</div>';
+    
+    // Redemption Summary
+    $output .= '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 18px;">📊 Redemption Info</h4>';
+    
+    $output .= '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">xp_redem</p>';
+    $output .= '<p id="popup-xp-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #2c3e50;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">yam_redem</p>';
+    $output .= '<p id="popup-yam-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #2c3e50;">0</p>';
+    $output .= '</div>';
+    
+    $output .= '<div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">';
+    $output .= '<p style="margin: 0 0 5px 0; font-size: 12px; color: #6c757d;">usd_redem</p>';
+    $output .= '<p id="popup-usd-amount" style="margin: 0; font-size: 20px; font-weight: bold; color: #28a745;">$0</p>';
+    $output .= '</div>';
+    $output .= '</div>';
+    
+    // Additional Database Fields Display - HIDDEN FOR PRODUCTION (Debug info only)
+    /*
+    $output .= '<div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 6px;">';
+    $output .= '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 14px;">📋 Additional Database Fields</h5>';
+    $output .= '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">';
+    $output .= '<div><strong>id:</strong> <span style="color: #6c757d;">Auto-generated</span></div>';
+    $output .= '<div><strong>meta_ids:</strong> <span id="popup-meta-ids" style="color: #6c757d;">Loading...</span></div>';
+    $output .= '<div><strong>status:</strong> <span style="color: #28a745;">pending</span></div>';
+    $output .= '<div><strong>payment_method:</strong> <span id="popup-payment-method-display" style="color: #6c757d;">Not selected</span></div>';
+    $output .= '<div><strong>payment_details:</strong> <span id="popup-payment-details-display" style="color: #6c757d;">Not provided</span></div>';
+    $output .= '<div><strong>redem_date:</strong> <span style="color: #6c757d;">Current timestamp</span></div>';
+    $output .= '<div><strong>processed_date:</strong> <span style="color: #6c757d;">NULL</span></div>';
+    $output .= '<div><strong>admin_notes:</strong> <span style="color: #6c757d;">NULL</span></div>';
+    $output .= '<div><strong>transaction_id:</strong> <span style="color: #6c757d;">NULL</span></div>';
+    $output .= '</div>';
+    $output .= '</div>';
+    */
+    $output .= '</div>';
+    
+    // Payment Method Selection
+    $output .= '<div style="margin-bottom: 20px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 16px;">💳 Payment Method</h4>';
+    $output .= '<select id="payment-method" style="width: 100%; padding: 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; background: white;">';
+    $output .= '<option value="">Select Payment Method</option>';
+    $output .= '<option value="paypal">PayPal</option>';
+    $output .= '<option value="venmo">Venmo</option>';
+    $output .= '<option value="bank_transfer">Bank Transfer</option>';
+    $output .= '<option value="crypto">Cryptocurrency</option>';
+    $output .= '</select>';
+    $output .= '</div>';
+    
+    // Payment Details
+    $output .= '<div style="margin-bottom: 25px;">';
+    $output .= '<h4 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 16px;">📝 Payment Details</h4>';
+    $output .= '<textarea id="payment-details" placeholder="Enter your payment details (e.g., PayPal email, Venmo username, etc.)" style="width: 100%; padding: 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; min-height: 80px; resize: vertical;"></textarea>';
+    $output .= '</div>';
+    
+    // Action Buttons
+    $output .= '<div style="display: flex; gap: 15px; justify-content: center;">';
+    $output .= '<button onclick="closeRedemptionPopup()" style="background: #6c757d; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">Cancel</button>';
+    $output .= '<button onclick="submitRedemptionRequest()" style="background: #6F42C1; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">Submit Request</button>';
+    $output .= '</div>';
+    
+    $output .= '</div>';
+    $output .= '</div>';
+    
+    // Add JavaScript directly to the output
+    $output .= '<script type="text/javascript">
+    console.log("Redemption popup script loaded - inline");
+    </script>';
     
     // User Information Section
     $output .= '<div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
@@ -3880,7 +4991,7 @@ function dongtrader_display_xp_dashboard() {
     $discord_user_id = get_user_meta($user_id, 'discord_user_id', true);
     
     // Check if there's any Discord invite data
-    $discord_invite_data = get_user_meta($user_id, '_discord_invite', false);
+    $discord_invite_data = get_user_meta($user_id, '_discord_invite', true);
     $has_discord_invite_data = !empty($discord_invite_data);
     
     if ($discord_user_id) {
@@ -3898,8 +5009,8 @@ function dongtrader_display_xp_dashboard() {
             $output .= '<p style="margin: 8px 0; color: #27ae60;"><strong>✅ All XP has been verified and completed!</strong></p>';
         }
         $output .= '</div>';
-    } else if (!$has_discord_invite_data) {
-        // Only show "Connect Discord Account" if there's no Discord invite data
+    } elseif (!$has_discord_invite_data) {
+        // Show "Connect Discord Account" only if user is not connected to Discord AND has no _discord_invite data
         $output .= '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">';
         $output .= '<h4 style="color: #721c24; margin-top: 0;">🔗 Connect Discord Account</h4>';
         $output .= '<p style="margin: 8px 0; color: #721c24;"><strong>Action Required:</strong> To receive your XP rewards, you must connect your Discord account.</p>';
@@ -3917,6 +5028,763 @@ function dongtrader_display_xp_dashboard() {
     $output .= '</div>';
     
     return $output;
+}
+
+/**
+ * Check if a transaction is eligible for redemption
+ * Validates both status and maturity period
+ * @param array $transaction Transaction array
+ * @param int $umeta_id Umeta ID for tracking
+ * @return array Array with 'eligible' bool and additional info
+ */
+function dongtrader_check_transaction_eligibility($transaction, $umeta_id) {
+    if (!is_array($transaction)) {
+        return array(
+            'eligible' => false,
+            'reason' => 'Invalid transaction data',
+            'umeta_id' => $umeta_id
+        );
+    }
+    
+    // Check the status field - exclude if already in redemption process
+    $status = isset($transaction['status']) ? $transaction['status'] : 'none';
+    
+    if ($status === 'requested' || $status === 'processing') {
+        return array(
+            'eligible' => false,
+            'reason' => 'Already in redemption process',
+            'umeta_id' => $umeta_id,
+            'status' => $status
+        );
+    }
+    
+    // Get delivery date from transaction
+    $delivery_date = dongtrader_get_delivery_date_from_xp_entry($transaction);
+    
+    // If no delivery date found, check if we can use fallback
+    if (empty($delivery_date)) {
+        // Fallback: Try to use umeta_id creation timestamp or current date
+        // This handles legacy entries without dates
+        global $wpdb;
+        $umeta_row = $wpdb->get_row($wpdb->prepare(
+            "SELECT umeta_id FROM {$wpdb->usermeta} WHERE umeta_id = %d",
+            $umeta_id
+        ));
+        
+        // For legacy entries without dates, we'll mark them as "unknown maturity"
+        // Admin can review these manually
+        return array(
+            'eligible' => false,
+            'reason' => 'No delivery date found (legacy entry)',
+            'umeta_id' => $umeta_id,
+            'immature' => true,
+            'needs_review' => true
+        );
+    }
+    
+    // Check if entry is mature
+    $is_mature = dongtrader_is_xp_entry_mature($delivery_date);
+    
+    if (!$is_mature) {
+        $days_remaining = dongtrader_days_until_maturity($delivery_date);
+        $maturity_date = dongtrader_calculate_maturity_date($delivery_date);
+        
+        return array(
+            'eligible' => false,
+            'reason' => 'XP entry not yet mature',
+            'umeta_id' => $umeta_id,
+            'immature' => true,
+            'delivery_date' => $delivery_date,
+            'maturity_date' => $maturity_date,
+            'days_remaining' => $days_remaining
+        );
+    }
+    
+    // Entry is mature and status is eligible
+    return array(
+        'eligible' => true,
+        'umeta_id' => $umeta_id,
+        'delivery_date' => $delivery_date,
+        'maturity_date' => dongtrader_calculate_maturity_date($delivery_date),
+        'status' => $status
+    );
+}
+
+/**
+ * AJAX handler to get XP umeta_id values
+ */
+add_action('wp_ajax_get_xp_umeta_ids', 'dongtrader_get_xp_umeta_ids');
+add_action('wp_ajax_submit_redemption_request', 'dongtrader_submit_redemption_request');
+
+// Test AJAX handler
+add_action('wp_ajax_test_ajax', 'dongtrader_test_ajax');
+
+function dongtrader_test_ajax() {
+    // Security check: Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'test_ajax')) {
+        wp_die('Security check failed');
+}
+
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_die('You must be logged in to perform this action');
+    }
+    
+    wp_send_json_success('Test AJAX working');
+}
+
+function dongtrader_get_xp_umeta_ids() {
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error('User not logged in');
+    }
+    
+    // Validate and sanitize user ID
+    $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+    $current_user_id = get_current_user_id();
+    
+    if ($user_id !== $current_user_id || $user_id <= 0) {
+        wp_send_json_error('Invalid user ID');
+    }
+    
+    global $wpdb;
+    
+    // Define meta keys to search for
+    $meta_keys = array('_buyer_details', '_seller_details', '_discord_invite', '_discord_poll', '_talentshow_entry');
+    
+    // Create placeholders for the IN clause
+    $placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+    
+    // Single optimized query to get all umeta_ids with their meta_values
+    $query = $wpdb->prepare(
+        "SELECT umeta_id, meta_value FROM {$wpdb->usermeta} 
+         WHERE user_id = %d AND meta_key IN ($placeholders)",
+        array_merge(array($user_id), $meta_keys)
+    );
+    
+    $results = $wpdb->get_results($query, ARRAY_A);
+    
+    // Check for database errors
+    if ($wpdb->last_error) {
+        wp_send_json_error('Database error: ' . $wpdb->last_error);
+    }
+    
+    $filtered_umeta_ids = array();
+    $filtered_count = 0;
+    $immature_entries = array(); // Track immature entries for UI display
+    
+    error_log("=== Umeta ID Filtering (with maturity check) ===");
+    error_log("Total records found: " . count($results));
+    
+    // Filter out transactions with status 'requested' or already processed
+    // AND filter out immature entries (not yet 8-12 weeks old)
+    foreach ($results as $row) {
+        $umeta_id = intval($row['umeta_id']);
+        $meta_value = $row['meta_value'];
+        
+        // Skip if empty
+        if (empty($meta_value)) {
+            error_log("Skipping umeta_id $umeta_id: Empty meta_value");
+            continue;
+        }
+        
+        // Try to decode as JSON first
+        $meta_data = json_decode($meta_value, true);
+        $is_json = (json_last_error() === JSON_ERROR_NONE);
+        
+        // If not JSON, try PHP serialized data
+        if (!$is_json) {
+            $meta_data = @unserialize($meta_value);
+            if ($meta_data !== false && is_array($meta_data)) {
+                // Handle nested array structure - check if it's an array of transactions
+                if (isset($meta_data[0]) && is_array($meta_data[0])) {
+                    // It's an array of transactions, process each one
+                    foreach ($meta_data as $transaction) {
+                        $should_include = dongtrader_check_transaction_eligibility($transaction, $umeta_id);
+                        if ($should_include['eligible']) {
+                            $filtered_umeta_ids[] = $umeta_id;
+                            $filtered_count++;
+                        } elseif (isset($should_include['immature'])) {
+                            $immature_entries[] = $should_include;
+                        }
+                    }
+                    continue; // Continue to next row
+                } else {
+                    // Single transaction
+                $is_json = true;
+                }
+            }
+        }
+        
+        if ($is_json && is_array($meta_data)) {
+            $should_include = dongtrader_check_transaction_eligibility($meta_data, $umeta_id);
+            
+            if ($should_include['eligible']) {
+                $filtered_umeta_ids[] = $umeta_id;
+                $filtered_count++;
+                error_log("Including umeta_id $umeta_id (mature and eligible)");
+            } elseif (isset($should_include['immature'])) {
+                $immature_entries[] = $should_include;
+                error_log("Excluding umeta_id $umeta_id - " . $should_include['reason']);
+            } else {
+                error_log("Excluding umeta_id $umeta_id - " . $should_include['reason']);
+            }
+        } else {
+            // If we can't parse it, check if it's safe to include (fallback for old data)
+            // For backwards compatibility, we'll include it but log a warning
+            error_log("Warning: Including umeta_id $umeta_id (unparseable data - legacy entry)");
+            $filtered_umeta_ids[] = $umeta_id;
+            $filtered_count++;
+        }
+    }
+    
+    error_log("Filtered count: $filtered_count mature entries out of " . count($results));
+    error_log("Immature entries: " . count($immature_entries));
+    
+    // Return success response with filtered data
+    wp_send_json_success(array(
+        'umeta_ids' => $filtered_umeta_ids,
+        'count' => $filtered_count,
+        'total_found' => count($results),
+        'meta_keys_searched' => $meta_keys,
+        'immature_entries' => $immature_entries // Include immature entries info for UI
+    ));
+}
+
+/**
+ * AJAX handler to submit redemption request
+ */
+function dongtrader_submit_redemption_request() {
+    // Security check: Verify user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error('User not logged in');
+    }
+    
+    // Get and validate form data
+    $user_id = get_current_user_id();
+    
+    error_log('=== REDEMPTION REQUEST RECEIVED ===');
+    error_log('POST data: ' . print_r($_POST, true));
+    
+    $xp_amount = isset($_POST['xp_amount']) ? intval($_POST['xp_amount']) : 0;
+    $yam_amount = isset($_POST['yam_amount']) ? floatval($_POST['yam_amount']) : 0;
+    $usd_amount = isset($_POST['usd_amount']) ? floatval($_POST['usd_amount']) : 0;
+    $xp_per_yam = isset($_POST['xp_per_yam']) ? floatval($_POST['xp_per_yam']) : 0;
+    $yam_per_usd = isset($_POST['yam_per_usd']) ? floatval($_POST['yam_per_usd']) : 0;
+    $payment_method = isset($_POST['payment_method']) ? sanitize_text_field($_POST['payment_method']) : '';
+    $payment_details = isset($_POST['payment_details']) ? sanitize_textarea_field($_POST['payment_details']) : '';
+    // Don't sanitize JSON - just get it as-is
+    $meta_ids = isset($_POST['meta_ids']) ? $_POST['meta_ids'] : '';
+    
+    error_log("Extracted meta_ids: " . $meta_ids);
+    error_log("Meta IDs type: " . gettype($meta_ids));
+    error_log("Meta IDs length: " . strlen($meta_ids));
+    error_log("Meta IDs JSON decode test: " . print_r(json_decode($meta_ids, true), true));
+    
+    // Validate required fields
+    if (empty($payment_method)) {
+        wp_send_json_error('Payment method is required');
+    }
+    
+    if (empty($payment_details)) {
+        wp_send_json_error('Payment details are required');
+    }
+    
+    if ($xp_amount <= 0 || $yam_amount <= 0 || $usd_amount <= 0) {
+        wp_send_json_error('Invalid redemption amounts');
+    }
+    
+    global $wpdb;
+    
+    // ===== MATURITY AND REDEMPTION WINDOW VALIDATION =====
+    
+    // Check if currently within a redemption window
+    if (!dongtrader_is_within_redemption_window()) {
+        $days_until = dongtrader_days_until_next_redemption_window();
+        $next_window = dongtrader_get_next_redemption_window();
+        wp_send_json_error(array(
+            'message' => 'Redemption can only be submitted during monthly redemption windows.',
+            'days_until_window' => $days_until,
+            'next_window_date' => $next_window['date'],
+            'next_window_start' => $next_window['start']
+        ));
+    }
+    
+    // Validate maturity for all selected XP entries
+    if (!empty($meta_ids)) {
+        $meta_ids_array = json_decode($meta_ids, true);
+        if (is_array($meta_ids_array) && !empty($meta_ids_array)) {
+            $immature_entries = array();
+            $delivery_dates = array();
+            
+            foreach ($meta_ids_array as $umeta_id) {
+                $umeta_id = intval($umeta_id);
+                
+                // Get the usermeta record
+                $meta_row = $wpdb->get_row($wpdb->prepare(
+                    "SELECT meta_key, meta_value FROM {$wpdb->usermeta} WHERE umeta_id = %d AND user_id = %d",
+                    $umeta_id, $user_id
+                ));
+                
+                if (!$meta_row) {
+                    continue;
+                }
+                
+                // Parse transaction data
+                $meta_data = json_decode($meta_row->meta_value, true);
+                if (!$meta_data || !is_array($meta_data)) {
+                    $meta_data = @unserialize($meta_row->meta_value);
+                }
+                
+                if (is_array($meta_data)) {
+                    // Handle array of transactions
+                    if (isset($meta_data[0]) && is_array($meta_data[0])) {
+                        foreach ($meta_data as $transaction) {
+                            $check_result = dongtrader_check_transaction_eligibility($transaction, $umeta_id);
+                            if (isset($check_result['immature']) && $check_result['immature']) {
+                                $immature_entries[] = $check_result;
+                            }
+                            if (isset($check_result['delivery_date'])) {
+                                $delivery_dates[] = $check_result['delivery_date'];
+                            }
+                        }
+                    } else {
+                        // Single transaction
+                        $check_result = dongtrader_check_transaction_eligibility($meta_data, $umeta_id);
+                        if (isset($check_result['immature']) && $check_result['immature']) {
+                            $immature_entries[] = $check_result;
+                        }
+                        if (isset($check_result['delivery_date'])) {
+                            $delivery_dates[] = $check_result['delivery_date'];
+                        }
+                    }
+                }
+            }
+            
+            // If any entries are immature, reject the redemption
+            if (!empty($immature_entries)) {
+                $immature_list = array();
+                foreach ($immature_entries as $entry) {
+                    $days = isset($entry['days_remaining']) ? $entry['days_remaining'] : 'unknown';
+                    $immature_list[] = "Entry #{$entry['umeta_id']} - {$days} days until mature";
+                }
+                wp_send_json_error(array(
+                    'message' => 'Some selected XP entries are not yet mature (8-12 weeks required).',
+                    'immature_entries' => $immature_entries,
+                    'details' => implode(', ', $immature_list)
+                ));
+            }
+            
+            // Calculate oldest and youngest delivery dates for storage
+            if (!empty($delivery_dates)) {
+                $oldest_delivery = min($delivery_dates);
+                $youngest_delivery = max($delivery_dates);
+                $maturity_date = dongtrader_calculate_maturity_date($youngest_delivery);
+            } else {
+                $oldest_delivery = null;
+                $youngest_delivery = null;
+                $maturity_date = null;
+            }
+        } else {
+            $oldest_delivery = null;
+            $youngest_delivery = null;
+            $maturity_date = null;
+        }
+    } else {
+        $oldest_delivery = null;
+        $youngest_delivery = null;
+        $maturity_date = null;
+    }
+    
+    // ===== END VALIDATION =====
+    
+    // Get maturity weeks setting
+    $maturity_weeks = dongtrader_get_maturity_weeks();
+    $is_within_window = dongtrader_is_within_redemption_window();
+    
+    // Create redemption table if it doesn't exist
+    $table_name = $wpdb->prefix . 'dongtrader_redemptions';
+    
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        user_id int(11) NOT NULL,
+        xp_redem bigint(20) NOT NULL,
+        yam_redem decimal(20,8) NOT NULL,
+        usd_redem decimal(10,2) NOT NULL,
+        conversion_rate_xp_yam decimal(20,8) NOT NULL,
+        conversion_rate_yam_usd decimal(20,8) NOT NULL,
+        meta_ids text,
+        status varchar(20) DEFAULT 'pending',
+        payment_method varchar(50) NOT NULL,
+        payment_details text NOT NULL,
+        redem_date datetime DEFAULT CURRENT_TIMESTAMP,
+        processed_date datetime NULL,
+        admin_notes text,
+        transaction_id varchar(100) NULL,
+        maturity_date datetime NULL,
+        oldest_delivery_date datetime NULL,
+        youngest_delivery_date datetime NULL,
+        maturity_weeks int(11) DEFAULT 10,
+        within_redemption_window tinyint(1) DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY user_id (user_id),
+        KEY status (status),
+        KEY redem_date (redem_date),
+        KEY maturity_date (maturity_date)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+    
+    // Add new columns to existing table if they don't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'maturity_date'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN maturity_date datetime NULL AFTER transaction_id");
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN oldest_delivery_date datetime NULL AFTER maturity_date");
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN youngest_delivery_date datetime NULL AFTER oldest_delivery_date");
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN maturity_weeks int(11) DEFAULT 10 AFTER youngest_delivery_date");
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN within_redemption_window tinyint(1) DEFAULT 0 AFTER maturity_weeks");
+        $wpdb->query("ALTER TABLE $table_name ADD KEY maturity_date (maturity_date)");
+    }
+    
+    // Insert redemption request with maturity data
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'xp_redem' => $xp_amount,
+            'yam_redem' => $yam_amount,
+            'usd_redem' => $usd_amount,
+            'conversion_rate_xp_yam' => $xp_per_yam,
+            'conversion_rate_yam_usd' => $yam_per_usd,
+            'meta_ids' => $meta_ids,
+            'status' => 'pending',
+            'payment_method' => $payment_method,
+            'payment_details' => $payment_details,
+            'redem_date' => current_time('mysql'),
+            'maturity_date' => $maturity_date,
+            'oldest_delivery_date' => $oldest_delivery,
+            'youngest_delivery_date' => $youngest_delivery,
+            'maturity_weeks' => $maturity_weeks,
+            'within_redemption_window' => $is_within_window ? 1 : 0
+        ),
+        array(
+            '%d', // user_id
+            '%d', // xp_redem
+            '%f', // yam_redem
+            '%f', // usd_redem
+            '%f', // conversion_rate_xp_yam
+            '%f', // conversion_rate_yam_usd
+            '%s', // meta_ids
+            '%s', // status
+            '%s', // payment_method
+            '%s', // payment_details
+            '%s', // redem_date
+            '%s', // maturity_date
+            '%s', // oldest_delivery_date
+            '%s', // youngest_delivery_date
+            '%d', // maturity_weeks
+            '%d'  // within_redemption_window
+        )
+    );
+    
+    if ($result === false) {
+        wp_send_json_error('Failed to submit redemption request: ' . $wpdb->last_error);
+    }
+    
+    $redemption_id = $wpdb->insert_id;
+    
+    // Update user meta records to mark them as redeemed (pending)
+    $updated_meta_details = array();
+    $failed_meta_ids = array();
+    
+    if (!empty($meta_ids)) {
+        $meta_ids_array = json_decode($meta_ids, true);
+        if (is_array($meta_ids_array) && !empty($meta_ids_array)) {
+            $updated_count = 0;
+            $error_count = 0;
+            
+            error_log("=== REDEMPTION DEBUG START #$redemption_id ===");
+            error_log("Attempting to update " . count($meta_ids_array) . " usermeta records");
+            error_log("Meta IDs array: " . print_r($meta_ids_array, true));
+            
+            foreach ($meta_ids_array as $umeta_id) {
+                $umeta_id = intval($umeta_id);
+                error_log("Processing umeta_id: $umeta_id");
+                
+                // Get the full usermeta row for debugging
+                $meta_row = $wpdb->get_row($wpdb->prepare(
+                    "SELECT umeta_id, user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE umeta_id = %d",
+                    $umeta_id
+                ));
+                
+                if (!$meta_row) {
+                    $error_count++;
+                    $failed_meta_ids[] = array(
+                        'umeta_id' => $umeta_id,
+                        'error' => 'Record not found'
+                    );
+                    error_log("  ERROR: No record found for umeta_id: $umeta_id");
+                    continue;
+                }
+                
+                error_log("  Found record: user_id={$meta_row->user_id}, meta_key={$meta_row->meta_key}");
+                
+                // Verify ownership
+                if ($meta_row->user_id != $user_id) {
+                    $error_count++;
+                    $failed_meta_ids[] = array(
+                        'umeta_id' => $umeta_id,
+                        'error' => 'Ownership mismatch'
+                    );
+                    error_log("  ERROR: Ownership violation - belongs to user {$meta_row->user_id}, not $user_id");
+                    continue;
+                }
+                
+                if ($meta_row->meta_value) {
+                    // Try to decode as JSON first
+                    $meta_data = json_decode($meta_row->meta_value, true);
+                    $is_json = (json_last_error() === JSON_ERROR_NONE);
+                    
+                    // If not JSON, try PHP serialized data
+                    if (!$is_json) {
+                        error_log("  Detected PHP serialized data, attempting to unserialize");
+                        $meta_data = @unserialize($meta_row->meta_value);
+                        $is_serialized = ($meta_data !== false);
+                        
+                        if ($is_serialized && is_array($meta_data)) {
+                            error_log("  Successfully unserialized PHP data");
+                            error_log("  Data structure: " . print_r(array_keys($meta_data), true));
+                            
+                            // Handle different array structures
+                            // Case 1: Array of transactions like [0 => ['order_id' => 123, ...], 1 => [...], ...]
+                            // This is the case for _buyer_details, _seller_details, etc.
+                            if (isset($meta_data[0]) && is_array($meta_data[0])) {
+                                // It's a nested array with multiple transactions
+                                error_log("  Detected array of transactions with " . count($meta_data) . " items");
+                                
+                                // We need to update ALL transactions in this array, not just the first one
+                                $modified = false;
+                                foreach ($meta_data as $index => &$transaction) {
+                                    if (is_array($transaction)) {
+                                        // Get the current status
+                                        $current_status = isset($transaction['status']) ? $transaction['status'] : 'none';
+                                        
+                                        // Only update if not already requested
+                                        if ($current_status !== 'requested' && $current_status !== 'processing' && $current_status !== 'completed') {
+                                            $transaction['status'] = 'requested';
+                                            $transaction['redemption_id'] = $redemption_id;
+                                            $transaction['redemption_date'] = current_time('mysql');
+                                            $modified = true;
+                                            error_log("  Updated transaction #$index (order_id: " . (isset($transaction['order_id']) ? $transaction['order_id'] : 'N/A') . ")");
+                                        } else {
+                                            error_log("  Skipped transaction #$index (already $current_status)");
+                                        }
+                                    }
+                                }
+                                unset($transaction); // Break reference
+                                
+                                if ($modified) {
+                                    // Keep the full array structure for saving
+                                    $meta_data_to_save = $meta_data; // This is now the full array with updated transactions
+                                    $meta_data = $meta_data; // Keep original structure for processing
+                                    $is_json = true; // Mark as processable
+                                } else {
+                                    error_log("  No transactions modified - all already have status");
+                                }
+                            } else {
+                                // Single transaction (not in an array of transactions)
+                                if (!isset($meta_data['status'])) {
+                                    $meta_data['status'] = 'requested';
+                                }
+                                $meta_data['redemption_id'] = $redemption_id;
+                                $meta_data['redemption_date'] = current_time('mysql');
+                                $meta_data_to_save = $meta_data;
+                                $is_json = true; // Mark as processable
+                            }
+                        }
+                    }
+                    
+                    if ($is_json && is_array($meta_data)) {
+                        // Check if this is an array of transactions (not a single transaction)
+                        $is_array_of_transactions = isset($meta_data[0]) && is_array($meta_data[0]) && !isset($meta_data['status']);
+                        
+                        if (!$is_array_of_transactions) {
+                            // This is a single transaction, check status
+                            $current_status = isset($meta_data['status']) ? $meta_data['status'] : 'none';
+                            error_log("  Current status: $current_status");
+                            
+                            // Only skip if already in a redemption process (requested or processing)
+                            // Don't skip 'completed', 'released', 'redeemed', or other statuses
+                            if ($current_status === 'requested' || $current_status === 'processing') {
+                                error_log("  SKIPPED: Already marked as $current_status (previous redemption)");
+                                $updated_count++;
+                                $updated_meta_details[] = array(
+                                    'umeta_id' => $umeta_id,
+                                    'meta_key' => $meta_row->meta_key,
+                                    'user_id' => $meta_row->user_id,
+                                    'previous_status' => $current_status,
+                                    'new_status' => $current_status,
+                                    'xp_awarded' => isset($meta_data['xp_awarded']) ? $meta_data['xp_awarded'] : 0,
+                                    'transaction_type' => isset($meta_data['transaction_type']) ? $meta_data['transaction_type'] : 'unknown',
+                                    'note' => 'Already redeemed in previous request'
+                                );
+                                continue; // Skip updating, already marked
+                            }
+                            
+                            // Update the status for all other statuses
+                            $meta_data['status'] = 'requested';
+                            $meta_data['redemption_id'] = $redemption_id;
+                            $meta_data['redemption_date'] = current_time('mysql');
+                            $meta_data_to_save = $meta_data;
+                        } else {
+                            error_log("  Processing array of " . count($meta_data) . " transactions");
+                        }
+                        
+                        // Determine what data to save
+                        $data_to_save = isset($meta_data_to_save) ? $meta_data_to_save : $meta_data;
+                        
+                        // Check if original data was serialized PHP format
+                        $was_serialized = (strpos($meta_row->meta_value, 'a:') === 0);
+                        
+                        // Update the meta value 
+                        if ($was_serialized) {
+                            // Save as serialized PHP to maintain compatibility
+                            $updated_value = serialize($data_to_save);
+                            error_log("  Saving as PHP serialized format");
+                        } else {
+                            // Save as JSON
+                            $updated_value = json_encode($data_to_save);
+                            error_log("  Saving as JSON format");
+                        }
+                        
+                        $update_result = $wpdb->update(
+                            $wpdb->usermeta,
+                            array('meta_value' => $updated_value),
+                            array('umeta_id' => $umeta_id),
+                            array('%s'),
+                            array('%d')
+                        );
+                        
+                        if ($update_result !== false) {
+                            $updated_count++;
+                            // Extract data from various possible structures
+                            $xp_awarded = 0;
+                            $transaction_count = 0;
+                            
+                            if (isset($meta_data['xp_awarded'])) {
+                                // Single transaction
+                                $xp_awarded = $meta_data['xp_awarded'];
+                                $transaction_count = 1;
+                            } elseif (isset($meta_data[0]) && is_array($meta_data[0])) {
+                                // Array of transactions
+                                $xp_awarded = 0;
+                                $transaction_count = count($meta_data);
+                                foreach ($meta_data as $trans) {
+                                    if (isset($trans['xp_awarded'])) {
+                                        $xp_awarded += intval($trans['xp_awarded']);
+                                    }
+                                }
+                            }
+                            
+                            $transaction_type = 'unknown';
+                            if (isset($meta_data['transaction_type'])) {
+                                $transaction_type = $meta_data['transaction_type'];
+                            } elseif (isset($meta_data['order_id'])) {
+                                $transaction_type = 'order';
+                            } elseif (isset($meta_data[0]['transaction_type'])) {
+                                $transaction_type = $meta_data[0]['transaction_type'];
+                            }
+                            
+                            $current_status_for_log = isset($current_status) ? $current_status : 'none';
+                            
+                            $updated_meta_details[] = array(
+                                'umeta_id' => $umeta_id,
+                                'meta_key' => $meta_row->meta_key,
+                                'user_id' => $meta_row->user_id,
+                                'previous_status' => $current_status_for_log,
+                                'new_status' => 'requested',
+                                'xp_awarded' => $xp_awarded,
+                                'transaction_type' => $transaction_type,
+                                'transaction_count' => $transaction_count
+                            );
+                            
+                            if ($transaction_count > 1) {
+                                error_log("  SUCCESS: Updated umeta_id $umeta_id with $transaction_count transactions");
+                            } else {
+                                error_log("  SUCCESS: Updated umeta_id $umeta_id");
+                            }
+                        } else {
+                            $error_count++;
+                            $failed_meta_ids[] = array(
+                                'umeta_id' => $umeta_id,
+                                'error' => $wpdb->last_error
+                            );
+                            error_log("  ERROR: Failed to update - " . $wpdb->last_error);
+                        }
+                    } else {
+                        $error_count++;
+                        $failed_meta_ids[] = array(
+                            'umeta_id' => $umeta_id,
+                            'error' => 'Invalid JSON data',
+                            'raw_data' => substr($meta_row->meta_value, 0, 100) // First 100 chars for debugging
+                        );
+                        error_log("  ERROR: Invalid JSON data for umeta_id $umeta_id");
+                        error_log("  RAW DATA: " . substr($meta_row->meta_value, 0, 200));
+                        error_log("  JSON ERROR: " . json_last_error_msg());
+                    }
+                } else {
+                    $error_count++;
+                    $failed_meta_ids[] = array(
+                        'umeta_id' => $umeta_id,
+                        'error' => 'Empty meta_value'
+                    );
+                    error_log("  ERROR: Empty meta_value");
+                }
+
+            }
+            
+            // Log the update results
+            error_log("=== REDEMPTION DEBUG END #$redemption_id ===");
+            error_log("SUMMARY: Updated $updated_count records, $error_count errors");
+        } else {
+            error_log("Redemption #$redemption_id: Invalid meta_ids format - " . $meta_ids);
+        }
+    } else {
+        error_log("Redemption #$redemption_id: No meta_ids provided");
+    }
+    
+    // Send notification email to admin (optional)
+    $admin_email = get_option('admin_email');
+    $user = get_userdata($user_id);
+    $subject = 'New Redemption Request #' . $redemption_id;
+    $message = "A new redemption request has been submitted:\n\n";
+    $message .= "Redemption ID: #" . $redemption_id . "\n";
+    $message .= "User: " . $user->display_name . " (" . $user->user_email . ")\n";
+    $message .= "XP Amount: " . number_format($xp_amount) . "\n";
+    $message .= "YAM Amount: " . number_format($yam_amount, 2) . "\n";
+    $message .= "USD Amount: $" . number_format($usd_amount, 2) . "\n";
+    $message .= "Payment Method: " . $payment_method . "\n";
+    $message .= "Payment Details: " . $payment_details . "\n";
+    $message .= "Date: " . current_time('Y-m-d H:i:s') . "\n\n";
+    $message .= "Please review and process this request.";
+    
+    wp_mail($admin_email, $subject, $message);
+    
+    // Return success response with debug information
+    wp_send_json_success(array(
+        'message' => 'Redemption request submitted successfully!',
+        'redemption_id' => $redemption_id,
+        'status' => 'pending',
+        'debug' => array(
+            'updated_count' => count($updated_meta_details),
+            'failed_count' => count($failed_meta_ids),
+            'updated_meta_details' => $updated_meta_details,
+            'failed_meta_ids' => $failed_meta_ids
+        )
+    ));
 }
 
 /**
@@ -4003,3 +5871,376 @@ function dongtrader_test_xp_award() {
     }
 }
 add_action('wp_head', 'dongtrader_test_xp_award');
+
+
+/**
+ * Add redemption popup JavaScript to footer
+ */
+function dongtrader_redemption_popup_script() {
+    // Only load on account pages
+    if (!is_account_page() || !is_user_logged_in()) {
+        return;
+    }
+    
+    ?>
+    <script type="text/javascript">
+    console.log('Redemption popup script loaded');
+    
+    // Generate nonce for AJAX calls
+    var ajaxNonce = '<?php echo wp_create_nonce('get_xp_umeta_ids'); ?>';
+    var ajaxUserId = '<?php echo get_current_user_id(); ?>';
+    var ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    
+    // Store redemption data globally
+    window.currentRedemptionData = {};
+    
+    // Redemption popup functions
+    window.showRedemptionPopup = function(xpAmount, yamAmount, usdAmount, xpPerYam, yamPerUsd) {
+        console.log("showRedemptionPopup called");
+        
+        // Store the original values globally
+        window.currentRedemptionData = {
+            xpAmount: xpAmount,
+            yamAmount: yamAmount,
+            usdAmount: usdAmount,
+            xpPerYam: xpPerYam,
+            yamPerUsd: yamPerUsd
+        };
+        
+        console.log("Stored redemption data:", window.currentRedemptionData);
+        
+        // Update main redemption data
+        var popupXpAmount = document.getElementById("popup-xp-amount");
+        var popupYamAmount = document.getElementById("popup-yam-amount");
+        var popupUsdAmount = document.getElementById("popup-usd-amount");
+        var popupXpYamRate = document.getElementById("popup-xp-yam-rate");
+        var popupYamUsdRate = document.getElementById("popup-yam-usd-rate");
+        
+        if (popupXpAmount) popupXpAmount.textContent = xpAmount.toLocaleString();
+        if (popupYamAmount) popupYamAmount.textContent = yamAmount.toLocaleString();
+        if (popupUsdAmount) popupUsdAmount.textContent = "$" + usdAmount.toLocaleString();
+        if (popupXpYamRate) popupXpYamRate.textContent = xpPerYam.toLocaleString();
+        if (popupYamUsdRate) popupYamUsdRate.textContent = yamPerUsd.toLocaleString();
+        
+        // Get umeta_id values via AJAX
+        console.log("Making AJAX call to get umeta_ids");
+        
+        var ajaxData = {
+            action: "get_xp_umeta_ids",
+            user_id: ajaxUserId,
+            nonce: ajaxNonce
+        };
+        
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: "POST",
+            data: ajaxData,
+            success: function(response) {
+                    var metaIdsDisplay = document.getElementById("popup-meta-ids");
+                if (!metaIdsDisplay) return;
+                
+                if (response && response.success === true && response.data) {
+                    var umetaIds = response.data.umeta_ids || [];
+                    var count = response.data.count || 0;
+                    
+                    // Store meta IDs globally for form submission
+                    window.currentRedemptionData.metaIds = umetaIds;
+                    
+                    console.log('Meta IDs retrieved:', umetaIds);
+                    
+                    if (count > 0) {
+                        metaIdsDisplay.textContent = "Found " + count + " meta IDs: " + JSON.stringify(umetaIds);
+                            metaIdsDisplay.style.color = "#28a745";
+                        } else {
+                            metaIdsDisplay.textContent = "No meta IDs found for this user";
+                            metaIdsDisplay.style.color = "#ffc107";
+                    }
+                } else {
+                    metaIdsDisplay.textContent = "Error: " + (response.data || "Unknown error");
+                        metaIdsDisplay.style.color = "#dc3545";
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", xhr, status, error);
+                var metaIdsDisplay = document.getElementById("popup-meta-ids");
+                if (metaIdsDisplay) {
+                    metaIdsDisplay.textContent = "Error loading meta IDs: " + error;
+                    metaIdsDisplay.style.color = "#dc3545";
+                }
+            }
+        });
+        
+        // Show popup
+        document.getElementById("redemption-popup").style.display = "flex";
+        document.body.style.overflow = "hidden";
+        
+        // Add event listeners for real-time updates
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.addEventListener("change", updatePaymentDisplay);
+        if (paymentDetailsEl) paymentDetailsEl.addEventListener("input", updatePaymentDisplay);
+    };
+    
+    window.closeRedemptionPopup = function() {
+        document.getElementById("redemption-popup").style.display = "none";
+        document.body.style.overflow = "auto";
+        
+        // Clear form fields
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.value = "";
+        if (paymentDetailsEl) paymentDetailsEl.value = "";
+    };
+    
+    window.updatePaymentDisplay = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        var methodDisplay = document.getElementById("popup-payment-method-display");
+        var detailsDisplay = document.getElementById("popup-payment-details-display");
+        if (methodDisplay) methodDisplay.textContent = paymentMethod || "Not selected";
+        if (detailsDisplay) detailsDisplay.textContent = paymentDetails || "Not provided";
+    };
+    
+    // Wrap everything in jQuery ready
+    jQuery(document).ready(function($) {
+    
+    // Simple test function
+    window.testFunction = function() {
+        alert('Test function works!');
+    };
+    
+    // Test nonce function
+    window.testNonce = function() {
+        console.log('Testing nonce...');
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_xp_umeta_ids',
+                user_id: ajaxUserId,
+                nonce: ajaxNonce
+            },
+            success: function(response) {
+                console.log('Nonce test response:', response);
+                alert('Nonce test: ' + JSON.stringify(response));
+            },
+            error: function(xhr, status, error) {
+                console.log('Nonce test error:', xhr, status, error);
+                alert('Nonce test error: ' + error);
+            }
+        });
+    };
+    
+    // Make functions globally available immediately
+    window.testAjax = function() {
+        console.log('Testing basic AJAX...');
+        jQuery.ajax({
+            url: '<?php echo admin_url('admin-ajax.php'); ?>',
+            type: 'POST',
+            data: {
+                action: 'test_ajax'
+            },
+            success: function(response) {
+                console.log('Test AJAX response:', response);
+                document.getElementById('ajax-test-result').style.display = 'block';
+                document.getElementById('ajax-test-result').innerHTML = 'SUCCESS: ' + JSON.stringify(response);
+                document.getElementById('ajax-test-result').style.background = '#d4edda';
+                document.getElementById('ajax-test-result').style.color = '#155724';
+            },
+            error: function(xhr, status, error) {
+                console.log('Test AJAX error:', xhr, status, error);
+                document.getElementById('ajax-test-result').style.display = 'block';
+                document.getElementById('ajax-test-result').innerHTML = 'ERROR: ' + error;
+                document.getElementById('ajax-test-result').style.background = '#f8d7da';
+                document.getElementById('ajax-test-result').style.color = '#721c24';
+            }
+        });
+    };
+    
+    
+    window.updatePaymentDisplay = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        var methodDisplay = document.getElementById("popup-payment-method-display");
+        var detailsDisplay = document.getElementById("popup-payment-details-display");
+        if (methodDisplay) methodDisplay.textContent = paymentMethod || "Not selected";
+        if (detailsDisplay) detailsDisplay.textContent = paymentDetails || "Not provided";
+    }
+    
+    window.closeRedemptionPopup = function() {
+        document.getElementById("redemption-popup").style.display = "none";
+        document.body.style.overflow = "auto";
+        // Clear form data
+        var paymentMethodEl = document.getElementById("payment-method");
+        var paymentDetailsEl = document.getElementById("payment-details");
+        if (paymentMethodEl) paymentMethodEl.value = "";
+        if (paymentDetailsEl) paymentDetailsEl.value = "";
+    }
+    
+    window.submitRedemptionRequest = function() {
+        var paymentMethod = document.getElementById("payment-method").value;
+        var paymentDetails = document.getElementById("payment-details").value.trim();
+        
+        if (!paymentMethod) {
+            alert("Please select a payment method.");
+            return;
+        }
+        
+        if (!paymentDetails) {
+            alert("Please enter your payment details.");
+            return;
+        }
+        
+        // Get the redemption data from stored values
+        if (!window.currentRedemptionData) {
+            alert('Error: Redemption data not found. Please close and reopen the popup.');
+            console.error('currentRedemptionData is undefined');
+            return;
+        }
+        
+        var xpAmount = window.currentRedemptionData.xpAmount;
+        var yamAmount = window.currentRedemptionData.yamAmount;
+        var usdAmount = window.currentRedemptionData.usdAmount;
+        var xpPerYam = window.currentRedemptionData.xpPerYam;
+        var yamPerUsd = window.currentRedemptionData.yamPerUsd;
+        // Get meta IDs from stored data
+        var metaIds = window.currentRedemptionData.metaIds || [];
+        
+        console.log('Using stored redemption data:', {
+            xpAmount: xpAmount,
+            yamAmount: yamAmount,
+            usdAmount: usdAmount,
+            xpPerYam: xpPerYam,
+            yamPerUsd: yamPerUsd,
+            metaIds: metaIds,
+            metaIdsCount: metaIds.length
+        });
+        
+        // Validate meta IDs
+        if (!metaIds || metaIds.length === 0) {
+            alert('Warning: No usermeta records found to redeem. Please refresh and try again.');
+            console.error('No meta IDs available for redemption');
+            return;
+        }
+        
+        // Show redemption amounts in alert
+        alert('Redemption Request Details:\\n\\n' +
+              'XP Amount: ' + xpAmount.toLocaleString() + '\\n' +
+              'YAM Amount: ' + yamAmount.toLocaleString() + '\\n' +
+              'USD Amount: $' + usdAmount.toLocaleString() + '\\n\\n' +
+              'Payment Method: ' + paymentMethod + '\\n' +
+              'Payment Details: ' + paymentDetails + '\\n\\n' +
+              'Submitting request...');
+        
+        // Validate stored values
+        if (!xpAmount || !yamAmount || !usdAmount || xpAmount <= 0 || yamAmount <= 0 || usdAmount <= 0) {
+            alert('Error: Invalid redemption amounts detected. Please try again.');
+            console.error('Invalid amounts:', { xpAmount, yamAmount, usdAmount });
+            return;
+        }
+        
+        // Prepare AJAX data
+        var ajaxData = {
+            action: 'submit_redemption_request',
+            xp_amount: xpAmount,
+            yam_amount: yamAmount,
+            usd_amount: usdAmount,
+            xp_per_yam: xpPerYam,
+            yam_per_usd: yamPerUsd,
+            payment_method: paymentMethod,
+            payment_details: paymentDetails,
+            meta_ids: JSON.stringify(metaIds), // Convert array to JSON string
+            nonce: ajaxNonce
+        };
+        
+        console.log('Submitting redemption request:', ajaxData);
+        console.log('Meta IDs being sent:', metaIds);
+        
+        // Show loading state
+        var submitBtn = document.querySelector('button[onclick="submitRedemptionRequest()"]');
+        var originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Submitting...';
+        submitBtn.disabled = true;
+        
+        // Make AJAX call
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: ajaxData,
+            success: function(response) {
+                console.log('Redemption submission response:', response);
+                
+                if (response && response.success) {
+                    // Build success message
+                    var msg = 'Redemption request submitted successfully!\\n\\n';
+                    msg += 'Request ID: #' + response.data.redemption_id + '\\n';
+                    msg += 'Status: ' + response.data.status + '\\n\\n';
+                    
+                    // Add debug information if available
+                    if (response.data.debug) {
+                        console.log('=== USQMETA UPDATE DEBUG ===');
+                        console.log('Updated Records:', response.data.debug.updated_count);
+                        console.log('Failed Records:', response.data.debug.failed_count);
+                        console.log('\\nUpdated Usermeta Details:');
+                        if (response.data.debug.updated_meta_details && response.data.debug.updated_meta_details.length > 0) {
+                            response.data.debug.updated_meta_details.forEach(function(meta) {
+                                console.log('  - Umeta ID: ' + meta.umeta_id);
+                                console.log('    Meta Key: ' + meta.meta_key);
+                                console.log('    User ID: ' + meta.user_id);
+                                console.log('    Status: ' + meta.previous_status + ' → ' + meta.new_status);
+                                console.log('    XP Awarded: ' + meta.xp_awarded);
+                                console.log('    Transaction Type: ' + meta.transaction_type);
+                                console.log('    ---');
+                            });
+                        } else {
+                            console.log('  No usermeta records were updated.');
+                        }
+                        
+                        if (response.data.debug.failed_meta_ids && response.data.debug.failed_meta_ids.length > 0) {
+                            console.log('\\nFailed Usermeta IDs:');
+                            response.data.debug.failed_meta_ids.forEach(function(failed) {
+                                console.log('  - Umeta ID: ' + failed.umeta_id + ' - Error: ' + failed.error);
+                            });
+                        }
+                        
+                        msg += 'Debug Info:\\n';
+                        msg += 'Updated: ' + response.data.debug.updated_count + ' records\\n';
+                        msg += 'Failed: ' + response.data.debug.failed_count + ' records\\n\\n';
+                        msg += 'See browser console for detailed usermeta update information.';
+                    }
+                    
+                    msg += '\\n\\nYou will be contacted within 24-48 hours.';
+                    
+                    alert(msg);
+        closeRedemptionPopup();
+                } else {
+                    alert('Error submitting redemption request: ' + (response.data || 'Unknown error'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', xhr, status, error);
+                alert('Error submitting redemption request: ' + error);
+            },
+            complete: function() {
+                // Restore button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    }
+    
+    // Close popup when clicking outside
+    $(document).on("click", "#redemption-popup", function(event) {
+        if (event.target === this) {
+            closeRedemptionPopup();
+        }
+    });
+    
+    }); // End of jQuery ready
+    </script>
+    <?php
+}
+add_action('wp_footer', 'dongtrader_redemption_popup_script');
+
