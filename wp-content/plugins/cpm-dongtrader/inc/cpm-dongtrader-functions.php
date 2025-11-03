@@ -358,6 +358,83 @@ function dongtrader_get_next_redemption_window() {
 }
 
 /**
+ * Check if user is eligible to redeem XP
+ * Validates all requirements: minimum amount, matured XP, redemption window, active requests
+ * @param float $total_usd Total USD value of completed XP
+ * @param int $total_completed_xp Total completed/matured XP
+ * @param bool $has_active_redemption Whether user has pending/processing redemptions
+ * @return array Array with 'eligible' bool and 'reason' string if not eligible
+ */
+function dongtrader_check_redemption_button_eligibility($total_usd, $total_completed_xp, $has_active_redemption) {
+    $min_redemption_amount = 1.0; // Minimum $1.00 USD required
+    
+    // Validation 1: Check for active redemption requests
+    if ($has_active_redemption) {
+        return array(
+            'eligible' => false,
+            'reason' => 'active_redemption',
+            'message' => 'You have a pending redemption request. Please wait for it to be processed.'
+        );
+    }
+    
+    // Validation 2: Check minimum USD amount (STRICT: Must be >= $1.00)
+    $total_usd_numeric = floatval($total_usd);
+    // Use strict comparison - button only shows if amount is >= $1.00 exactly
+    if ($total_usd_numeric < $min_redemption_amount) {
+        return array(
+            'eligible' => false,
+            'reason' => 'minimum_amount',
+            'message' => 'You need at least $1.00 USD worth of matured XP to redeem. Current value: $' . number_format($total_usd_numeric, 2),
+            'current_amount' => $total_usd_numeric,
+            'required_amount' => $min_redemption_amount,
+            'debug_info' => 'USD: ' . $total_usd_numeric . ' | Required: ' . $min_redemption_amount . ' | Check: ' . ($total_usd_numeric < $min_redemption_amount ? 'FAIL' : 'PASS')
+        );
+    }
+    
+    // Validation 3: Check if user has matured/completed XP (not just pending)
+    if ($total_completed_xp <= 0) {
+        return array(
+            'eligible' => false,
+            'reason' => 'no_matured_xp',
+            'message' => 'You need matured XP credits (8-12 weeks old) to redeem. Your XP is still pending maturity.'
+        );
+    }
+    
+    // Validation 4: Check if within redemption window
+    if (!dongtrader_is_within_redemption_window()) {
+        $current_date_obj = new DateTime(current_time('mysql'));
+        $is_september_1st = ($current_date_obj->format('m-d') === '09-01');
+        $days_until = dongtrader_days_until_next_redemption_window();
+        $next_window = dongtrader_get_next_redemption_window();
+        
+        if ($is_september_1st) {
+            return array(
+                'eligible' => false,
+                'reason' => 'september_1st_block',
+                'message' => 'No redemptions allowed on September 1st (Let It Ride Day).',
+                'next_window_date' => date('F j, Y', strtotime($next_window['start'])),
+                'days_until_window' => $days_until
+            );
+        } else {
+            return array(
+                'eligible' => false,
+                'reason' => 'outside_window',
+                'message' => 'Redemption window is currently closed.',
+                'next_window_date' => date('F j, Y', strtotime($next_window['start'])),
+                'days_until_window' => $days_until,
+                'window_range' => date('F j', strtotime($next_window['start'])) . ' - ' . date('F j', strtotime($next_window['end']))
+            );
+        }
+    }
+    
+    // All validations passed
+    return array(
+        'eligible' => true,
+        'reason' => 'all_checks_passed'
+    );
+}
+
+/**
  * Get days until next redemption window
  * @return int|null Days until next window (0 if currently in window)
  */
@@ -4110,8 +4187,8 @@ function dongtrader_display_xp_dashboard() {
                     $status_color = '#17a2b8';
                 } elseif ($invite_status === 'completed') {
                     // Legacy status for backward compatibility
-                    $status_text = 'Released';
-                    $status_color = '#17a2b8';
+                $status_text = 'Released';
+                $status_color = '#17a2b8';
                 } elseif ($invite_status === 'processing') {
                     $status_text = 'Processing';
                     $status_color = '#007cba';
@@ -4641,8 +4718,10 @@ function dongtrader_display_xp_dashboard() {
     // XP to USD Conversion
     $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
     $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;">XP to USD</p>';
-    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 0) . '</p>';
+    $output .= '<p style="margin: 0; font-size: 18px; font-weight: bold; color: #2c3e50;">' . number_format($total_completed_xp) . ' XP = $' . number_format($total_usd, 2) . '</p>';
     $output .= '<p style="margin: 5px 0 0 0; font-size: 12px; color: #6c757d;">Rate: 1 USD = ' . number_format($xp_per_usd, 0) . ' XP</p>';
+    // Debug: Show minimum requirement
+    $output .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: ' . ($total_usd >= 1.0 ? '#28a745' : '#dc3545') . '; font-weight: bold;">Minimum for redemption: $1.00 ' . ($total_usd >= 1.0 ? '✅' : '❌') . '</p>';
     $output .= '</div>';
     
     // Check if user has any pending or processing redemption requests
@@ -4662,26 +4741,73 @@ function dongtrader_display_xp_dashboard() {
     // Ensure USD amount is numeric and properly rounded for comparison
     $total_usd_numeric = floatval($total_usd);
     
-    // Redeem Button - only show if no active redemption requests exist, has redeemable XP, and USD amount is at least $1
-    if (!$has_active_redemption && $total_completed_xp > 0 && $total_usd_numeric >= 1.0) {
+    // STRICT VALIDATION: Button ONLY displays if USD value >= $1.00
+    // Validate redemption button eligibility using comprehensive validation function
+    $eligibility_check = dongtrader_check_redemption_button_eligibility($total_usd_numeric, $total_completed_xp, $has_active_redemption);
+    
+    // Display redeem button ONLY if eligible (requires >= $1.00 USD worth of matured XP)
+    if ($eligibility_check['eligible']) {
         $output .= '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center;">';
         $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6c757d;">Redeem Rewards</p>';
         $output .= '<button type="button" class="redeem-button" id="redeem-rewards-btn" onclick="showRedemptionPopup(' . $total_completed_xp . ', ' . $total_yam . ', ' . $total_usd . ', ' . $xp_per_yam . ', ' . $yam_per_usd . ')" style="background: #6F42C1; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; width: 100%; max-width: 150px;" onmouseover="this.style.background=\'#5a32a3\'; this.style.transform=\'translateY(-2px)\';" onmouseout="this.style.background=\'#6F42C1\'; this.style.transform=\'translateY(0)\';">';
         $output .= 'Redeem';
         $output .= '</button>';
         $output .= '</div>';
-    } elseif ($has_active_redemption) {
-        // Show message when there's an active redemption request
-        $output .= '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #ffc107;">';
-        $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #856404; font-weight: bold;">Redemption in Progress</p>';
-        $output .= '<p style="margin: 0; font-size: 12px; color: #856404;">You have a pending redemption request. Please wait for it to be processed.</p>';
-        $output .= '</div>';
-    } elseif ($total_usd_numeric < 1.0 && $total_completed_xp > 0) {
-        // Show message when USD amount is less than $1
-        $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
-        $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #495057; font-weight: bold;">Minimum Redemption Required</p>';
-        $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">You need at least $1.00 USD to redeem your rewards. Current value: $' . number_format($total_usd_numeric, 2) . '</p>';
-        $output .= '</div>';
+    } else {
+        // Show appropriate message based on reason
+        $reason = $eligibility_check['reason'];
+        $message = isset($eligibility_check['message']) ? $eligibility_check['message'] : 'Redemption not available.';
+        
+        if ($reason === 'active_redemption') {
+            // Active redemption request
+            $output .= '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #ffc107;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #856404; font-weight: bold;">🔄 Redemption in Progress</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #856404;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'minimum_amount') {
+            // Minimum $1 USD not met
+            $current_amount = isset($eligibility_check['current_amount']) ? $eligibility_check['current_amount'] : 0;
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #495057; font-weight: bold;">💰 Minimum Redemption Required</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'no_matured_xp') {
+            // No matured XP available
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #495057; font-weight: bold;">⏳ XP Still Maturing</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        } elseif ($reason === 'september_1st_block') {
+            // September 1st block
+            $next_window = isset($eligibility_check['next_window_date']) ? $eligibility_check['next_window_date'] : '';
+            $output .= '<div style="text-align: center; padding: 10px; background: #f8d7da; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #dc3545;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #721c24; font-weight: bold;">🚫 September 1st - Let It Ride Day</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #721c24;">' . $message . '</p>';
+            if ($next_window) {
+                $output .= '<p style="margin: 8px 0 0 0; font-size: 11px; color: #856404;">Next window: ' . $next_window . '</p>';
+            }
+            $output .= '</div>';
+        } elseif ($reason === 'outside_window') {
+            // Outside redemption window
+            $next_window_date = isset($eligibility_check['next_window_date']) ? $eligibility_check['next_window_date'] : '';
+            $days_until = isset($eligibility_check['days_until_window']) ? $eligibility_check['days_until_window'] : 0;
+            $window_range = isset($eligibility_check['window_range']) ? $eligibility_check['window_range'] : '';
+            $output .= '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #ffc107;">';
+            $output .= '<p style="margin: 0 0 10px 0; font-size: 14px; color: #856404; font-weight: bold;">⏳ Redemption Window Closed</p>';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #856404;">' . $message . '</p>';
+            if ($next_window_date && $days_until !== null) {
+                $output .= '<p style="margin: 8px 0 0 0; font-size: 11px; color: #856404;">Next window: ' . $next_window_date . ' (' . $days_until . ' days)</p>';
+                if ($window_range) {
+                    $output .= '<p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">Window: ' . $window_range . '</p>';
+                }
+            }
+            $output .= '</div>';
+        } else {
+            // Generic not eligible message
+            $output .= '<div style="text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 4px solid #6c757d;">';
+            $output .= '<p style="margin: 0; font-size: 12px; color: #6c757d;">' . $message . '</p>';
+            $output .= '</div>';
+        }
     }
     
     $output .= '</div>';
@@ -4699,25 +4825,67 @@ function dongtrader_display_xp_dashboard() {
     $output .= '<p style="margin: 0; color: #6c757d; font-size: 14px;">Review your redemption request before submitting</p>';
     $output .= '</div>';
     
-    // Redemption Window Status
+    // Redemption Window Status and Rules - Enhanced Display
     $is_within_window = dongtrader_is_within_redemption_window();
     $next_window = dongtrader_get_next_redemption_window();
     $days_until_window = dongtrader_days_until_next_redemption_window();
     
-    $window_status_color = $is_within_window ? '#28a745' : '#ffc107';
-    $window_status_text = $is_within_window ? '✅ Redemption Window Open' : '⏳ Redemption Window Closed';
-    $window_status_msg = $is_within_window 
-        ? 'You can submit redemption requests now.' 
-        : 'Next window: ' . $next_window['date'] . ' (' . $days_until_window . ' days)';
+    // Get current window dates
+    $current_window = dongtrader_get_monthly_redemption_window();
+    $current_window_start = date('F j, Y', strtotime($current_window['start']));
+    $current_window_end = date('F j, Y', strtotime($current_window['end']));
     
-    $output .= '<div style="background: ' . ($is_within_window ? '#d4edda' : '#fff3cd') . '; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid ' . $window_status_color . ';">';
-    $output .= '<p style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; color: ' . ($is_within_window ? '#155724' : '#856404') . ';">' . $window_status_text . '</p>';
-    $output .= '<p style="margin: 0; font-size: 12px; color: ' . ($is_within_window ? '#155724' : '#856404') . ';">' . $window_status_msg . '</p>';
-    if (!$is_within_window) {
-        $window_start = date('F j', strtotime($next_window['start']));
-        $window_end = date('F j', strtotime($next_window['end']));
-        $output .= '<p style="margin: 5px 0 0 0; font-size: 11px; color: #856404;">Window: ' . $window_start . ' - ' . $window_end . '</p>';
+    // Format next window dates
+    $next_window_start = date('F j, Y', strtotime($next_window['start']));
+    $next_window_end = date('F j, Y', strtotime($next_window['end']));
+    
+    // Check if it's September 1st
+    $current_date_obj = new DateTime(current_time('mysql'));
+    $is_september_1st = ($current_date_obj->format('m-d') === '09-01');
+    
+    $window_status_color = $is_within_window ? '#28a745' : ($is_september_1st ? '#dc3545' : '#ffc107');
+    $window_status_text = $is_within_window 
+        ? '✅ Redemption Window Open' 
+        : ($is_september_1st ? '🚫 No Redemptions Allowed (September 1st)' : '⏳ Redemption Window Closed');
+    
+    $output .= '<div style="background: ' . ($is_within_window ? '#d4edda' : ($is_september_1st ? '#f8d7da' : '#fff3cd')) . '; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid ' . $window_status_color . ';">';
+    
+    // Status Header
+    $output .= '<h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; color: ' . ($is_within_window ? '#155724' : ($is_september_1st ? '#721c24' : '#856404')) . ';">📅 Redemption Window Status</h4>';
+    $output .= '<p style="margin: 0 0 15px 0; font-size: 14px; font-weight: bold; color: ' . ($is_within_window ? '#155724' : ($is_september_1st ? '#721c24' : '#856404')) . ';">' . $window_status_text . '</p>';
+    
+    // Current Status Details
+    if ($is_within_window) {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">Current Window:</p>';
+        $output .= '<p style="margin: 0; font-size: 13px; color: #155724;"><strong>' . $current_window_start . '</strong> to <strong>' . $current_window_end . '</strong></p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #6c757d;">You can submit redemption requests during this period.</p>';
+        $output .= '</div>';
+    } else if ($is_september_1st) {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #721c24;">September 1st - Let It Ride Day</p>';
+        $output .= '<p style="margin: 0; font-size: 12px; color: #721c24;">No redemptions are allowed on September 1st. This is the annual "Let It Ride Day" for reconciliation.</p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #856404;"><strong>Next available window:</strong> ' . $next_window_start . ' - ' . $next_window_end . ' (' . $days_until_window . ' days)</p>';
+        $output .= '</div>';
+    } else {
+        $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+        $output .= '<p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">Next Window:</p>';
+        $output .= '<p style="margin: 0; font-size: 13px; color: #856404;"><strong>' . $next_window_start . '</strong> to <strong>' . $next_window_end . '</strong></p>';
+        $output .= '<p style="margin: 8px 0 0 0; font-size: 12px; color: #6c757d;">Days remaining: <strong>' . $days_until_window . ' days</strong></p>';
+        $output .= '</div>';
     }
+    
+    // Redemption Window Rules
+    $output .= '<div style="background: white; padding: 12px; border-radius: 6px; margin-top: 15px;">';
+    $output .= '<p style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">📋 Redemption Window Rules:</p>';
+    $output .= '<ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #495057; line-height: 1.8;">';
+    $output .= '<li><strong>Window Period:</strong> 1st through 7th of each month (00:00:00 to 23:59:59)</li>';
+    $output .= '<li><strong>September 1st:</strong> No redemptions allowed (Annual "Let It Ride Day")</li>';
+    $output .= '<li><strong>Next Window After Sept 1:</strong> October 1-7</li>';
+    $output .= '<li><strong>Request Timing:</strong> Redemption requests can only be submitted during open windows</li>';
+    $output .= '</ul>';
+    $output .= '</div>';
+    
     $output .= '</div>';
     
     // Redemption Summary
@@ -5043,7 +5211,7 @@ function dongtrader_get_xp_umeta_ids() {
                     continue; // Continue to next row
                 } else {
                     // Single transaction
-                    $is_json = true;
+                $is_json = true;
                 }
             }
         }
