@@ -1087,21 +1087,45 @@ function add_custom_tab_to_my_account()
         ],
 
         [
+            'name' => __('Wallet', 'cpm-dongtrader'),
+            'slug' => 'detente-wallet',
+            'position' => 2,
+        ],
+
+        [
+            'name' => __('XP Transfers', 'cpm-dongtrader'),
+            'slug' => 'xp-transfers',
+            'position' => 3,
+        ],
+
+        [
             'name' => __('My Treasury', 'cpm-dongtrader'),
             'slug' => 'detente-treasury',
-            'position' => 2,
+            'position' => 4,
         ],
 
         [
             'name' => __('Group', 'cpm-dongtrader'),
             'slug' => 'detente-group',
-            'position' => 3,
+            'position' => 5,
         ],
 
         [
             'name' => __('Seller Income', 'cpm-dongtrader'),
             'slug' => 'detente-commission',
-            'position' => 4,
+            'position' => 6,
+        ],
+
+        [
+            'name' => __('POC Pooling', 'cpm-dongtrader'),
+            'slug' => 'poc-pooling',
+            'position' => 7,
+        ],
+
+        [
+            'name' => __('Redemption', 'cpm-dongtrader'),
+            'slug' => 'redemption',
+            'position' => 8,
         ],
     ];
 
@@ -1153,8 +1177,319 @@ function add_custom_tab_to_my_account()
         });
 
     endforeach;
+    
+    // Add XP Transfers modal script to footer
+    add_action('wp_footer', 'dongtrader_xp_transfers_script');
+    
+    // Flush rewrite rules if endpoints were just added or changed
+    $endpoints_flushed = get_option('dongtrader_endpoints_flushed', false);
+    $current_endpoints = array_column($all_my_account_tabs, 'slug');
+    $saved_endpoints = get_option('dongtrader_saved_endpoints', array());
+    
+    // Check if endpoints have changed or if this is first time
+    if (!$endpoints_flushed || $current_endpoints !== $saved_endpoints) {
+        flush_rewrite_rules(false);
+        update_option('dongtrader_endpoints_flushed', true);
+        update_option('dongtrader_saved_endpoints', $current_endpoints);
+    }
+    
+    // Temporary: Force flush on next page load (remove after first successful load)
+    // Uncomment the line below if rewrite rules still don't work, then comment it again after page loads once
+    // delete_option('dongtrader_endpoints_flushed');
 }
 add_action('wp_loaded', 'add_custom_tab_to_my_account');
+
+/**
+ * AJAX handler to search for verified users by email, username, or FonePay ID
+ */
+add_action('wp_ajax_search_xp_receiver', 'dongtrader_search_xp_receiver');
+
+/**
+ * AJAX handler to send XP transfer
+ */
+add_action('wp_ajax_send_xp_transfer', 'dongtrader_send_xp_transfer');
+
+function dongtrader_search_xp_receiver() {
+    // Security check
+    check_ajax_referer('search_receiver', 'nonce');
+    
+    // Check if user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('You must be logged in to search for users.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    $query = isset($_POST['query']) ? sanitize_text_field($_POST['query']) : '';
+    
+    if (strlen($query) < 2) {
+        wp_send_json_success(array());
+        return;
+    }
+    
+    $current_user_id = get_current_user_id();
+    $results = array();
+    
+    global $wpdb;
+    
+    // Search by email, username, or FonePay ID
+    $search_query = '%' . $wpdb->esc_like($query) . '%';
+    
+    // Get users matching email, username, or display name
+    $users = $wpdb->get_results($wpdb->prepare("
+        SELECT DISTINCT u.ID, u.user_email, u.user_login, u.display_name
+        FROM {$wpdb->users} u
+        WHERE (
+            u.user_email LIKE %s 
+            OR u.user_login LIKE %s 
+            OR u.display_name LIKE %s
+        )
+        AND u.ID != %d
+        AND u.user_email != ''
+        AND u.user_email IS NOT NULL
+        ORDER BY u.display_name ASC
+        LIMIT 20
+    ", $search_query, $search_query, $search_query, $current_user_id));
+    
+    // Also search by FonePay ID
+    $fonepay_users = $wpdb->get_results($wpdb->prepare("
+        SELECT DISTINCT u.ID, u.user_email, u.user_login, u.display_name
+        FROM {$wpdb->users} u
+        INNER JOIN {$wpdb->usermeta} um ON u.ID = um.user_id
+        WHERE um.meta_key = 'mega-paypal'
+        AND um.meta_value LIKE %s
+        AND u.ID != %d
+        AND u.user_email != ''
+        AND u.user_email IS NOT NULL
+        ORDER BY u.display_name ASC
+        LIMIT 20
+    ", $search_query, $current_user_id));
+    
+    // Combine results
+    $all_users = array();
+    $seen_ids = array();
+    
+    // Add regular user search results
+    foreach ($users as $user) {
+        if (!in_array($user->ID, $seen_ids)) {
+            $all_users[] = $user;
+            $seen_ids[] = $user->ID;
+        }
+    }
+    
+    // Add FonePay search results
+    foreach ($fonepay_users as $user) {
+        if (!in_array($user->ID, $seen_ids)) {
+            $all_users[] = $user;
+            $seen_ids[] = $user->ID;
+        }
+    }
+    
+    // Build results array with all user data
+    foreach ($all_users as $user) {
+        // Get FonePay ID if exists
+        $fonepay_id = get_user_meta($user->ID, 'mega-paypal', true);
+        
+        // Build display name
+        $display_name = !empty($user->display_name) ? $user->display_name : $user->user_login;
+        
+        $results[] = array(
+            'id' => $user->ID,
+            'name' => $display_name,
+            'email' => $user->user_email,
+            'username' => $user->user_login,
+            'fonepay_id' => $fonepay_id ? $fonepay_id : ''
+        );
+        
+        // Limit to 10 results
+        if (count($results) >= 10) {
+            break;
+        }
+    }
+    
+    wp_send_json_success($results);
+}
+
+/**
+ * AJAX handler to send XP transfer
+ */
+function dongtrader_send_xp_transfer() {
+    // Security check
+    check_ajax_referer('send_xp_transfer', 'nonce');
+    
+    // Check if user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('You must be logged in to send XP.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    $sender_id = get_current_user_id();
+    $receiver_id = isset($_POST['receiver_id']) ? intval($_POST['receiver_id']) : 0;
+    $xp_amount = isset($_POST['xp_amount']) ? floatval($_POST['xp_amount']) : 0;
+    $memo = isset($_POST['memo']) ? sanitize_text_field($_POST['memo']) : '';
+    
+    // Validation
+    if (!$receiver_id || $receiver_id <= 0) {
+        wp_send_json_error(array('message' => __('Please select a receiver.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    if ($receiver_id == $sender_id) {
+        wp_send_json_error(array('message' => __('You cannot send XP to yourself.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    if ($xp_amount <= 0) {
+        wp_send_json_error(array('message' => __('Please enter a valid XP amount.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    // Check minimum transfer (0.000001 XP = 1 YAM)
+    $min_transfer = 0.000001;
+    if ($xp_amount < $min_transfer) {
+        wp_send_json_error(array('message' => sprintf(__('Minimum transfer: %s XP', 'cpm-dongtrader'), number_format($min_transfer, 6))));
+        return;
+    }
+    
+    // Get sender's balance
+    $sender_scan_raw = get_user_meta($sender_id, 'seller_scan', true);
+    $buyer_scan_raw = get_user_meta($sender_id, 'buyer_scan', true);
+    $personal_scan_raw = get_user_meta($sender_id, 'personal_scan', true);
+    
+    $seller_scan_data = maybe_unserialize($sender_scan_raw);
+    $buyer_scan_data = maybe_unserialize($buyer_scan_raw);
+    $personal_scan_data = maybe_unserialize($personal_scan_raw);
+    
+    if (!is_array($seller_scan_data)) $seller_scan_data = array();
+    if (!is_array($buyer_scan_data)) $buyer_scan_data = array();
+    if (!is_array($personal_scan_data)) $personal_scan_data = array();
+    
+    $sender_total_xp = 0;
+    foreach ($seller_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            // Skip XP transfer entries - these are already accounted for in transactions table
+            if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
+                continue;
+            }
+            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+            $sender_total_xp += $xp;
+        }
+    }
+    foreach ($buyer_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            // Skip XP transfer entries - these are already accounted for in transactions table
+            if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
+                continue;
+            }
+            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+            $sender_total_xp += $xp;
+        }
+    }
+    foreach ($personal_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            // Skip XP transfer entries - these are already accounted for in transactions table
+            if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
+                continue;
+            }
+            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+            $sender_total_xp += $xp;
+        }
+    }
+    
+    // Get transactions to calculate available XP
+    global $wpdb;
+    $table_name_trans = $wpdb->prefix . 'xp_transactions';
+    $sender_transactions = $wpdb->get_results($wpdb->prepare("
+        SELECT xp_amount, sender_id, receiver_id
+        FROM {$table_name_trans}
+        WHERE sender_id = %d OR receiver_id = %d
+    ", $sender_id, $sender_id), ARRAY_A);
+    
+    $sender_xp_sent = 0;
+    $sender_xp_received = 0;
+    if (is_array($sender_transactions)) {
+        foreach ($sender_transactions as $trans) {
+            $xp_amt = floatval($trans['xp_amount']);
+            if (intval($trans['sender_id']) === $sender_id) {
+                $sender_xp_sent += $xp_amt;
+            } else {
+                $sender_xp_received += $xp_amt;
+            }
+        }
+    }
+    
+    // Calculate available XP: Total XP - Sent + Received
+    $sender_available_xp = $sender_total_xp - $sender_xp_sent + $sender_xp_received;
+    if ($sender_available_xp < 0) {
+        $sender_available_xp = 0;
+    }
+    
+    // Check balance sufficiency
+    if ($xp_amount > $sender_available_xp) {
+        wp_send_json_error(array('message' => __('Insufficient balance.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    // Check maximum transfer (50% of available balance)
+    $max_transfer = $sender_available_xp * 0.5;
+    if ($xp_amount > $max_transfer) {
+        wp_send_json_error(array('message' => sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format($max_transfer, 6))));
+        return;
+    }
+    
+    // Verify receiver exists and is active
+    $receiver = get_userdata($receiver_id);
+    if (!$receiver || !$receiver->user_email) {
+        wp_send_json_error(array('message' => __('Receiver not found or inactive.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'xp_transactions';
+    
+    // Calculate YAM equivalent (1 XP = 1,000,000 YAM)
+    // Round to whole number since yam_equivalent is decimal(20,0)
+    $yam_equivalent = round($xp_amount * 1000000, 0);
+    
+    // Insert transaction into database
+    // Field order matches table structure:
+    // 1. id (auto-increment, not included)
+    // 2. sender_id (bigint) - %d
+    // 3. receiver_id (bigint) - %d
+    // 4. xp_amount (decimal(20,6)) - %f
+    // 5. yam_equivalent (decimal(20,0)) - %d (whole number)
+    // 6. memo (text) - %s
+    // 7. transaction_date (timestamp) - %s
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'sender_id' => $sender_id,
+            'receiver_id' => $receiver_id,
+            'xp_amount' => $xp_amount,
+            'yam_equivalent' => $yam_equivalent,
+            'memo' => $memo,
+            'transaction_date' => current_time('mysql')
+        ),
+        array('%d', '%d', '%f', '%d', '%s', '%s')
+    );
+    
+    if ($result === false) {
+        wp_send_json_error(array('message' => __('Failed to record transaction. Please try again.', 'cpm-dongtrader')));
+        return;
+    }
+    
+    $transaction_id = $wpdb->insert_id;
+    
+    // Note: XP transfers are only stored in wp_xp_transactions table
+    // We don't store transfers in personal_scan usermeta to avoid double-counting
+    // Balance is calculated dynamically: Base XP from scans - Sent + Received (from transactions table)
+    
+    // Send success response
+    wp_send_json_success(array(
+        'message' => __('XP transferred successfully!', 'cpm-dongtrader'),
+        'transaction_id' => $transaction_id,
+        'new_balance' => $sender_available_xp - $xp_amount
+    ));
+}
 
 
 
@@ -1262,5 +1597,644 @@ function isLastDayOfMonth() {
     
     // Check if tomorrow is the first day of the next month
     return $tomorrow->format('j') === '1';
+}
+
+/**
+ * Add XP Transfers modal JavaScript to footer
+ */
+function dongtrader_xp_transfers_script() {
+    // Only load on account pages and xp-transfers endpoint
+    if (!is_account_page() || !is_user_logged_in()) {
+        return;
+    }
+    
+    // Check if we're on the xp-transfers page
+    global $wp;
+    if (!isset($wp->query_vars['xp-transfers'])) {
+        return;
+    }
+    
+    // Get total XP for calculations (same logic as template)
+    $user_id = get_current_user_id();
+    $seller_scan_raw = get_user_meta($user_id, 'seller_scan', true);
+    $buyer_scan_raw = get_user_meta($user_id, 'buyer_scan', true);
+    $personal_scan_raw = get_user_meta($user_id, 'personal_scan', true);
+    
+    $seller_scan_data = maybe_unserialize($seller_scan_raw);
+    $buyer_scan_data = maybe_unserialize($buyer_scan_raw);
+    $personal_scan_data = maybe_unserialize($personal_scan_raw);
+    
+    if (!is_array($seller_scan_data)) $seller_scan_data = array();
+    if (!is_array($buyer_scan_data)) $buyer_scan_data = array();
+    if (!is_array($personal_scan_data)) $personal_scan_data = array();
+    
+    $user_treasury_entries = array();
+    foreach ($seller_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            $user_treasury_entries[] = $entry;
+        }
+    }
+    foreach ($buyer_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            $user_treasury_entries[] = $entry;
+        }
+    }
+    foreach ($personal_scan_data as $entry) {
+        if (is_array($entry) && !empty($entry)) {
+            $user_treasury_entries[] = $entry;
+        }
+    }
+    
+    $total_xp = 0;
+    foreach ($user_treasury_entries as $entry) {
+        // Skip XP transfer entries - these are already accounted for in transactions table
+        // XP transfers are stored in personal_scan with source='xp_transfer'
+        if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
+            continue;
+        }
+        
+        $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+        $total_xp += $xp;
+    }
+    
+    // Get transactions to calculate available XP
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'xp_transactions';
+    $user_transactions = $wpdb->get_results($wpdb->prepare("
+        SELECT xp_amount, sender_id, receiver_id
+        FROM {$table_name}
+        WHERE sender_id = %d OR receiver_id = %d
+    ", $user_id, $user_id), ARRAY_A);
+    
+    $total_xp_sent_js = 0;
+    $total_xp_received_js = 0;
+    if (is_array($user_transactions)) {
+        foreach ($user_transactions as $trans) {
+            $xp_amt = floatval($trans['xp_amount']);
+            if (intval($trans['sender_id']) === $user_id) {
+                $total_xp_sent_js += $xp_amt;
+            } else {
+                $total_xp_received_js += $xp_amt;
+            }
+        }
+    }
+    
+    // Calculate available XP: Total XP - Sent + Received
+    $available_xp_js = $total_xp - $total_xp_sent_js + $total_xp_received_js;
+    if ($available_xp_js < 0) {
+        $available_xp_js = 0;
+    }
+    
+    // Calculate max transfer (50% of available balance)
+    $max_transfer = $available_xp_js * 0.5;
+    
+    ?>
+    <script type="text/javascript">
+    console.log('=== XP TRANSFERS SCRIPT LOADING ===');
+    
+    jQuery(document).ready(function($) {
+        console.log('📄 jQuery document ready fired');
+        
+        // Validation constants from documentation
+        var minTransfer = 0.000001; // 1 YAM equivalent (minimum transfer)
+        var maxTransfer = <?php echo number_format($max_transfer, 6, '.', ''); ?>; // 50% of available balance
+        var currentBalance = <?php echo number_format($available_xp_js, 6, '.', ''); ?>; // Available XP (Total - Sent + Received)
+        
+        // Helper function to format numbers in scientific notation (e.g., "1.03 × 10²³")
+        function formatScientificNotation(num) {
+            if (num === 0 || num === null || isNaN(num)) {
+                return '0';
+            }
+            var scientific = num.toExponential(2);
+            var parts = scientific.split('e');
+            var mantissa = parseFloat(parts[0]).toString();
+            // Remove trailing zeros and decimal point if needed
+            mantissa = mantissa.replace(/\.?0+$/, '');
+            var exponent = parts[1] ? parts[1].replace('+', '') : '0';
+            return mantissa + ' × 10<sup>' + exponent + '</sup>';
+        }
+        
+        // Tab switching functionality
+        function switchTab(tabName) {
+            console.log('🔄 Switching to tab:', tabName);
+            
+            // Remove active class from all tabs and buttons
+            $('.xp-tab-button').removeClass('active');
+            $('.tab-content').removeClass('active');
+            
+            // Hide all tab contents explicitly
+            $('.tab-content').css({
+                'display': 'none',
+                'visibility': 'hidden',
+                'opacity': '0'
+            });
+            
+            // Add active class to selected tab button
+            var $tabButton = $('.xp-tab-button[data-tab="' + tabName + '"]');
+            $tabButton.addClass('active');
+            
+            // Show selected tab content
+            var $tabContent = $('#' + tabName + '-tab');
+            $tabContent.addClass('active');
+            $tabContent.css({
+                'display': 'block',
+                'visibility': 'visible',
+                'opacity': '1'
+            });
+            
+            console.log('✅ Tab switched to:', tabName);
+            console.log('- Tab button found:', $tabButton.length > 0);
+            console.log('- Tab button active:', $tabButton.hasClass('active'));
+            console.log('- Tab content found:', $tabContent.length > 0);
+            console.log('- Tab content active:', $tabContent.hasClass('active'));
+            console.log('- Transactions tab visible:', $('#transactions-tab').is(':visible'));
+            console.log('- Send XP tab visible:', $('#send-xp-tab').is(':visible'));
+        }
+        
+        // Ensure Transactions tab is active on page load
+        console.log('🔵 Initializing tabs...');
+        console.log('- Transactions tab active:', $('#transactions-tab').hasClass('active'));
+        console.log('- Send XP tab active:', $('#send-xp-tab').hasClass('active'));
+        
+        // Tab button click handlers
+        $(document).on('click', '.xp-tab-button', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var tabName = $(this).data('tab');
+            console.log('🟢 Tab button clicked:', tabName);
+            if (tabName) {
+                switchTab(tabName);
+            } else {
+                console.error('❌ No tab name found!');
+            }
+        });
+        
+        // Send XP button/tab handler (for backward compatibility)
+        $(document).on('click', '#open-send-xp-tab', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🟢 Send XP tab button clicked!');
+            switchTab('send-xp');
+        });
+        
+        // Receiver search functionality
+        let searchTimeout = null;
+        let selectedReceiver = null;
+        
+        $(document).on('input', '#receiver_search', function() {
+            var query = $(this).val().trim();
+            var $results = $('#receiver_results');
+            
+            // Clear previous timeout
+            clearTimeout(searchTimeout);
+            
+            // Hide results if query is too short
+            if (query.length < 2) {
+                $results.hide().html('');
+                return;
+            }
+            
+            // Show loading state
+            $results.html('<div class="receiver-result-item" style="text-align: center; padding: 10px; color: #64748b;"><?php echo esc_js(__('Searching...', 'cpm-dongtrader')); ?></div>').show();
+            
+            // Debounce search
+            searchTimeout = setTimeout(function() {
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'search_xp_receiver',
+                        query: query,
+                        nonce: '<?php echo wp_create_nonce('search_receiver'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success && response.data && response.data.length > 0) {
+                            var html = '';
+                            response.data.forEach(function(user) {
+                                var displayText = user.name;
+                                if (user.fonepay_id) {
+                                    displayText += ' <span style="color: #64748b; font-size: 0.85em;">(' + user.fonepay_id + ')</span>';
+                                }
+                                html += '<div class="receiver-result-item" data-user-id="' + user.id + '" data-name="' + user.name + '" data-email="' + user.email + '">';
+                                html += '<div class="name">' + displayText + '</div>';
+                                html += '<div class="email">' + user.email + '</div>';
+                                html += '</div>';
+                            });
+                            $results.html(html).show();
+                        } else {
+                            $results.html('<div class="receiver-result-item" style="text-align: center; padding: 10px; color: #64748b;"><?php echo esc_js(__('No users found', 'cpm-dongtrader')); ?></div>').show();
+                        }
+                    },
+                    error: function() {
+                        $results.html('<div class="receiver-result-item" style="text-align: center; padding: 10px; color: #dc2626;"><?php echo esc_js(__('Search error. Please try again.', 'cpm-dongtrader')); ?></div>').show();
+                    }
+                });
+            }, 300);
+        });
+        
+        // Select receiver from results
+        $(document).on('click', '.receiver-result-item', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var userId = $(this).data('user-id');
+            var userName = $(this).data('name');
+            var userEmail = $(this).data('email');
+            
+            if (!userId) return;
+            
+            selectedReceiver = {
+                id: userId,
+                name: userName,
+                email: userEmail
+            };
+            
+            // Update hidden field and display
+            $('#receiver_id').val(userId);
+            $('#receiver_name').text(userName);
+            $('#receiver_email').text(userEmail);
+            
+            // Show selected receiver card (which includes the cross button)
+            $('#selected_receiver').show();
+            
+            // Hide dropdown immediately
+            $('#receiver_results').hide().html('');
+            
+            // Clear search input and show selected user name
+            $('#receiver_search').val(userName).blur();
+            
+            // Hide any error messages
+            $('#receiver_error').hide();
+            $('#receiver_search').removeClass('error');
+            
+            // Validate form after receiver selection
+            validateForm();
+        });
+        
+        // Hide dropdown when search input loses focus (but only if no user selected)
+        $(document).on('blur', '#receiver_search', function() {
+            // Small delay to allow click on result item to register first
+            setTimeout(function() {
+                if (!selectedReceiver || !selectedReceiver.id) {
+                    $('#receiver_results').hide();
+                }
+            }, 200);
+        });
+        
+        // Close results when clicking outside
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.receiver-search').length && !$(e.target).closest('#selected_receiver').length) {
+                $('#receiver_results').hide();
+            }
+        });
+        
+        // Form interactions
+        $(document).on('input', '#memo', function() {
+            var length = $(this).val().length;
+            $('#char_count').text(length);
+        });
+        
+        // Real-time XP amount validation and conversion display
+        $(document).on('input', '#xp_amount', function() {
+            var amount = parseFloat($(this).val()) || 0;
+            var amountValue = $(this).val().trim();
+            
+            // Show conversion if amount is valid - NEW CONVERSION
+            if (amount > 0 && !isNaN(amount) && amount >= minTransfer && amount <= maxTransfer && amount <= currentBalance) {
+                // NEW: Calculate USD directly from XP (USD = XP / 10^23)
+                var xpPerDollar = 100000000000000000000000; // 10^23
+                var usd = amount / xpPerDollar;
+                // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
+                var yam = usd; // 1 YAM = 1 USD
+                $('#yam_equiv').text(yam.toExponential(2));
+                $('#usd_value').text(usd.toFixed(2));
+                $('#conversion_display').show();
+            } else {
+                $('#conversion_display').hide();
+            }
+            
+            // Validate form (this will handle error messages and button state)
+            validateForm();
+        });
+        
+        // Clear receiver function
+        window.clearReceiver = function() {
+            selectedReceiver = null;
+            // Hide the selected receiver card (which includes the cross button)
+            $('#selected_receiver').hide();
+            // Clear search input
+            $('#receiver_search').val('').focus();
+            // Clear hidden field
+            $('#receiver_id').val('');
+            // Hide dropdown
+            $('#receiver_results').hide().html('');
+            // Validate form (this will handle error messages and button state)
+            validateForm();
+        };
+        
+        // Validation function
+        function validateTransfer(receiverId, amount) {
+            var errors = [];
+            
+            // 1. Receiver validation - Required field
+            if (!receiverId || receiverId === '' || receiverId === null || receiverId === undefined) {
+                errors.push({
+                    field: 'receiver',
+                    message: '<?php echo esc_js(__('Please select a receiver', 'cpm-dongtrader')); ?>'
+                });
+            }
+            
+            // 2. Amount validation - Required field and must be a valid number
+            if (!amount || amount === '' || isNaN(amount) || amount <= 0) {
+                errors.push({
+                    field: 'amount',
+                    message: '<?php echo esc_js(__('Please enter a valid XP amount', 'cpm-dongtrader')); ?>'
+                });
+                return errors; // Return early if amount is invalid
+            }
+            
+            // 3. Minimum transfer check (0.000001 XP = 1 YAM equivalent)
+            if (amount < minTransfer) {
+                errors.push({
+                    field: 'amount',
+                    message: '<?php echo esc_js(sprintf(__('Minimum transfer: %s XP (1 YAM equivalent)', 'cpm-dongtrader'), number_format(0.000001, 6))); ?>'
+                });
+            }
+            
+            // 4. Maximum transfer check (50% of sender's balance)
+            if (amount > maxTransfer) {
+                errors.push({
+                    field: 'amount',
+                    message: '<?php echo esc_js(sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format($max_transfer, 6))); ?>'
+                });
+            }
+            
+            // 5. Balance sufficiency check
+            if (amount > currentBalance) {
+                errors.push({
+                    field: 'amount',
+                    message: '<?php echo esc_js(__('Insufficient balance', 'cpm-dongtrader')); ?>'
+                });
+            }
+            
+            // 6. Check if sender has any balance
+            if (currentBalance <= 0) {
+                errors.push({
+                    field: 'amount',
+                    message: '<?php echo esc_js(__('You have no XP balance to transfer', 'cpm-dongtrader')); ?>'
+                });
+            }
+            
+            return errors;
+        }
+        
+        // Real-time validation function
+        function validateForm() {
+            var receiverId = $('#receiver_id').val();
+            var amount = parseFloat($('#xp_amount').val()) || 0;
+            var isValid = true;
+            
+            // Clear previous errors
+            $('#receiver_error').hide().text('');
+            $('#amount_error').hide().text('');
+            
+            // Remove error classes from inputs
+            $('#receiver_search').removeClass('error');
+            $('#xp_amount').removeClass('error');
+            
+            // Validate receiver
+            if (!receiverId || receiverId === '' || receiverId === null || receiverId === undefined) {
+                $('#receiver_error').text('<?php echo esc_js(__('Please select a receiver', 'cpm-dongtrader')); ?>').show();
+                $('#receiver_search').addClass('error');
+                isValid = false;
+            }
+            
+            // Validate amount
+            var amountValue = $('#xp_amount').val().trim();
+            if (!amountValue || amountValue === '') {
+                $('#amount_error').text('<?php echo esc_js(__('XP amount is required', 'cpm-dongtrader')); ?>').show();
+                $('#xp_amount').addClass('error');
+                isValid = false;
+            } else if (isNaN(amount) || amount <= 0) {
+                $('#amount_error').text('<?php echo esc_js(__('Please enter a valid XP amount', 'cpm-dongtrader')); ?>').show();
+                $('#xp_amount').addClass('error');
+                isValid = false;
+            } else if (amount < minTransfer) {
+                $('#amount_error').text('<?php echo esc_js(sprintf(__('Minimum transfer: %s XP', 'cpm-dongtrader'), number_format(0.000001, 6))); ?>').show();
+                $('#xp_amount').addClass('error');
+                isValid = false;
+            } else if (amount > maxTransfer) {
+                $('#amount_error').text('<?php echo esc_js(sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format($max_transfer, 6))); ?>').show();
+                $('#xp_amount').addClass('error');
+                isValid = false;
+            } else if (amount > currentBalance) {
+                $('#amount_error').text('<?php echo esc_js(__('Insufficient balance', 'cpm-dongtrader')); ?>').show();
+                $('#xp_amount').addClass('error');
+                isValid = false;
+            }
+            
+            // Enable/disable submit button
+            if (isValid && receiverId && amount > 0 && amount >= minTransfer && amount <= maxTransfer && amount <= currentBalance) {
+                $('#submit_btn').prop('disabled', false);
+            } else {
+                $('#submit_btn').prop('disabled', true);
+            }
+            
+            return isValid;
+        }
+        
+        // Real-time validation on input change
+        $(document).on('input blur', '#xp_amount', function() {
+            validateForm();
+        });
+        
+        // Real-time validation on receiver selection
+        $(document).on('change', '#receiver_id', function() {
+            validateForm();
+        });
+        
+        // Validate on receiver search blur
+        $(document).on('blur', '#receiver_search', function() {
+            setTimeout(function() {
+                validateForm();
+            }, 200); // Delay to allow dropdown click to register
+        });
+        
+        // Submit button - Show summary instead of submitting
+        $(document).on('click', '#submit_btn', function(e) {
+            e.preventDefault();
+            
+            // Validate form
+            if (!validateForm()) {
+                // Scroll to first error
+                var firstError = $('.error-text:visible').first();
+                if (firstError.length) {
+                    $('html, body').animate({
+                        scrollTop: firstError.offset().top - 100
+                    }, 300);
+                }
+                return;
+            }
+            
+            // Get form values
+            var receiverId = $('#receiver_id').val();
+            var receiverName = $('#receiver_name').text();
+            var receiverEmail = $('#receiver_email').text();
+            var amount = parseFloat($('#xp_amount').val()) || 0;
+            var memo = $('#memo').val();
+            
+            // Final validation
+            var validationErrors = validateTransfer(receiverId, amount);
+            
+            if (validationErrors.length > 0) {
+                // Show errors in form
+                validationErrors.forEach(function(error) {
+                    if (error.field === 'receiver') {
+                        $('#receiver_error').text(error.message).show();
+                        $('#receiver_search').addClass('error');
+                    } else if (error.field === 'amount') {
+                        $('#amount_error').text(error.message).show();
+                        $('#xp_amount').addClass('error');
+                    }
+                });
+                
+                // Scroll to first error
+                var firstError = $('.error-text:visible').first();
+                if (firstError.length) {
+                    $('html, body').animate({
+                        scrollTop: firstError.offset().top - 100
+                    }, 300);
+                }
+                
+                return;
+            }
+            
+            // Hide any error messages
+            $('#receiver_error').hide();
+            $('#amount_error').hide();
+            $('#receiver_search').removeClass('error');
+            $('#xp_amount').removeClass('error');
+            
+            // Calculate values
+            var yam = amount * 1000000; // 1 XP = 1,000,000 YAM
+            var newBalance = currentBalance - amount;
+            
+            // Update summary
+            $('#summary_receiver').text(receiverName + ' (' + receiverEmail + ')');
+            $('#summary_amount').html(formatScientificNotation(amount));
+            $('#summary_yam').text(yam.toLocaleString('en-US', {maximumFractionDigits: 2}));
+            $('#summary_new_balance').html(formatScientificNotation(newBalance));
+            
+            // Hide form and show summary
+            $('#send-xp-form').hide();
+            $('#transfer_summary').show();
+            
+            // Scroll to summary
+            $('html, body').animate({
+                scrollTop: $('#transfer_summary').offset().top - 100
+            }, 300);
+        });
+        
+        // Confirm button - Actually submit the form
+        $(document).on('click', '#confirm_btn', function(e) {
+            e.preventDefault();
+            
+            // Get form values
+            var receiverId = $('#receiver_id').val();
+            var amount = parseFloat($('#xp_amount').val()) || 0;
+            var memo = $('#memo').val() || '';
+            var nonce = $('#xp_transfer_nonce').val();
+            
+            // Disable button and show loading state
+            var $confirmBtn = $(this);
+            var originalText = $confirmBtn.text();
+            $confirmBtn.prop('disabled', true).text('<?php echo esc_js(__('Sending...', 'cpm-dongtrader')); ?>');
+            
+            // Submit via AJAX
+            $.ajax({
+                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                type: 'POST',
+                data: {
+                    action: 'send_xp_transfer',
+                    receiver_id: receiverId,
+                    xp_amount: amount,
+                    memo: memo,
+                    nonce: nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Show success message
+                        alert(response.data.message || '<?php echo esc_js(__('XP transferred successfully!', 'cpm-dongtrader')); ?>');
+                        
+                        // Reload page to show updated balance and transaction history
+                        window.location.reload();
+                    } else {
+                        // Show error message
+                        alert(response.data.message || '<?php echo esc_js(__('Transfer failed. Please try again.', 'cpm-dongtrader')); ?>');
+                        $confirmBtn.prop('disabled', false).text(originalText);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Transfer error:', error);
+                    alert('<?php echo esc_js(__('An error occurred. Please try again.', 'cpm-dongtrader')); ?>');
+                    $confirmBtn.prop('disabled', false).text(originalText);
+                }
+            });
+        });
+        
+        // Cancel confirm button - Go back to form
+        $(document).on('click', '#cancel_confirm_btn', function(e) {
+            e.preventDefault();
+            $('#transfer_summary').hide();
+            $('#send-xp-form').show();
+        });
+        
+        // Transaction filter functionality
+        $(document).on('click', '.transaction-filter-btn', function() {
+            var filter = $(this).data('filter');
+            
+            // Remove active class from all buttons
+            $('.transaction-filter-btn').removeClass('active');
+            $('.transaction-filter-btn').css({
+                'background': '#f9fafb',
+                'color': '#6b7280',
+                'border-color': '#e5e7eb'
+            });
+            
+            // Add active class to clicked button
+            $(this).addClass('active');
+            $(this).css({
+                'background': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'color': '#ffffff',
+                'border-color': '#047857'
+            });
+            
+            // Filter table rows
+            if (filter === 'all') {
+                $('.transaction-row').removeClass('hidden').show();
+            } else if (filter === 'sent') {
+                $('.transaction-row').each(function() {
+                    if ($(this).data('transaction-type') === 'sent') {
+                        $(this).removeClass('hidden').show();
+                    } else {
+                        $(this).addClass('hidden').hide();
+                    }
+                });
+            } else if (filter === 'received') {
+                $('.transaction-row').each(function() {
+                    if ($(this).data('transaction-type') === 'received') {
+                        $(this).removeClass('hidden').show();
+                    } else {
+                        $(this).addClass('hidden').hide();
+                    }
+                });
+            }
+        });
+        
+        console.log('✅ XP Transfers tabs initialized');
+        console.log('💡 Click on tabs to switch between Transactions and Send XP');
+    });
+    </script>
+    <?php
 }
 

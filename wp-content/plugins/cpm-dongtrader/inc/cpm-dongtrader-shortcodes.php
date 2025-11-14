@@ -63,23 +63,23 @@ function mega_bundled_product_selection($atts)
 		</form>
 	</div>
 	<script>
-		$(document).ready(function () {
+		jQuery(document).ready(function () {
 			if (window.location.href.includes("yam=yamer")) {
 				// Hide the popup manually
-				$('#cpp-popup-3').css('display', 'none');
-				$('#cpp-popup').css('display', 'none');
-				$('#elementor-popup-modal-1140').css('display', 'none');
+				jQuery('#cpp-popup-3').css('display', 'none');
+				jQuery('#cpp-popup').css('display', 'none');
+				jQuery('#elementor-popup-modal-1140').css('display', 'none');
 
 				// Remove body class that prevents scrolling
-				$('body').removeClass('elementor-popup-open').css('overflow', 'auto');
+				jQuery('body').removeClass('elementor-popup-open').css('overflow', 'auto');
 
 				// Set form field value
-				$('#form-field-name').val('yamer');
+				jQuery('#form-field-name').val('yamer');
 			}
 
 			// Handle click outside the container
-			$(document).on('mousedown', function (event) {
-				const container = $('#membership_selection_form_container');
+			jQuery(document).on('mousedown', function (event) {
+				const container = jQuery('#membership_selection_form_container');
 
 				// If clicked outside the popup container
 				if (!container.is(event.target) && container.has(event.target).length === 0) {
@@ -89,10 +89,10 @@ function mega_bundled_product_selection($atts)
 					window.history.replaceState({}, document.title, url.pathname + url.search);
 
 					// Also hide popup and enable scroll just in case
-					$('#cpp-popup-3').hide();
-					$('#cpp-popup').hide();
-					$('#elementor-popup-modal-1140').hide();
-					$('body').removeClass('elementor-popup-open').css('overflow', 'auto');
+					jQuery('#cpp-popup-3').hide();
+					jQuery('#cpp-popup').hide();
+					jQuery('#elementor-popup-modal-1140').hide();
+					jQuery('body').removeClass('elementor-popup-open').css('overflow', 'auto');
 				}
 			});
 		});
@@ -160,6 +160,7 @@ function mega_process_popup_params()
 		exit();
 	}
 }
+
 
 
 function find_matching_product_variation_id($product_id, $attribute)

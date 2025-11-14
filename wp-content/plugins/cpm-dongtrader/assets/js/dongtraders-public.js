@@ -9,13 +9,13 @@ function dong_traders_url_copy(element) {
 
 
 (function ($) {
-  $(document).ready(function () {
+  jQuery(document).ready(function () {
 
 
     jQuery("#checkbox-control-0").prop("checked", true);
     //initialize tab on backend
-    $(document).on("click", ".update_card", function (ev) {
-      $(".qr-tiger-vcard-code-generator").css("display", "block");
+    jQuery(document).on("click", ".update_card", function (ev) {
+      jQuery(".qr-tiger-vcard-code-generator").css("display", "block");
     }); // END OF DOCUMENT READY
 
     // Only initialize country/state dropdowns if elements exist
@@ -29,8 +29,8 @@ function dong_traders_url_copy(element) {
 
     jQuery(".select-product").change(function () {
       var get_p_id = jQuery(this).val();
-      $("div.export_variation_product_hide").hide();
-      $("#varition-" + get_p_id).show();
+      jQuery("div.export_variation_product_hide").hide();
+      jQuery("#varition-" + get_p_id).show();
     });
   });
 

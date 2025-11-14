@@ -72,6 +72,7 @@ $release_profits = $wpdb->prepare("SELECT * FROM $release_fund ORDER BY release_
 					<h3 class=" tab-title"><?php _e('Generate new QR code ', 'cpm-dongtrader') ?></h2>
 						<p>Add new QR image by providing color ,size and URL of QR code.</p>
 						<form action="" method="POST" class="qrtiger-form">
+							<?php wp_nonce_field('dongtrader_generate_qr2', 'qrtiger_nonce'); ?>
 							<div class="dong-notify-msg">
 							</div>
 							<div class="form-group">

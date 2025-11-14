@@ -51,7 +51,10 @@ jQuery(document).ready(function ($) {
 
   /* A jQuery function to initialize the tabs. */
   $(function () {
-    $("#tabs-wrap").tabs();
+    // Check if jQuery UI tabs is available (only on settings page)
+    if (typeof $.fn.tabs !== 'undefined' && $("#tabs-wrap").length > 0) {
+      $("#tabs-wrap").tabs();
+    }
   });
 
   function animate_button(show) {
@@ -73,13 +76,15 @@ jQuery(document).ready(function ($) {
     $(".form-loader").css("display", "block");
     var qRsize = $(".qrtiger-size").val(),
       qRurl = $(".qrtiger-url").val(),
-      qRcolor = $(".qrtiger-color").val();
+      qRcolor = $(".qrtiger-color").val(),
+      qRnonce = $("input[name='qrtiger_nonce']").val();
     var datas = {
       action: "dongtrader_generate_qr2",
       type: "JSON",
       qrsize: qRsize,
       qrcolor: qRcolor,
       qrurl: qRurl,
+      nonce: qRnonce,
     };
 
     dong_ajax_request(datas);
@@ -91,37 +96,52 @@ jQuery(document).ready(function ($) {
    */
   function dong_ajax_request(data) {
     $.post(dongScript.ajaxUrl, data, function (rdata) {
-      /*  Parse jason data to object */
-      var resp = JSON.parse(rdata);
-      /*  Set icon class either error or succes*/
-      var iconClass = resp.dataStatus ? `fa fa-check` : `fa fa-times-circle`;
-      /*  Setting the value of the variable `msgClass` to `success-msg` if the value of
-        `resp.dataStatus` is true, and `error-msg` if the value of `resp.dataStatus` is false. */
-      var msgClass = resp.dataStatus ? `success-msg` : `error-msg`;
-      /*  Setting the value of the variable `msgText` to `QR code generated successfully` if the value of
-        `resp.dataStatus` is true, and `All fields are required` if the value of `resp.dataStatus` is false. */
-      var msgText = resp.dataStatus
-        ? `QR code generated successfully.`
-        : `All fields are required`;
-      /*  Response Html Message Combined to display the response status as error or valid*/
-      var responseHtml = `<div class="${msgClass}"><i class="${iconClass}"></i>${msgText}</div>`;
-      /*  if api response is ok and ajax response data is valid */
-      if (resp.dataStatus && resp.apistatus) {
-        $(".dong-notify-msg").append(responseHtml).fadeOut(2000, "swing");
-        $("#openModal1").fadeOut(2500, "swing");
+      try {
+        /*  Parse json data to object */
+        var resp = JSON.parse(rdata);
+        /*  Set icon class either error or success*/
+        var iconClass = resp.dataStatus ? `fa fa-check` : `fa fa-times-circle`;
+        /*  Setting the value of the variable `msgClass` to `success-msg` if the value of
+          `resp.dataStatus` is true, and `error-msg` if the value of `resp.dataStatus` is false. */
+        var msgClass = resp.dataStatus ? `success-msg` : `error-msg`;
+        /*  Setting the value of the variable `msgText` to `QR code generated successfully` if the value of
+          `resp.dataStatus` is true, and use error message if available, otherwise default message. */
+        var msgText = resp.dataStatus
+          ? `QR code generated successfully.`
+          : (resp.error || `All fields are required`);
+        /*  Response Html Message Combined to display the response status as error or valid*/
+        var responseHtml = `<div class="${msgClass}"><i class="${iconClass}"></i>${msgText}</div>`;
+        /*  if api response is ok and ajax response data is valid */
+        if (resp.dataStatus && resp.apistatus) {
+          $(".dong-notify-msg").append(responseHtml).fadeOut(2000, "swing");
+          $("#openModal1").fadeOut(2500, "swing");
+          animate_button(false);
+          sessionStorage.setItem("lastid", "second");
+          window.location.reload();
+        } else if (resp.dataStatus && !resp.apistatus) {
+          /*  if api response is bad and ajax response data is valid */
+          var notifyHtml = `<div class="error-msg"><i class="fa fa-times-circle"></i>Api Error! Please Try Again</div>`;
+          $(".dong-notify-msg").append(notifyHtml).fadeOut(2000, "swing");
+          animate_button(false);
+        } else {
+          /*  if everything gone wrong */
+          $(".dong-notify-msg").append(responseHtml).fadeOut(2000, "swing");
+          animate_button(false);
+        }
         animate_button(false);
-        sessionStorage.setItem("lastid", "second");
-        window.location.reload();
-      } else if (resp.dataStatus && !resp.apistatus) {
-        /*  if api response is bad and ajax response data is valid */
-        var notifyHtml = `<div class="error-msg"><i class="fa fa-times-circle"></i>Api Error! Please Try Again</div>`;
-        $(".dong-notify-msg").append(notifyHtml).fadeOut(2000, "swing");
-        animate_button(false);
-      } else {
-        /*  if everything gone wrong */
-        $(".dong-notify-msg").append(responseHtml).fadeOut(2000, "swing");
+      } catch (e) {
+        /*  Handle JSON parse error */
+        console.error('JSON Parse Error:', e);
+        console.error('Response data:', rdata);
+        var errorHtml = `<div class="error-msg"><i class="fa fa-times-circle"></i>Error: Invalid server response. Please try again.</div>`;
+        $(".dong-notify-msg").append(errorHtml).fadeOut(2000, "swing");
         animate_button(false);
       }
+    }).fail(function(xhr, status, error) {
+      /*  Handle AJAX failure */
+      console.error('AJAX Error:', status, error);
+      var errorHtml = `<div class="error-msg"><i class="fa fa-times-circle"></i>Error: Failed to generate QR code. Please try again.</div>`;
+      $(".dong-notify-msg").append(errorHtml).fadeOut(2000, "swing");
       animate_button(false);
     });
   }
@@ -141,11 +161,42 @@ jQuery(document).ready(function ($) {
     $(this).text("Removing...");
     var itemId = $(this).attr("data-remove");
     var metaKey = $(this).attr("data-meta");
-    var container = $(this).parent().parent();
-    var checkLocation = container.hasClass("dong-qr-components-single");
-    var loop = !checkLocation ? $(this).attr("data-index") : "";
-    var changeEvt = !checkLocation ? $("#variable_description" + loop) : false;
-    var save = !checkLocation ? $(".save-variation-changes") : false;
+    var removeButton = $(this);
+    var loop = $(this).attr("data-index") || "";
+    var checkLocation = $(this).closest('.dong-qr-components-single').length > 0;
+    
+    // Get container based on type
+    var container;
+    if (metaKey === 'variable_product_qr_data') {
+      // For variable products, try to get loop from container ID if not in data-index
+      if (!loop) {
+        var containerId = $(this).closest('[id^="dong-qr-components"]').attr('id');
+        if (containerId) {
+          loop = containerId.replace('dong-qr-components', '');
+        }
+      }
+      // Use the specific container ID
+      container = loop ? $("#dong-qr-components" + loop) : $(this).closest('.dong-qr-components');
+    } else {
+      // For single products
+      container = $(this).closest('.dong-qr-components');
+    }
+    
+    var changeEvt = !checkLocation && loop ? $("#variable_description" + loop) : false;
+    var save = !checkLocation && loop ? $(".save-variation-changes") : false;
+    
+    // Store data before emptying (for variable products)
+    var parentProductId = '';
+    var variationId = itemId;
+    if (metaKey === 'variable_product_qr_data') {
+      var hiddenInput = container.find('input[data-id]');
+      if (hiddenInput.length) {
+        // For existing QR, data-id contains parent product ID
+        parentProductId = hiddenInput.attr('data-id');
+      }
+      // Variation ID is the itemId
+      variationId = itemId;
+    }
 
     $.post(
       dongScript.ajaxUrl, 
@@ -155,15 +206,67 @@ jQuery(document).ready(function ($) {
         metakey: metaKey,
       },
       function (mData) {
+        // Determine initiator based on metaKey BEFORE emptying
+        var initiator = '';
+        var variations = '';
+        var postId = itemId;
+        
+        if (metaKey === '_product_qr_codes') {
+          initiator = '_product_qr_codes';
+        } else if (metaKey === '_product-qr-direct-checkouts') {
+          initiator = '_product-qr-direct-checkouts';
+        } else if (metaKey === 'variable_product_qr_data') {
+          initiator = '_product-qr-variabled';
+          variations = variationId; // variation ID
+          postId = parentProductId || itemId; // parent product ID (optional, used for validation)
+        }
+        
+        // Empty container after getting data
         container.empty();
-        if (changeEvt) changeEvt.trigger("change");
-        if (save) save.trigger("click");
-        if (checkLocation) window.location.reload();
+        
+        // Automatically regenerate QR code after removal
+        if (initiator) {
+          // Show loading state in container
+          container.html('<p>Regenerating QR code...</p>');
+          
+          // For variable products, trigger change event
+          if (metaKey === 'variable_product_qr_data') {
+            if (changeEvt && changeEvt.length) {
+              changeEvt.trigger("change");
+            }
+          }
+          
+          var inPut = $('<input>').attr('data-id', postId);
+          container.append(inPut);
+          
+          // Create a temporary button element for status updates
+          var statusButton = $('<button>').text('Regenerating...');
+          
+          // Trigger generation
+          initiate_ajax_request(
+            {
+              action: "dongtrader_meta_qr_generator",
+              productnums: postId,
+              variations: variations,
+              intiator: initiator,
+              loop: loop || ""
+            },
+            inPut,
+            container,
+            statusButton
+          );
+        } else {
+          // If no initiator, just show generate button (old behavior)
+          if (changeEvt && changeEvt.length) changeEvt.trigger("change");
+          if (save && save.length) save.trigger("click");
+          if (checkLocation) window.location.reload();
+        }
       }
     );
   });
 
   $(document).on("click", ".qr-delete", function (rm) {
+    rm.preventDefault();
 
     var index = $(this).attr('data-index');
     var buttonId = $(this).prop('id');
@@ -175,20 +278,23 @@ jQuery(document).ready(function ($) {
           {
             action : "dongtrader_delete_qr_items_settingspage",
             index : index,
+            nonce : dongScript.deleteQrNonce,
           },
           function(data){
-          
-
-            if(data.resp){
+            if(data && data.resp){
               row.remove();
             }
 
-            if(data.reload){
+            if(data && data.reload){
               window.location.reload();
             }
           }
         
-      );
+      ).fail(function(xhr, status, error) {
+        console.error('AJAX Error:', status, error);
+        $('#'+buttonId).text('Delete');
+        alert('Error: Failed to delete QR code. Please try again.');
+      });
   
   });
 
@@ -249,15 +355,31 @@ jQuery(document).ready(function ($) {
 
   function initiate_ajax_request(datas, inPut, mainContainer, button) {
     $.post(dongScript.ajaxUrl, datas, function (mData) {
-      
-      var jsonData = JSON.parse(mData);
-      console.table(jsonData);
-      if (jsonData.success) {
-        mainContainer.empty();
-        mainContainer.append(jsonData.template);
-        inPut.val(mData);
+      try {
+        var jsonData = JSON.parse(mData);
+        console.table(jsonData);
+        if (jsonData.success) {
+          mainContainer.empty();
+          mainContainer.append(jsonData.template);
+          inPut.val(mData);
+          button.text("Generate Product QR");
+        } else {
+          // Handle error response
+          alert('Error: ' + (jsonData.error || 'QR generation failed'));
+          button.text("Generate Product QR");
+        }
+      } catch (e) {
+        // Handle JSON parse error
+        console.error('JSON Parse Error:', e);
+        console.error('Response data:', mData);
+        alert('Error parsing server response. Please check the console for details.');
         button.text("Generate Product QR");
       }
+    }).fail(function(xhr, status, error) {
+      // Handle AJAX failure
+      console.error('AJAX Error:', status, error);
+      alert('Error: Failed to generate QR code. Please try again.');
+      button.text("Generate Product QR");
     });
   }
 

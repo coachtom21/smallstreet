@@ -6,18 +6,18 @@
    *
    */
 
-  $(document).ready(function ($) {
-    $(".export-loader").css("display", "none");
-    /* $("body").on("click", "#export-csv-order", function (event) { */
+  jQuery(document).ready(function () {
+    jQuery(".export-loader").css("display", "none");
+    /* jQuery("body").on("click", "#export-csv-order", function (event) { */
 
-    $("#export-csv-order").on("submit", function (event) {
+    jQuery("#export-csv-order").on("submit", function (event) {
       event.preventDefault();
-      $(".export-loader").css("display", "");
+      jQuery(".export-loader").css("display", "");
       var start_date = this.start_month.value;
       var end_date = this.end_month.value;
-      //var user_id = $("#affilate_id option:selected").val();
-      if ($("#affilate_id option:selected").val() == "") {
-        var user_id = $("#affilate_id option:selected").val();
+      //var user_id = jQuery("#affilate_id option:selected").val();
+      if (jQuery("#affilate_id option:selected").val() == "") {
+        var user_id = jQuery("#affilate_id option:selected").val();
       } else {
         var user_id = this.affilate_id.value;
       }
@@ -37,7 +37,7 @@
         (("" + day).length < 2 ? "0" : "") +
         day;
 
-      $.ajax({
+      jQuery.ajax({
         type: "POST",
         url: exporterajax.ajaxurl,
         data: {
@@ -47,8 +47,8 @@
           user_id: user_id,
         },
         success: function (response) {
-          $(".export-loader").css("display", "none");
-          if ($.trim(response) == "") {
+          jQuery(".export-loader").css("display", "none");
+          if (jQuery.trim(response) == "") {
             alert("There is no Order Data To export");
           } else {
             /*
