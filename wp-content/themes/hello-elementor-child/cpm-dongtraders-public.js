@@ -64,3 +64,71 @@ minus.addEventListener("click", () => {
     num.innerText = localStorage.getItem("num");
   }
 });
+
+// Check for proof_id and scan_type=proof in URL, then save to localStorage when user selects "yes"
+(function() {
+  'use strict';
+  
+  // Function to initialize the proof of delivery handler
+  function initProofOfDeliveryHandler() {
+    // Check if jQuery is available
+    if (typeof jQuery === 'undefined') {
+      console.error('jQuery is not loaded');
+      return;
+    }
+    
+    // Wait for DOM to be ready
+    jQuery(document).ready(function() {
+      // Get URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const scanType = urlParams.get('scan_type');
+      const proofId = urlParams.get('proof_id');
+
+      // Check if both proof_id and scan_type=proof exist in URL
+      if (proofId && scanType === 'proof') {
+        console.log('Proof of delivery scan detected:', {
+          proof_id: proofId,
+          scan_type: scanType
+        });
+
+        // Listen for changes on the "Is this proof of delivery?" radio button
+        jQuery(document).on('change', 'input[name="delivery_proof"]', function() {
+          const deliveryProofValue = jQuery('input[name="delivery_proof"]:checked').val();
+          
+          // Only save to localStorage if user selects "yes"
+          if (deliveryProofValue === 'yes') {
+            // Prepare scan data object
+            const scanData = {
+              proof_id: proofId,
+              scan_type: scanType,
+              delivery_proof: 'yes',
+              timestamp: new Date().toISOString()
+            };
+
+            // Save to localStorage with key "scan data"
+            localStorage.setItem('scan data', JSON.stringify(scanData));
+            
+            // Log for debugging
+            console.log('Scan data saved to localStorage:', scanData);
+          } else {
+            // Remove data if user selects "no" or changes selection
+            localStorage.removeItem('scan data');
+            console.log('Scan data removed from localStorage (user selected "no")');
+          }
+        });
+      }
+    });
+  }
+  
+  // Try to initialize immediately if jQuery is already loaded
+  if (typeof jQuery !== 'undefined') {
+    initProofOfDeliveryHandler();
+  } else {
+    // Wait for jQuery to load
+    window.addEventListener('load', function() {
+      if (typeof jQuery !== 'undefined') {
+        initProofOfDeliveryHandler();
+      }
+    });
+  }
+})();

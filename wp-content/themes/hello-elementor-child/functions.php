@@ -504,6 +504,9 @@ function handle_discord_user_insert($request)
     $insert_id = add_user_meta($user->ID, '_discord_invite', $meta_value);
         
     if ($insert_id) {
+        // Trigger update of related usermeta entries
+        update_user_meta_on_discord_verification($user->ID);
+        
         return rest_ensure_response([
             'success' => true,
             'message' => 'Discord invite data saved successfully',
@@ -519,6 +522,130 @@ function handle_discord_user_insert($request)
         return new WP_Error('insert_failed', 'Failed to save Discord data', ['status' => 500]);
     }
 
+}
+
+/**
+ * Hook into added_user_meta to automatically update related entries when _discord_invite is added
+ */
+add_action('added_user_meta', 'handle_discord_invite_meta_added', 10, 4);
+function handle_discord_invite_meta_added($meta_id, $user_id, $meta_key, $meta_value) {
+    // Only process when _discord_invite is added
+    if ($meta_key === '_discord_invite') {
+        update_user_meta_on_discord_verification($user_id);
+    }
+}
+
+/**
+ * Update usermeta entries and treasury_reminder when user is Discord verified
+ * Updates status from 'pending' to 'verified' in seller_scan, buyer_scan, personal_scan
+ * @param int $user_id User ID
+ */
+function update_user_meta_on_discord_verification($user_id) {
+    if (empty($user_id) || !is_numeric($user_id)) {
+        error_log('update_user_meta_on_discord_verification: Invalid user_id');
+        return false;
+    }
+    
+    error_log('update_user_meta_on_discord_verification: Processing user_id ' . $user_id);
+    
+    // Meta keys to update
+    $meta_keys_to_update = array(
+        'seller_scan',
+        'buyer_scan',
+        'personal_scan'
+    );
+    
+    $updated_count = 0;
+    
+    // Update each meta key
+    foreach ($meta_keys_to_update as $meta_key) {
+        $meta_data = get_user_meta($user_id, $meta_key, true);
+        
+        if (empty($meta_data)) {
+            continue; // Skip if no data exists
+        }
+        
+        $updated = false;
+        
+        // Unserialize if needed
+        $meta_data = maybe_unserialize($meta_data);
+        
+        // Handle array data (seller_scan, buyer_scan, personal_scan)
+        if (is_array($meta_data)) {
+            foreach ($meta_data as $index => $entry) {
+                if (is_array($entry)) {
+                    // Update status from 'pending' to 'verified' (only status, not scan_status)
+                    if (isset($entry['status']) && $entry['status'] === 'pending') {
+                        $meta_data[$index]['status'] = 'verified';
+                        $updated = true;
+                    }
+                }
+            }
+        } 
+        // Handle single entry (could be JSON string or array)
+        elseif (is_string($meta_data)) {
+            $decoded = json_decode($meta_data, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                // Single entry format - only update status
+                if (isset($decoded['status']) && $decoded['status'] === 'pending') {
+                    $decoded['status'] = 'verified';
+                    $meta_data = $decoded;
+                    $updated = true;
+                }
+            }
+        }
+        
+        // Save updated data
+        if ($updated) {
+            $result = update_user_meta($user_id, $meta_key, $meta_data);
+            if ($result !== false) {
+                $updated_count++;
+                error_log('Updated meta_key: ' . $meta_key . ' for user_id: ' . $user_id . ' - Changed status from pending to verified');
+            }
+        }
+    }
+    
+    // Update treasury_reminder option
+    update_treasury_reminder_on_discord_verification($user_id);
+    
+    error_log('update_user_meta_on_discord_verification: Updated ' . $updated_count . ' meta keys for user_id ' . $user_id);
+    
+    return $updated_count > 0;
+}
+
+/**
+ * Update treasury_reminder option when user is Discord verified
+ * Updates status from 'pending' to 'verified' for matching user_id entries
+ * @param int $user_id User ID
+ */
+function update_treasury_reminder_on_discord_verification($user_id) {
+    $treasury_data = get_option('treasury_reminder', array());
+    
+    if (!is_array($treasury_data) || empty($treasury_data)) {
+        return false;
+    }
+    
+    $updated_count = 0;
+    
+    // Find and update all entries for this user_id
+    foreach ($treasury_data as $index => $entry) {
+        if (isset($entry['user_id']) && intval($entry['user_id']) === intval($user_id)) {
+            // Update status from 'pending' to 'verified' (only status, not scan_status)
+            if (isset($entry['status']) && $entry['status'] === 'pending') {
+                $treasury_data[$index]['status'] = 'verified';
+                $updated_count++;
+            }
+        }
+    }
+    
+    // Save updated treasury_reminder
+    if ($updated_count > 0) {
+        $result = update_option('treasury_reminder', $treasury_data);
+        error_log('update_treasury_reminder_on_discord_verification: Updated ' . $updated_count . ' entries in treasury_reminder for user_id ' . $user_id . ' - Changed status from pending to verified');
+        return $result;
+    }
+    
+    return false;
 }
 
 

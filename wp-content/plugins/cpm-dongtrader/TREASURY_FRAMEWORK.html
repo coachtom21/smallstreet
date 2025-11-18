@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Treasury Framework Documentation</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #555;
+            margin-top: 20px;
+        }
+        h4 {
+            color: #666;
+            margin-top: 15px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        ul, ol {
+            margin-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Treasury Framework Documentation</h1>
+
+    <h2>Overview</h2>
+    <p>The Treasury Framework is a comprehensive system for tracking Proof of Delivery (PoD) transactions, XP (Experience Points) minting, YAM token calculations, and trade value distribution across three user roles: Seller, Buyer, and Personal.</p>
+
+    <h2>System Architecture</h2>
+
+    <h3>1. Data Storage</h3>
+
+    <h4>1.1 WordPress Usermeta Tables (wp_usermeta)</h4>
+    <p>The system stores scan data in three separate usermeta keys per user:</p>
+    <ul>
+        <li><strong>seller_scan</strong>: Stores seller scan transactions</li>
+        <li><strong>buyer_scan</strong>: Stores buyer scan transactions</li>
+        <li><strong>personal_scan</strong>: Stores personal scan transactions</li>
+    </ul>
+
+    <p><strong>Table Structure:</strong></p>
+    <ul>
+        <li>umeta_id (Primary Key, Auto Increment)</li>
+        <li>user_id (Indexed, BigInt)</li>
+        <li>meta_key (Indexed, Varchar 255)</li>
+        <li>meta_value (LongText - stores serialized array data)</li>
+    </ul>
+
+    <p><strong>Data Format:</strong></p>
+    <p>Each scan entry is stored as an array with the following fields:</p>
+    <pre><code>array(
+    'delivery_proof' => 'yes',
+    'discord_join' => false,
+    'mega-mobile' => 'phone_number',
+    'percentage' => 3|7|10,  // 3% for seller, 7% for buyer, 10% for personal
+    'proof_id' => 'unique_proof_id',  // Format: product_id_timestamp
+    'role' => 'seller|buyer|personal',
+    'scan_status' => 'pending|confirmed',
+    'scan_type' => 'proof|checkout',
+    'status' => 'pending',
+    'timestamp' => 'ISO_8601_timestamp',
+    'trade_value' => 10.30,  // Base trade value in USD
+    'trade_value_usd' => 0,  // Calculated trade value
+    'treasury_distributed' => 0.309,  // Percentage of trade value
+    'treasury_reminder' => 0,
+    'user_id' => 813,
+    'xp_reminder' => 0,
+    'xp_units' => 0.006489,  // XP earned
+    'yam_reminder' => 0,
+    'yam_value' => 6489,  // YAM equivalent
+    'buyer_id' => 813,  // For buyer entries
+    'seller_id' => 812   // For buyer entries (if matched)
+)</code></pre>
+
+    <h4>1.2 WordPress Options Table (wp_options)</h4>
+    <p>The system maintains a centralized treasury reminder data in the <code>wp_options</code> table:</p>
+    <ul>
+        <li><strong>Option Name</strong>: <code>treasury_reminder</code></li>
+        <li><strong>Option Value</strong>: Serialized array of all treasury entries across all users</li>
+    </ul>
+
+    <p><strong>Purpose:</strong></p>
+    <ul>
+        <li>Centralized tracking of all transactions</li>
+        <li>Cross-user matching (seller-buyer pairs)</li>
+        <li>Treasury distribution calculations</li>
+        <li>Leaderboard rankings</li>
+    </ul>
+
+    <h2>2. Transaction Flow</h2>
+
+    <h3>2.1 Seller Scan Flow</h3>
+    <ol>
+        <li><strong>QR Code Generation</strong>
+            <ul>
+                <li>Unique <code>proof_id</code> created: <code>{product_id}_{timestamp}</code></li>
+                <li>QR code contains URL with <code>proof_id</code> and <code>scan_type=proof</code></li>
+            </ul>
+        </li>
+        <li><strong>Seller Scans QR Code</strong>
+            <ul>
+                <li>User enters phone number</li>
+                <li>OTP verification via Twilio</li>
+                <li>Duplicate check: Verifies if <code>proof_id</code> already exists in current user's <code>seller_scan</code> usermeta</li>
+                <li>If duplicate: Shows error popup "Product qr is already scanned", prevents data insertion</li>
+            </ul>
+        </li>
+        <li><strong>Data Insertion (if not duplicate)</strong>
+            <ul>
+                <li>Creates entry in <code>seller_scan</code> usermeta</li>
+                <li>Creates entry in <code>treasury_reminder</code> option</li>
+                <li>Initial status: <code>scan_status = 'pending'</code></li>
+                <li>Percentage: 3% of trade value</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>2.2 Buyer Scan Flow</h3>
+    <ol>
+        <li><strong>Buyer Scans Same QR Code</strong>
+            <ul>
+                <li>Uses same <code>proof_id</code> as seller scan</li>
+                <li>OTP verification</li>
+                <li>Duplicate check: Verifies if <code>proof_id</code> exists in current user's <code>buyer_scan</code> usermeta AND <code>scan_status = 'confirmed'</code></li>
+                <li>If duplicate: Shows error popup, prevents data insertion</li>
+            </ul>
+        </li>
+        <li><strong>Matching Logic</strong>
+            <ul>
+                <li>System searches all <code>seller_scan</code> entries across all users</li>
+                <li>Matches by <code>proof_id</code></li>
+                <li>If match found:
+                    <ul>
+                        <li>Updates seller's <code>seller_scan</code> entry: <code>scan_status = 'confirmed'</code>, adds <code>buyer_id</code></li>
+                        <li>Updates seller's entry in <code>treasury_reminder</code>: <code>scan_status = 'confirmed'</code>, adds <code>buyer_id</code></li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li><strong>Buyer Data Insertion</strong>
+            <ul>
+                <li>Creates entry in <code>buyer_scan</code> usermeta</li>
+                <li>Creates entry in <code>treasury_reminder</code> option</li>
+                <li>Status: <code>scan_status = 'confirmed'</code> (if seller matched)</li>
+                <li>Percentage: 7% of trade value</li>
+                <li>Includes <code>buyer_id</code> (own user_id) and <code>seller_id</code> (matched seller's user_id)</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>2.3 Personal Scan Flow</h3>
+    <ol>
+        <li><strong>Personal User Scans QR Code</strong>
+            <ul>
+                <li>OTP verification</li>
+                <li>Duplicate check: Verifies if <code>proof_id</code> exists in current user's <code>personal_scan</code> usermeta</li>
+                <li>If duplicate: Shows error popup, prevents data insertion</li>
+            </ul>
+        </li>
+        <li><strong>Data Insertion</strong>
+            <ul>
+                <li>Creates entry in <code>personal_scan</code> usermeta</li>
+                <li>Creates entry in <code>treasury_reminder</code> option</li>
+                <li>Status: <code>scan_status = 'confirmed'</code> (always confirmed for personal)</li>
+                <li>Percentage: 10% of trade value</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>3. Calculation Formulas</h2>
+
+    <h3>3.1 Trade Value Calculation</h3>
+    <p><strong>Base Trade Value:</strong> $10.30 USD per transaction</p>
+    <p><strong>Trade Value Distribution:</strong></p>
+    <ul>
+        <li>Seller: 3% of $10.30 = $0.309</li>
+        <li>Buyer: 7% of $10.30 = $0.721</li>
+        <li>Personal: 10% of $10.30 = $1.03</li>
+    </ul>
+
+    <h3>3.2 YAM Token Calculation</h3>
+    <p><strong>Conversion Rate:</strong> 21,000 YAM = $1 USD</p>
+    <p><strong>Formula:</strong></p>
+    <pre><code>YAM Value = (Trade Value USD × Percentage) × 21,000</code></pre>
+    <p><strong>Examples:</strong></p>
+    <ul>
+        <li>Seller: ($0.309) × 21,000 = 6,489 YAM</li>
+        <li>Buyer: ($0.721) × 21,000 = 15,141 YAM</li>
+        <li>Personal: ($1.03) × 21,000 = 21,630 YAM</li>
+    </ul>
+
+    <h3>3.3 XP (Experience Points) Calculation</h3>
+    <p><strong>Conversion Rate:</strong> 1 YAM = 0.000001 XP (1 million YAM = 1 XP)</p>
+    <p><strong>Formula:</strong></p>
+    <pre><code>XP Units = YAM Value × 0.000001</code></pre>
+    <p><strong>Examples:</strong></p>
+    <ul>
+        <li>Seller: 6,489 YAM × 0.000001 = 0.006489 XP</li>
+        <li>Buyer: 15,141 YAM × 0.000001 = 0.015141 XP</li>
+        <li>Personal: 21,630 YAM × 0.000001 = 0.02163 XP</li>
+    </ul>
+
+    <h3>3.4 Reverse Calculations</h3>
+    <ul>
+        <li><strong>From YAM to USD:</strong> <code>USD = YAM / 21,000</code></li>
+        <li><strong>From XP to YAM:</strong> <code>YAM = XP / 0.000001</code></li>
+        <li><strong>From XP to USD:</strong> <code>USD = (XP / 0.000001) / 21,000</code></li>
+    </ul>
+
+    <h2>4. Status Management</h2>
+
+    <h3>4.1 Scan Status Values</h3>
+    <ul>
+        <li><strong>pending</strong>: Initial status for seller scans, waiting for buyer confirmation</li>
+        <li><strong>confirmed</strong>: Status after buyer scan matches seller, or for personal scans</li>
+    </ul>
+
+    <h3>4.2 Status Transitions</h3>
+    <ul>
+        <li><strong>Seller:</strong> Initial: <code>pending</code> → After buyer match: <code>confirmed</code></li>
+        <li><strong>Buyer:</strong> If seller matched: <code>confirmed</code> | If no seller match: <code>pending</code> (rare case)</li>
+        <li><strong>Personal:</strong> Always: <code>confirmed</code></li>
+    </ul>
+
+    <h2>5. Duplicate Prevention</h2>
+
+    <h3>5.1 Seller Scan Duplicate Check</h3>
+    <p><strong>Location:</strong> <code>ct_validate_twilio_otp()</code> function</p>
+    <p><strong>Logic:</strong> Check current user's <code>seller_scan</code> usermeta for existing <code>proof_id</code></p>
+    <p><strong>Response:</strong> Returns success with "warning" flag, shows error popup, allows login but prevents data insertion</p>
+
+    <h3>5.2 Buyer Scan Duplicate Check</h3>
+    <p><strong>Logic:</strong> Check current user's <code>buyer_scan</code> usermeta for existing <code>proof_id</code> AND <code>scan_status = 'confirmed'</code></p>
+
+    <h3>5.3 Personal Scan Duplicate Check</h3>
+    <p><strong>Logic:</strong> Check current user's <code>personal_scan</code> usermeta for existing <code>proof_id</code></p>
+
+    <h2>6. Treasury Reminder Update Logic</h2>
+
+    <h3>6.1 Duplicate Prevention in Treasury Reminder</h3>
+    <p><strong>Location:</strong> <code>ct_insert_scan_data()</code> function</p>
+    <p><strong>Logic:</strong> Check for existing entry by <code>proof_id</code> and <code>role</code>. Update existing entry instead of creating duplicate.</p>
+
+    <h3>6.2 Seller-Buyer Matching in Treasury Reminder</h3>
+    <p><strong>When Buyer Scans:</strong></p>
+    <ol>
+        <li>Search <code>treasury_reminder</code> for seller entry with matching <code>proof_id</code> and <code>role='seller'</code></li>
+        <li>Update seller entry: <code>scan_status = 'confirmed'</code>, add <code>buyer_id</code></li>
+        <li>Create/update buyer entry with <code>seller_id</code> reference</li>
+    </ol>
+
+    <h2>7. Wallet Display System</h2>
+
+    <h3>7.1 Data Retrieval</h3>
+    <p><strong>Location:</strong> <code>content-detente-wallet.php</code> template</p>
+    <p><strong>Process:</strong></p>
+    <ol>
+        <li>Retrieve data from three usermeta keys: <code>seller_scan</code>, <code>buyer_scan</code>, <code>personal_scan</code></li>
+        <li>Unserialize data using <code>maybe_unserialize()</code></li>
+        <li>Combine all entries into single array</li>
+    </ol>
+
+    <h3>7.2 Calculations</h3>
+    <ul>
+        <li><strong>Total XP:</strong> Sum of all <code>xp_units</code> from confirmed scans</li>
+        <li><strong>Total YAM:</strong> Sum of all <code>yam_value</code> from confirmed scans</li>
+        <li><strong>Total Trade Value USD:</strong> Sum of all <code>trade_value_usd</code> or calculate from YAM: <code>total_yam / 21000</code></li>
+        <li><strong>Confirmed Deliveries:</strong> Count of entries where <code>scan_status = 'confirmed'</code></li>
+    </ul>
+
+    <h3>7.3 Role Breakdown</h3>
+    <ul>
+        <li><strong>Buyer (7%):</strong> Sum XP, YAM, and count from buyer entries</li>
+        <li><strong>Seller (3%):</strong> Sum XP, YAM, and count from seller entries</li>
+        <li><strong>Personal (10%):</strong> Sum XP, YAM, and count from personal entries</li>
+    </ul>
+
+    <h3>7.4 Leaderboard Calculation</h3>
+    <p><strong>Process:</strong></p>
+    <ol>
+        <li>Query all usermeta entries for <code>seller_scan</code>, <code>buyer_scan</code>, <code>personal_scan</code></li>
+        <li>For each user, sum XP from confirmed scans</li>
+        <li>Sort users by total XP (descending)</li>
+        <li>Calculate user's rank position</li>
+    </ol>
+
+    <h2>8. Transaction History Table</h2>
+
+    <h3>8.1 Display Fields</h3>
+    <ol>
+        <li><strong>Date:</strong> Formatted from <code>timestamp</code> or <code>date</code> field</li>
+        <li><strong>Proof ID:</strong> Unique identifier (<code>product_id_timestamp</code>)</li>
+        <li><strong>Role:</strong> Displayed as "Seller (3%)", "Buyer (7%)", or "Personal (10%)"</li>
+        <li><strong>Trade Value:</strong> USD amount (from <code>trade_value_usd</code> or calculated from YAM)</li>
+        <li><strong>XP Minted:</strong> XP units earned</li>
+        <li><strong>YAM:</strong> YAM token equivalent</li>
+        <li><strong>Status:</strong> Badge showing <code>pending</code> or <code>confirmed</code></li>
+    </ol>
+
+    <h3>8.2 Sorting</h3>
+    <p>Sorted by timestamp (newest first). Handles both ISO format (<code>2025-11-06T05:11:03.506Z</code>) and MySQL format.</p>
+
+    <h2>9. Key Functions</h2>
+
+    <h3>9.1 OTP Validation</h3>
+    <p><strong>Function:</strong> <code>ct_validate_twilio_otp()</code></p>
+    <ul>
+        <li>Validates OTP code</li>
+        <li>Performs duplicate checks</li>
+        <li>Returns nonce for login</li>
+        <li>Returns warning flag if duplicate found</li>
+    </ul>
+
+    <h3>9.2 Scan Data Insertion</h3>
+    <p><strong>Function:</strong> <code>ct_insert_scan_data()</code></p>
+    <ul>
+        <li>Inserts data into usermeta</li>
+        <li>Updates treasury_reminder option</li>
+        <li>Handles seller-buyer matching</li>
+        <li>Prevents duplicates</li>
+    </ul>
+
+    <h3>9.3 QR Code Generation</h3>
+    <p><strong>Function:</strong> <code>ct_generate_qr_code()</code> (in <code>cpm-dongtrader-functions.php</code>)</p>
+    <ul>
+        <li>Creates unique <code>proof_id</code> with timestamp</li>
+        <li>Generates QR code via QR Tiger API</li>
+        <li>Embeds URL with <code>proof_id</code> and <code>scan_type</code></li>
+    </ul>
+
+    <h2>10. Data Flow Diagram</h2>
+    <pre><code>QR Code Scan
+    ↓
+OTP Verification
+    ↓
+Duplicate Check (usermeta)
+    ↓
+[If Duplicate] → Error Popup → Login (no data insertion)
+    ↓
+[If Not Duplicate]
+    ↓
+Insert to Usermeta (seller_scan/buyer_scan/personal_scan)
+    ↓
+Update/Create Treasury Reminder Entry (wp_options)
+    ↓
+[If Buyer Scan] → Match Seller → Update Seller Entry
+    ↓
+Display Transaction in Wallet</code></pre>
+
+    <h2>11. Important Notes</h2>
+
+    <h3>11.1 LAUGH Mode</h3>
+    <ul>
+        <li>Trade credits only until August 31, 2026</li>
+        <li>No money moves — trade value accrues until August 31, 2030</li>
+        <li>XP represents verified 2-scan Proofs of Delivery</li>
+    </ul>
+
+    <h3>11.2 PBTV Eligibility</h3>
+    <ul>
+        <li>Top 30 XP wallets on August 11, 2026</li>
+        <li>Receive PBTV NFT minting authority for Detente 2030</li>
+    </ul>
+
+    <h3>11.3 Proof ID Format</h3>
+    <ul>
+        <li>Format: <code>{product_id}_{timestamp}</code></li>
+        <li>Example: <code>5665_1762405744</code></li>
+        <li>Ensures uniqueness for each QR code generation</li>
+    </ul>
+
+    <h3>11.4 Data Consistency</h3>
+    <ul>
+        <li>Usermeta stores user-specific scan data</li>
+        <li>Treasury reminder stores centralized transaction data</li>
+        <li>Both are updated simultaneously to maintain consistency</li>
+        <li>Duplicate prevention ensures data integrity</li>
+    </ul>
+
+    <h2>12. Error Handling</h2>
+
+    <h3>12.1 Duplicate Scan Error</h3>
+    <ul>
+        <li><strong>Message:</strong> "Product qr is already scanned"</li>
+        <li><strong>Action:</strong> Show error popup, allow login, prevent data insertion</li>
+        <li><strong>Flag:</strong> <code>window.skipScanDataInsertion = true</code></li>
+    </ul>
+
+    <h3>12.2 Missing Data</h3>
+    <ul>
+        <li>Default values used for missing fields</li>
+        <li>Trade value defaults to $10.30</li>
+        <li>Status defaults to 'pending'</li>
+    </ul>
+
+    <h2>13. Database Queries</h2>
+
+    <h3>13.1 Retrieve User Scan Data</h3>
+    <pre><code>get_user_meta($user_id, 'seller_scan', true);
+get_user_meta($user_id, 'buyer_scan', true);
+get_user_meta($user_id, 'personal_scan', true);</code></pre>
+
+    <h3>13.2 Retrieve Treasury Reminder</h3>
+    <pre><code>get_option('treasury_reminder', array());</code></pre>
+
+    <h3>13.3 Update Treasury Reminder</h3>
+    <pre><code>update_option('treasury_reminder', $treasury_data);</code></pre>
+
+    <h3>13.4 Leaderboard Query</h3>
+    <pre><code>SELECT user_id, meta_key, meta_value 
+FROM wp_usermeta 
+WHERE meta_key IN ('seller_scan', 'buyer_scan', 'personal_scan')</code></pre>
+
+    <h2>14. File Locations</h2>
+
+    <h3>14.1 Core Files</h3>
+    <ul>
+        <li><strong>OTP & Scan Logic:</strong> <code>wp-content/plugins/cpm-twilio/twilio-main.php</code></li>
+        <li><strong>QR Generation:</strong> <code>wp-content/plugins/cpm-dongtrader/inc/cpm-dongtrader-functions.php</code></li>
+        <li><strong>Wallet Template:</strong> <code>wp-content/plugins/cpm-dongtrader/template-parts/content-detente-wallet.php</code></li>
+        <li><strong>Frontend JS:</strong> <code>wp-content/plugins/cpm-twilio/assets/js/cpm-twilio-script.js</code></li>
+    </ul>
+
+    <h3>14.2 Database Tables</h3>
+    <ul>
+        <li><strong>Usermeta:</strong> <code>wp_usermeta</code> (WordPress core table)</li>
+        <li><strong>Options:</strong> <code>wp_options</code> (WordPress core table)</li>
+    </ul>
+
+    <h2>15. Future Enhancements</h2>
+
+    <h3>15.1 Potential Improvements</h3>
+    <ul>
+        <li>Export transaction history to CSV</li>
+        <li>Real-time XP balance updates</li>
+        <li>Transaction filtering by role/date/status</li>
+        <li>Detailed transaction view modal</li>
+        <li>XP transfer between users (if needed)</li>
+        <li>Treasury analytics dashboard</li>
+    </ul>
+
+    <h3>15.2 Performance Optimization</h3>
+    <ul>
+        <li>Cache treasury reminder data</li>
+        <li>Index optimization for usermeta queries</li>
+        <li>Batch processing for leaderboard calculations</li>
+    </ul>
+
+    <div class="footer">
+        <p><strong>Document Version:</strong> 1.0</p>
+        <p><strong>Last Updated:</strong> 2025-01-06</p>
+        <p><strong>Author:</strong> Treasury Framework Documentation</p>
+    </div>
+</body>
+</html>
+
+

@@ -402,10 +402,13 @@ function dong_exporter_order_csv_endpoint_content_old()
 add_action('template_redirect', 'dongtraders_product_link_with_membership_goes_checkoutpage');
 function dongtraders_product_link_with_membership_goes_checkoutpage()
 {
-    if (class_exists('WooCommerce')) {
-        if (is_product()) {
+    if (class_exists('WooCommerce') && function_exists('WC') && WC()->cart) {
+        if (function_exists('is_product') && is_product()) {
             WC()->cart->empty_cart();
             global $product;
+            if (!is_object($product) || !method_exists($product, 'get_id')) {
+                return;
+            }
             $checkout_url = wc_get_checkout_url();
             $product_id = $product->get_id();
             if (!empty(($_GET['add']))) {
@@ -430,10 +433,12 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
                 $check_add_varition_product = $_GET['varid'];
                 $variation = wc_get_product($check_add_varition_product);
 
-                if ($variation) {
-                    // Use proper method to get parent ID
+                if ($variation && is_object($variation)) {
                     $parent_id = $variation->get_parent_id();
                     $product = wc_get_product($parent_id);
+                    if (!$product || !is_object($product)) {
+                        return;
+                    }
 
                     $get_quantity_yam = dongtraders_set_product_quantity($parent_id);
 
@@ -443,7 +448,6 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
                         WC()->cart->add_to_cart($check_add_varition_product);
                     }
 
-
                     wp_redirect($checkout_url);
                     exit();
                 } else {
@@ -452,26 +456,9 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
                 }
             }
         }
-        if (isset($_GET['multiple-items'])) {
+        if (isset($_GET['multiple-items']) && function_exists('WC') && WC()->cart) {
 
-            // if(is_user_logged_in()){
-
-            //     $user_id = get_current_user_id();
-            //     $membership_level = pmpro_getMembershipLevelForUser($user_id);
-            //     $memberhip_name = strtolower($memberships_level->name);
-
-            //     if($memberhip_name == 'patron' || $memberhip_name == 'megavoter'){
-
-
-            //     }
-            // }
-
-            $checkout_url = wc_get_checkout_url();
-
-            // if(isset($_GET['membershipType'])){
-
-            //     $checkout_url =  $checkout_url .'?membership_type='.$_GET['membershipType'];
-            // }
+            $checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout');
 
             WC()->cart->empty_cart();
 
@@ -496,21 +483,11 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
             wp_redirect($checkout_url);
             exit();
         }
-        
-        // Handle YAMer direct checkout
-        if (isset($_GET['yamer']) && $_GET['yamer'] == '1') {
-            $checkout_url = wc_get_checkout_url();
-            
-            // Clear cart
+        if (isset($_GET['yamer']) && $_GET['yamer'] == '1' && function_exists('WC') && WC()->cart) {
+            $checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout');
             WC()->cart->empty_cart();
-            
-            // Add a free YAMer product
-            $yamer_product_id = 5348; // Your YAMer product ID
-            
-            // Try multiple approaches to add product to cart
+            $yamer_product_id = 5348;
             $product_added = false;
-            
-            // Method 1: Standard WooCommerce method
             $product = wc_get_product($yamer_product_id);
             if ($product) {
                 $cart_result = WC()->cart->add_to_cart($yamer_product_id, 1);
@@ -523,30 +500,11 @@ function dongtraders_product_link_with_membership_goes_checkoutpage()
             } else {
                 error_log('YAMer product ID 5348 not found');
             }
-            
-            // Method 2: If standard method failed, try direct database approach
             if (!$product_added) {
-                // Force add to cart using WooCommerce session
                 WC()->cart->add_to_cart($yamer_product_id, 1);
                 WC()->cart->calculate_totals();
                 error_log('YAMer: Attempted force add to cart');
             }
-            
-            // Method 3: If still empty, create a temporary product
-            if (WC()->cart->is_empty()) {
-                // Create a simple virtual product on the fly
-                $temp_product = new WC_Product_Simple();
-                $temp_product->set_name('YAMer Free Membership');
-                $temp_product->set_price(0);
-                $temp_product->set_regular_price(0);
-                $temp_product->set_virtual(true);
-                $temp_product->set_status('publish');
-                $temp_product->save();
-                
-                WC()->cart->add_to_cart($temp_product->get_id(), 1);
-                error_log('YAMer: Created temporary product with ID: ' . $temp_product->get_id());
-            }
-            
             wp_redirect($checkout_url);
             exit();
         }

@@ -277,7 +277,7 @@ $seven_percent_total_funded = 0;
 				$usd_total = 0;
 
 				$yam_total = dongtrader_xp_to_yam($grand_total_xp);
-				$usd_total = $yam_total / 21000;
+				$usd_total = $yam_total; // 1 YAM = 1 USD (new conversion rate)
 				
 				?>
 			</tbody>
@@ -313,8 +313,8 @@ $seven_percent_total_funded = 0;
 				<div>
 					<p style="margin: 8px 0;">
 						<strong style="color: #2c3e50;">Conversion Rates:</strong><br>
-						<small style="color: #2c3e50;">1 USD = 21,000 YAM</small><br>
-						<small style="color: #2c3e50;">1 YAM = $0.0000476 USD</small><br>
+						<small style="color: #2c3e50;">1 USD = 1 YAM (new conversion rate)</small><br>
+						<small style="color: #2c3e50;">1 YAM = 1 USD</small><br>
 						<small style="color: #2c3e50;">1 YAM = <?php echo number_format(dongtrader_xp_per_yam(), 0); ?> XP</small><br>
 						<small style="color: #2c3e50;">1 USD = <?php echo number_format(dongtrader_xp_per_dollar(), 0); ?> XP</small>
 					</p>
@@ -328,7 +328,7 @@ $seven_percent_total_funded = 0;
 			
 			<?php
 			// Calculate correct XP to YAM conversion using helper functions
-			$xp_per_yam = dongtrader_xp_per_yam(); // 47,619,047,619,047,619 XP per YAM (10^21 / 21,000)
+			$xp_per_yam = dongtrader_xp_per_yam(); // 10^23 XP per YAM (1 YAM = 1 USD = 10^23 XP)
 			$xp_to_yam = dongtrader_xp_to_yam($grand_total_xp);
 			
 			// Calculate patronage split (10% total of gross) using helper functions
@@ -342,7 +342,7 @@ $seven_percent_total_funded = 0;
 					<p style="margin: 8px 0;">
 						<strong style="color: #2c3e50;">YAM Tokens:</strong><br>
 						<span style="color: #e67e22; font-size: 18px; font-weight: bold;"><?php echo number_format($yam_total, 0); ?> YAM</span><br>
-						<small style="color: #2c3e50;">Value: $<?php echo number_format($yam_total / 21000, 0); ?> USD</small><br>
+						<small style="color: #2c3e50;">Value: $<?php echo number_format($yam_total, 0); ?> USD</small><br>
 						<small style="color: #2c3e50;">XP Value: <?php echo number_format($yam_total * $xp_per_yam, 0); ?> XP</small>
 					</p>
 				</div>
@@ -351,7 +351,7 @@ $seven_percent_total_funded = 0;
 					<p style="margin: 8px 0;">
 						<strong style="color: #2c3e50;">USD Value:</strong><br>
 						<span style="color: #2c3e50; font-size: 18px; font-weight: bold;">$<?php echo number_format($usd_total, 0); ?> USD</span><br>
-						<small style="color: #2c3e50;">Equivalent: <?php echo number_format($usd_total * 21000, 0); ?> YAM</small><br>
+						<small style="color: #2c3e50;">Equivalent: <?php echo number_format($usd_total, 0); ?> YAM</small><br>
 						<small style="color: #2c3e50;">XP Value: <?php echo number_format(dongtrader_usd_to_xp($usd_total), 0); ?> XP</small>
 					</p>
 				</div>
