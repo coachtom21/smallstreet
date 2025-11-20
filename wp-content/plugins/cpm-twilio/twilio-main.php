@@ -563,8 +563,13 @@ function ct_insert_scan_data() {
         }
     }
     
+    // Generate unique random ID for this transaction
+    // Format: timestamp_randomstring (e.g., 67890abc12345_A1b2C3d4)
+    $random_id = uniqid('', true) . '_' . strtolower(wp_generate_password(8, false));
+    
     // Prepare the data to insert (only include the fields specified by user)
     $new_scan_entry = array(
+        'id' => $random_id,
         'delivery_proof' => isset($scan_data['delivery_proof']) ? $scan_data['delivery_proof'] : 'yes',
         'discord_join' => isset($scan_data['discord_join']) ? (bool)$scan_data['discord_join'] : false,
         'mega-mobile' => isset($scan_data['mega-mobile']) ? $scan_data['mega-mobile'] : '',

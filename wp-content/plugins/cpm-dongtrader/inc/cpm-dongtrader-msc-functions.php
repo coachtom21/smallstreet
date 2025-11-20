@@ -1099,32 +1099,32 @@ function add_custom_tab_to_my_account()
         ],
 
         [
+            'name' => __('Redemption', 'cpm-dongtrader'),
+            'slug' => 'redemption',
+            'position' => 4,
+        ],
+
+        [
             'name' => __('My Treasury', 'cpm-dongtrader'),
             'slug' => 'detente-treasury',
-            'position' => 4,
+            'position' => 5,
         ],
 
         [
             'name' => __('Group', 'cpm-dongtrader'),
             'slug' => 'detente-group',
-            'position' => 5,
+            'position' => 6,
         ],
 
         [
             'name' => __('Seller Income', 'cpm-dongtrader'),
             'slug' => 'detente-commission',
-            'position' => 6,
+            'position' => 7,
         ],
 
         [
             'name' => __('POC Pooling', 'cpm-dongtrader'),
             'slug' => 'poc-pooling',
-            'position' => 7,
-        ],
-
-        [
-            'name' => __('Redemption', 'cpm-dongtrader'),
-            'slug' => 'redemption',
             'position' => 8,
         ],
     ];

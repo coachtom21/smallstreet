@@ -477,14 +477,20 @@ function handle_discord_user_insert($request)
         return new WP_Error('missing_fields', 'Discord ID and email are required', ['status' => 400]);
     }
 
+    // Validate that id is provided
+    if (empty($params['id'])) {
+        return new WP_Error('missing_fields', 'ID is required', ['status' => 400]);
+    }
+
     // Get user by email
     $user = get_user_by('email', sanitize_email($params['email']));
     if (!$user) {
         return new WP_Error('user_not_found', 'User with this email not found', ['status' => 404]);
     }
-
+    
     // Sanitize and prepare data
     $discord_entry = [
+        'id' => sanitize_text_field($params['id']),
         'discord_id' => sanitize_text_field($params['discord_id']),
         'discord_username' => isset($params['discord_username']) ? sanitize_text_field($params['discord_username']) : '',
         'discord_display_name' => isset($params['discord_display_name']) ? sanitize_text_field($params['discord_display_name']) : '',
@@ -1441,7 +1447,7 @@ function dongtrader_redemption_admin_page() {
                                 <strong><?php echo esc_html($user_name); ?></strong><br>
                                 <small><?php echo esc_html($user_email); ?></small>
                             </td>
-                            <td><?php echo number_format($redemption->xp_redem); ?></td>
+                            <td><?php echo format_xp_scientific_admin($redemption->xp_redem); ?></td>
                             <td><?php echo number_format($redemption->yam_redem, 2); ?></td>
                             <td>$<?php echo number_format($redemption->usd_redem, 2); ?></td>
                             <td><?php echo esc_html($redemption->payment_method); ?></td>
@@ -1736,12 +1742,12 @@ function dongtrader_redemption_admin_page() {
         document.addEventListener('submit', function(e) {
             var form = e.target;
             if (form && form.querySelector('button[name="update_status"]')) {
-                var statusSelect = form.querySelector('select[name="new_status"]');
+                var statusInput = form.querySelector('input[name="new_status"]');
                 var paymentMethodInput = form.querySelector('input[name="payment_method"]');
                 var redemptionIdInput = form.querySelector('input[name="redemption_id"]');
                 
                 // If status is "completed" and payment method exists, prevent submission and open payment gateway
-                if (statusSelect && statusSelect.value === 'completed' && paymentMethodInput && paymentMethodInput.value) {
+                if (statusInput && statusInput.value === 'completed' && paymentMethodInput && paymentMethodInput.value) {
                     e.preventDefault(); // Prevent form submission
                     e.stopPropagation();
                     
@@ -1767,7 +1773,7 @@ function dongtrader_redemption_admin_page() {
                                     window.pendingRedemptionUpdate = {
                                         form: form,
                                         redemptionId: redemptionIdInput.value,
-                                        status: statusSelect.value,
+                                        status: statusInput.value,
                                         adminNotes: adminNotesTextarea ? adminNotesTextarea.value : ''
                                     };
                                 } else {
@@ -1831,6 +1837,78 @@ function dongtrader_redemption_admin_page() {
 }
 
 /**
+ * Format number in scientific notation (for XP display)
+ */
+function format_xp_scientific_admin($num) {
+    if ($num == 0 || $num === null) {
+        return '0';
+    }
+    
+    // Convert to string to handle very large integers
+    $num_str = (string)$num;
+    
+    // Remove any decimal point and trailing zeros if it's a float
+    if (strpos($num_str, '.') !== false) {
+        $num_str = rtrim($num_str, '0');
+        $num_str = rtrim($num_str, '.');
+    }
+    
+    // If the number is small enough, use sprintf
+    if (strlen($num_str) <= 15) {
+        $scientific = sprintf('%.2e', floatval($num_str));
+        $parts = explode('e', $scientific);
+        $mantissa_raw = $parts[0];
+        
+        // Remove trailing zeros
+        if (strpos($mantissa_raw, '.') !== false) {
+            $mantissa = rtrim($mantissa_raw, '0');
+            if (substr($mantissa, -1) === '.') {
+                $mantissa = rtrim($mantissa, '.');
+            }
+        } else {
+            $mantissa = $mantissa_raw;
+        }
+        
+        $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+        
+        if ($exponent == 0) {
+            return $num_str;
+        }
+        
+        return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    }
+    
+    // For very large numbers, calculate scientific notation manually
+    // Remove leading zeros
+    $num_str = ltrim($num_str, '0');
+    if (empty($num_str)) {
+        return '0';
+    }
+    
+    // Get first 3 significant digits for mantissa
+    $mantissa_digits = substr($num_str, 0, 3);
+    
+    // Format mantissa with decimal point after first digit
+    $mantissa = $mantissa_digits[0];
+    if (strlen($mantissa_digits) > 1) {
+        $mantissa .= '.' . substr($mantissa_digits, 1);
+    }
+    
+    // Remove trailing zeros from mantissa
+    if (strpos($mantissa, '.') !== false) {
+        $mantissa = rtrim($mantissa, '0');
+        if (substr($mantissa, -1) === '.') {
+            $mantissa = rtrim($mantissa, '.');
+        }
+    }
+    
+    // Calculate exponent: total digits - 1
+    $exponent = strlen($num_str) - 1;
+    
+    return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+}
+
+/**
  * AJAX handler to get redemption details
  */
 add_action('wp_ajax_get_redemption_details', 'dongtrader_get_redemption_details');
@@ -1860,7 +1938,7 @@ function dongtrader_get_redemption_details() {
     
     $html .= '<div class="detail-row">';
     $html .= '<div class="detail-label">XP Amount:</div>';
-    $html .= '<div class="detail-value">' . number_format($redemption->xp_redem) . '</div>';
+    $html .= '<div class="detail-value">' . format_xp_scientific_admin($redemption->xp_redem) . '</div>';
     $html .= '</div>';
     
     $html .= '<div class="detail-row">';
@@ -1937,14 +2015,12 @@ function dongtrader_get_redemption_details() {
         $html .= '<input type="hidden" name="payment_method" value="' . esc_attr($redemption->payment_method) . '">';
         $html .= '<input type="hidden" name="payment_details" value="' . esc_attr($redemption->payment_details) . '">';
         $html .= '<input type="hidden" name="usd_amount" value="' . esc_attr($redemption->usd_redem) . '">';
+        $html .= '<input type="hidden" name="new_status" value="completed">';
     
-    $html .= '<label for="new_status">Status:</label>';
-    $html .= '<select name="new_status" id="new_status" required>';
-    $html .= '<option value="pending"' . ($redemption->status === 'pending' ? ' selected' : '') . '>Pending</option>';
-    $html .= '<option value="processing"' . ($redemption->status === 'processing' ? ' selected' : '') . '>Processing</option>';
-    $html .= '<option value="completed"' . ($redemption->status === 'completed' ? ' selected' : '') . '>Completed</option>';
-    $html .= '<option value="rejected"' . ($redemption->status === 'rejected' ? ' selected' : '') . '>Rejected</option>';
-    $html .= '</select>';
+    $html .= '<div class="detail-row">';
+    $html .= '<div class="detail-label">Current Status:</div>';
+    $html .= '<div class="detail-value"><span class="status-' . esc_attr($redemption->status) . '">' . esc_html(ucfirst($redemption->status)) . '</span></div>';
+    $html .= '</div>';
     
     $html .= '<label for="admin_notes">Admin Notes:</label>';
     $html .= '<textarea name="admin_notes" id="admin_notes" placeholder="Add notes about this redemption request...">' . esc_textarea($redemption->admin_notes) . '</textarea>';

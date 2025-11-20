@@ -90,8 +90,9 @@ if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
         if (is_array($discord_entry) && !empty($discord_entry)) {
             // NEW CONVERSION: XP is stored directly, or convert from USD if needed
             // If xp_units exists, use it directly (may be string for large numbers)
+            // Keep as string to preserve precision (bigint)
             if (isset($discord_entry['xp_units'])) {
-                $xp_units = is_string($discord_entry['xp_units']) ? floatval($discord_entry['xp_units']) : floatval($discord_entry['xp_units']);
+                $xp_units = is_string($discord_entry['xp_units']) ? $discord_entry['xp_units'] : (string)$discord_entry['xp_units'];
             } elseif (isset($discord_entry['xp_awarded'])) {
                 // Legacy: xp_awarded might be in old YAM format, convert to new XP
                 // Old: 1 XP = 1,000,000 YAM, so divide by 1,000,000
@@ -144,8 +145,9 @@ if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
         
         if (is_array($talent_entry) && !empty($talent_entry)) {
             // NEW CONVERSION: XP is stored directly
+            // Keep as string to preserve precision (bigint)
             if (isset($talent_entry['xp_units'])) {
-                $xp_units = is_string($talent_entry['xp_units']) ? floatval($talent_entry['xp_units']) : floatval($talent_entry['xp_units']);
+                $xp_units = is_string($talent_entry['xp_units']) ? $talent_entry['xp_units'] : (string)$talent_entry['xp_units'];
             } elseif (isset($talent_entry['xp_awarded'])) {
                 // Legacy conversion from YAM
                 $xp_awarded_yam = intval($talent_entry['xp_awarded']);
@@ -156,8 +158,8 @@ if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
             
             // Calculate USD from XP using new conversion
             $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-            // Legacy YAM for display
-            $yam_value = $trade_value_usd * 21000;
+            // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
+            $yam_value = dongtrader_xp_to_yam($xp_units);
             
             $formatted_entry = array(
                 'source' => 'talentshow_entry',
@@ -196,8 +198,9 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
         
         if (is_array($poll_entry) && !empty($poll_entry)) {
             // NEW CONVERSION: XP is stored directly
+            // Keep as string to preserve precision (bigint)
             if (isset($poll_entry['xp_units'])) {
-                $xp_units = is_string($poll_entry['xp_units']) ? floatval($poll_entry['xp_units']) : floatval($poll_entry['xp_units']);
+                $xp_units = is_string($poll_entry['xp_units']) ? $poll_entry['xp_units'] : (string)$poll_entry['xp_units'];
             } elseif (isset($poll_entry['xp_awarded'])) {
                 // Legacy conversion from YAM
                 $xp_awarded_yam = intval($poll_entry['xp_awarded']);
@@ -208,8 +211,8 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
             
             // Calculate USD from XP using new conversion
             $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
-            // Legacy YAM for display
-            $yam_value = $trade_value_usd * 21000;
+            // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
+            $yam_value = $xp_units > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
             
             $formatted_entry = array(
                 'source' => 'discord_poll',
@@ -307,10 +310,11 @@ foreach ($user_treasury_entries as $entry) {
     }
     
     // Get values - NEW CONVERSION: XP is primary, calculate USD from XP
-    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? floatval($entry['xp_units']) : floatval($entry['xp_units'])) : 0;
+    // Keep as string to preserve precision (bigint)
+    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? $entry['xp_units'] : (string)$entry['xp_units']) : '0';
     
     // Calculate trade_value_usd from XP using new conversion
-    if ($xp > 0) {
+    if ($xp !== '0' && $xp !== '' && floatval($xp) > 0) {
         $trade_usd = dongtrader_xp_to_usd($xp);
     } elseif (isset($entry['trade_value_usd']) && floatval($entry['trade_value_usd']) > 0) {
         // Fallback: use stored trade_value_usd if XP not available
@@ -321,7 +325,7 @@ foreach ($user_treasury_entries as $entry) {
         if ($stored_yam > 0) {
             // Convert YAM to XP (1 YAM = 10^23 XP)
             $xp_string = dongtrader_yam_to_xp($stored_yam);
-            $xp = floatval($xp_string);
+            $xp = is_string($xp_string) ? $xp_string : (string)$xp_string;
             $trade_usd = dongtrader_xp_to_usd($xp);
         } else {
             $trade_usd = 0;
@@ -329,7 +333,7 @@ foreach ($user_treasury_entries as $entry) {
     }
     
     // Calculate YAM for display using new conversion (1 YAM = 1 USD = 10^23 XP)
-    $yam = $xp > 0 ? dongtrader_xp_to_yam($xp) : 0;
+    $yam = ($xp !== '0' && $xp !== '' && floatval($xp) > 0) ? dongtrader_xp_to_yam($xp) : 0;
     
     // Base trade value is $10.30
     $trade_val = isset($entry['trade_value']) ? floatval($entry['trade_value']) : 10.30;
@@ -337,24 +341,25 @@ foreach ($user_treasury_entries as $entry) {
     $role = isset($entry['role']) ? strtolower($entry['role']) : '';
     
     // Add to totals (only confirmed entries reach here for seller_scan, buyer_scan, personal_scan)
-    $total_xp += $xp;
+    // Convert to float for addition, but store original string for display
+    $total_xp += floatval($xp);
     $total_yam += $yam;
     $total_trade_value_usd += $trade_usd;
     $total_trade_value += $trade_val;
     
     // Breakdown by role (only confirmed entries for seller_scan, buyer_scan, personal_scan)
     if (strpos($role, 'buyer') !== false || strpos($role, '7%') !== false) {
-        $buyer_xp += $xp;
+        $buyer_xp += floatval($xp);
         $buyer_yam += $yam;
         $buyer_trade_value += $trade_usd;
         $buyer_count++;
     } elseif (strpos($role, 'seller') !== false || strpos($role, '3%') !== false) {
-        $seller_xp += $xp;
+        $seller_xp += floatval($xp);
         $seller_yam += $yam;
         $seller_trade_value += $trade_usd;
         $seller_count++;
     } elseif (strpos($role, 'personal') !== false || strpos($role, '10%') !== false) {
-        $personal_xp += $xp;
+        $personal_xp += floatval($xp);
         $personal_yam += $yam;
         $personal_trade_value += $trade_usd;
         $personal_count++;
@@ -374,7 +379,9 @@ $total_xp_sent = 0;
 $total_xp_received = 0;
 if (is_array($user_transactions)) {
     foreach ($user_transactions as $trans) {
-        $xp_amt = floatval($trans['xp_amount']);
+        // Keep XP as string for precision, convert to float only for calculations
+        $xp_amt_str = is_string($trans['xp_amount']) ? $trans['xp_amount'] : (string)$trans['xp_amount'];
+        $xp_amt = floatval($xp_amt_str);
         $trans_sender_id = intval($trans['sender_id']);
         $trans_receiver_id = intval($trans['receiver_id']);
         
@@ -393,37 +400,83 @@ if ($available_xp < 0) {
     $available_xp = 0;
 }
 
-// Helper function to format numbers in scientific notation (e.g., "1.03 × 10²³")
+// Helper function to format numbers in scientific notation with full precision (e.g., "1.03000000000000004999999999998 × 10²³")
+// Uses string manipulation to preserve precision for large numbers (bigint)
 function format_xp_scientific_wallet($num) {
-    if ($num == 0 || $num === null) {
+    // Convert to string to preserve precision
+    $num_str = is_string($num) ? $num : (string)$num;
+    
+    // Remove any whitespace
+    $num_str = trim($num_str);
+    
+    if ($num_str == '0' || $num_str === '' || $num_str === null) {
         return '0';
     }
-    $scientific = sprintf('%.2e', $num);
-    $parts = explode('e', $scientific);
-    $mantissa_raw = $parts[0];
     
-    // Remove only trailing zeros after decimal point, but preserve decimal places
-    // e.g., "7.21" stays "7.21", "7.20" becomes "7.2", "7.00" becomes "7"
-    if (strpos($mantissa_raw, '.') !== false) {
-        // Has decimal point - remove trailing zeros but keep at least one digit after decimal if non-zero
-        $mantissa = rtrim($mantissa_raw, '0');
-        // If we removed all digits after decimal, remove the decimal point too
-        if (substr($mantissa, -1) === '.') {
-            $mantissa = rtrim($mantissa, '.');
-        }
+    // Handle negative numbers
+    $is_negative = false;
+    if (substr($num_str, 0, 1) === '-') {
+        $is_negative = true;
+        $num_str = substr($num_str, 1);
+    }
+    
+    // Remove leading zeros
+    $num_str = ltrim($num_str, '0');
+    if ($num_str === '' || $num_str === '.') {
+        return '0';
+    }
+    
+    // Check if it's already in scientific notation (e.g., "1.03e+23" or "1.03E23")
+    if (stripos($num_str, 'e') !== false) {
+        $parts = preg_split('/[eE]/', $num_str, 2);
+        $mantissa = trim($parts[0]);
+        $exponent = isset($parts[1]) ? intval(ltrim(trim($parts[1]), '+')) : 0;
+        
+        // Mantissa is already normalized (between 1 and 10), just use it as-is
+        // Keep all digits to show full precision
+        $sign = $is_negative ? '-' : '';
+        return $sign . $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    }
+    
+    // Convert to scientific notation manually
+    $dot_pos = strpos($num_str, '.');
+    
+    if ($dot_pos === false) {
+        // Integer - no decimal point
+        $digits = $num_str;
+        $exponent = strlen($digits) - 1;
+        $mantissa = substr($digits, 0, 1) . '.' . substr($digits, 1);
     } else {
-        $mantissa = $mantissa_raw;
+        // Has decimal point
+        $integer_part = substr($num_str, 0, $dot_pos);
+        $fractional_part = substr($num_str, $dot_pos + 1);
+        
+        if ($integer_part === '' || $integer_part === '0') {
+            // Number less than 1 (e.g., 0.000123)
+            $first_non_zero = strpos($fractional_part, '0') === 0 ? strspn($fractional_part, '0') : 0;
+            $first_digit_pos = $first_non_zero;
+            $first_digit = substr($fractional_part, $first_digit_pos, 1);
+            $remaining = substr($fractional_part, $first_digit_pos + 1);
+            $mantissa = $first_digit . '.' . $remaining;
+            $exponent = -($first_digit_pos + 1);
+        } else {
+            // Number >= 1
+            $first_digit = substr($integer_part, 0, 1);
+            $remaining = substr($integer_part, 1) . $fractional_part;
+            $mantissa = $first_digit . '.' . $remaining;
+            $exponent = strlen($integer_part) - 1;
+        }
     }
     
-    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+    // Remove trailing zeros from mantissa but keep all significant digits
+    // Don't remove zeros - show full precision as requested
+    // $mantissa = rtrim($mantissa, '0');
+    // if (substr($mantissa, -1) === '.') {
+    //     $mantissa = rtrim($mantissa, '.');
+    // }
     
-    // If exponent is 0, just return the integer value
-    if ($exponent == 0) {
-        $base_value = floatval($mantissa);
-        return ($base_value == floor($base_value)) ? (string)intval($base_value) : (string)$base_value;
-    }
-    
-    return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    $sign = $is_negative ? '-' : '';
+    return $sign . $mantissa . ' × 10<sup>' . $exponent . '</sup>';
 }
 
 // Recalculate YAM and USD based on available XP - NEW CONVERSION
@@ -1075,38 +1128,9 @@ $cs = get_woocommerce_currency_symbol();
             <h4><?php esc_html_e('XP Balance', 'cpm-dongtrader'); ?></h4>
             <div class="value">
                 <?php 
-                // Display XP in scientific notation
-                if ($available_xp > 0 && is_numeric($available_xp)) {
-                    $xp_scientific = sprintf('%.2e', (float)$available_xp);
-                    $parts = explode('e', $xp_scientific);
-                    if (count($parts) == 2) {
-                        $mantissa_raw = $parts[0];
-                        
-                        // Remove only trailing zeros after decimal point, but preserve decimal places
-                        if (strpos($mantissa_raw, '.') !== false) {
-                            $mantissa = rtrim($mantissa_raw, '0');
-                            if (substr($mantissa, -1) === '.') {
-                                $mantissa = rtrim($mantissa, '.');
-                            }
-                        } else {
-                            $mantissa = $mantissa_raw;
-                        }
-                        
-                        $exponent = intval($parts[1]);
-                        
-                        // If exponent is 0, just display the integer
-                        if ($exponent == 0) {
-                            $base_value = floatval($mantissa);
-                            echo ($base_value == floor($base_value)) ? esc_html((int)$base_value) : esc_html($base_value);
-                        } else {
-                            echo esc_html($mantissa) . ' × 10<sup>' . esc_html($exponent) . '</sup>';
-                        }
-                    } else {
-                        echo esc_html(number_format($available_xp, 0));
-                    }
-                } else {
-                    echo '0';
-                }
+                // Display XP in scientific notation with full precision (bigint)
+                $available_xp_str = is_string($available_xp) ? $available_xp : (string)$available_xp;
+                echo format_xp_scientific_wallet($available_xp_str);
                 ?>
             </div>
             <div class="sub-value"><?php esc_html_e('Available XP (after transfers)', 'cpm-dongtrader'); ?></div>
@@ -1161,13 +1185,13 @@ $cs = get_woocommerce_currency_symbol();
         
         <div class="wallet-card" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #fecaca;">
             <h4 style="color: #991b1b;"><?php esc_html_e('XP Sent', 'cpm-dongtrader'); ?></h4>
-            <div class="value" style="color: #dc2626;"><?php echo format_xp_scientific_wallet($total_xp_sent); ?></div>
+            <div class="value" style="color: #dc2626;"><?php echo format_xp_scientific_wallet((string)$total_xp_sent); ?></div>
             <div class="sub-value" style="color: #991b1b;"><?php esc_html_e('Total transferred out', 'cpm-dongtrader'); ?></div>
         </div>
         
         <div class="wallet-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #bbf7d0;">
             <h4 style="color: #065f46;"><?php esc_html_e('XP Received', 'cpm-dongtrader'); ?></h4>
-            <div class="value" style="color: #059669;"><?php echo format_xp_scientific_wallet($total_xp_received); ?></div>
+            <div class="value" style="color: #059669;"><?php echo format_xp_scientific_wallet((string)$total_xp_received); ?></div>
             <div class="sub-value" style="color: #065f46;"><?php esc_html_e('Total received from others', 'cpm-dongtrader'); ?></div>
         </div>
     </div>
@@ -1217,27 +1241,9 @@ $cs = get_woocommerce_currency_symbol();
             <div class="role-item buyer">
                 <div class="role-label"><?php esc_html_e('Buyer (7%)', 'cpm-dongtrader'); ?></div>
                 <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $buyer_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
-                    }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
-                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
+                    // Display XP with full precision (bigint)
+                    $buyer_xp_str = (string)$buyer_xp;
+                    echo format_xp_scientific_wallet($buyer_xp_str);
                 ?> XP</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
                     <?php 
@@ -1251,27 +1257,9 @@ $cs = get_woocommerce_currency_symbol();
             <div class="role-item seller">
                 <div class="role-label"><?php esc_html_e('Seller (3%)', 'cpm-dongtrader'); ?></div>
                 <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $seller_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
-                    }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
-                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
+                    // Display XP with full precision (bigint)
+                    $seller_xp_str = (string)$seller_xp;
+                    echo format_xp_scientific_wallet($seller_xp_str);
                 ?> XP</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
                     <?php 
@@ -1285,27 +1273,9 @@ $cs = get_woocommerce_currency_symbol();
             <div class="role-item personal">
                 <div class="role-label"><?php esc_html_e('Personal (10%)', 'cpm-dongtrader'); ?></div>
                 <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $personal_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
-                    }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
-                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
+                    // Display XP with full precision (bigint)
+                    $personal_xp_str = (string)$personal_xp;
+                    echo format_xp_scientific_wallet($personal_xp_str);
                 ?> XP</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
                     <?php 
@@ -1437,8 +1407,8 @@ $cs = get_woocommerce_currency_symbol();
                             $trade_val = $yam;
                         }
                         
-                        // Get XP units
-                        $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+                        // Get XP units - keep as string to preserve precision (bigint)
+                        $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? $entry['xp_units'] : (string)$entry['xp_units']) : '0';
                         
                         // Get status - prioritize scan_status over status
                         $status = 'pending';
@@ -1471,39 +1441,15 @@ $cs = get_woocommerce_currency_symbol();
                         <td><?php echo esc_html($role_display); ?></td>
                         <td>
                             <?php 
-                            // Display XP in scientific notation
-                            $xp_value = 0;
+                            // Display XP in scientific notation with full precision (bigint)
+                            $xp_value_str = '0';
                             if (isset($entry['xp_display_value'])) {
-                                $xp_value = floatval($entry['xp_display_value']);
-                            } else {
-                                $xp_value = $xp;
+                                $xp_value_str = is_string($entry['xp_display_value']) ? $entry['xp_display_value'] : (string)$entry['xp_display_value'];
+                            } elseif (isset($entry['xp_units'])) {
+                                $xp_value_str = is_string($entry['xp_units']) ? $entry['xp_units'] : (string)$entry['xp_units'];
                             }
                             
-                            if ($xp_value > 0) {
-                                $scientific = sprintf('%.2e', $xp_value);
-                                $parts = explode('e', $scientific);
-                                $mantissa_raw = $parts[0];
-                                
-                                // Remove only trailing zeros after decimal point, but preserve decimal places
-                                if (strpos($mantissa_raw, '.') !== false) {
-                                    $mantissa = rtrim($mantissa_raw, '0');
-                                    if (substr($mantissa, -1) === '.') {
-                                        $mantissa = rtrim($mantissa, '.');
-                                    }
-                                } else {
-                                    $mantissa = $mantissa_raw;
-                                }
-                                
-                                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                                if ($exponent == 0) {
-                                    $base_value = floatval($mantissa);
-                                    echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                                } else {
-                                echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                                }
-                            } else {
-                                echo '0';
-                            }
+                            echo format_xp_scientific_wallet($xp_value_str);
                             ?>
                         </td>
                         <td>
