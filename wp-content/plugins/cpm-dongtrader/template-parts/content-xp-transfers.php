@@ -228,10 +228,10 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
     }
 }
 
-// Calculate totals
-$total_xp = 0;
-$total_yam = 0;
-$total_trade_value_usd = 0;
+// Calculate totals (use strings for BCMath precision)
+$total_xp = '0';
+$total_yam = '0';
+$total_trade_value_usd = '0';
 
 // Process each entry
 foreach ($user_treasury_entries as $entry) {
@@ -250,43 +250,54 @@ foreach ($user_treasury_entries as $entry) {
         }
     }
     
-    // Get values - NEW CONVERSION: XP is primary, calculate USD from XP
-    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? floatval($entry['xp_units']) : floatval($entry['xp_units'])) : 0;
-    
+    // Get values - NEW CONVERSION: XP is primary. Use strings and BCMath for precision.
+    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? $entry['xp_units'] : (string)$entry['xp_units']) : '0';
+
     // Calculate trade_value_usd from XP using new conversion
-    if ($xp > 0) {
-        $trade_usd = dongtrader_xp_to_usd($xp);
-    } elseif (isset($entry['trade_value_usd']) && floatval($entry['trade_value_usd']) > 0) {
-        // Fallback: use stored trade_value_usd if XP not available
-        $trade_usd = floatval($entry['trade_value_usd']);
+    if (function_exists('bccomp') && bccomp($xp, '0', 20) === 1) {
+      $trade_usd = dongtrader_xp_to_usd($xp);
+    } elseif (isset($entry['trade_value_usd']) && (string)$entry['trade_value_usd'] !== '' && (function_exists('bccomp') ? bccomp((string)$entry['trade_value_usd'], '0', 20) === 1 : floatval($entry['trade_value_usd']) > 0)) {
+      // Fallback: use stored trade_value_usd if XP not available
+      $trade_usd = (string)$entry['trade_value_usd'];
     } else {
-        // Legacy: calculate from YAM if available
-        $stored_yam = isset($entry['yam_value']) ? floatval($entry['yam_value']) : 0;
-        if ($stored_yam > 0) {
-            // Convert YAM to XP (1 YAM = 10^23 XP)
-            $xp_string = dongtrader_yam_to_xp($stored_yam);
-            $xp = floatval($xp_string);
-            $trade_usd = dongtrader_xp_to_usd($xp);
-        } else {
-            $trade_usd = 0;
-        }
+      // Legacy: calculate from YAM if available
+      $stored_yam = isset($entry['yam_value']) ? (string)$entry['yam_value'] : '0';
+      if (function_exists('bccomp') ? bccomp($stored_yam, '0', 20) === 1 : floatval($stored_yam) > 0) {
+        // Convert YAM to XP (1 YAM = 10^23 XP)
+        $xp_string = dongtrader_yam_to_xp($stored_yam);
+        $xp = (string)$xp_string;
+        $trade_usd = dongtrader_xp_to_usd($xp);
+      } else {
+        $trade_usd = '0';
+      }
     }
-    
+
     // Calculate YAM for display using new conversion (1 YAM = 1 USD = 10^23 XP)
-    $yam = $xp > 0 ? dongtrader_xp_to_yam($xp) : 0;
-    
-    // Add to totals
-    $total_xp += $xp;
-    $total_yam += $yam;
-    $total_trade_value_usd += $trade_usd;
+    $yam = (function_exists('bccomp') && bccomp($xp, '0', 20) === 1) ? dongtrader_xp_to_yam($xp) : '0';
+
+    // Add to totals using BCMath
+    if (function_exists('bcadd')) {
+      $total_xp = bcadd($total_xp, (string)$xp, 20);
+      $total_yam = bcadd($total_yam, (string)$yam, 20);
+      $total_trade_value_usd = bcadd($total_trade_value_usd, (string)$trade_usd, 20);
+    } else {
+      $total_xp += floatval($xp);
+      $total_yam += floatval($yam);
+      $total_trade_value_usd += floatval($trade_usd);
+    }
 }
 
-// Calculate YAM equivalent (1 XP = 1,000,000 YAM)
-$yam_equivalent = $total_xp * 1000000;
-
-// Calculate max and min transfer amounts
-$max_transfer = $total_xp * 0.5; // 50% of balance
-$min_transfer = 0.000001; // Minimum transfer amount
+// Calculate YAM equivalent (1 XP = 1,000,000 YAM) using BCMath when available
+if (function_exists('bcmul')) {
+  $yam_equivalent = bcmul((string)$total_xp, '1000000', 0);
+  // Calculate max and min transfer amounts
+  $max_transfer = bcmul((string)$total_xp, '0.5', 20);
+  $min_transfer = '0.000001';
+} else {
+  $yam_equivalent = floatval($total_xp) * 1000000;
+  $max_transfer = floatval($total_xp) * 0.5;
+  $min_transfer = 0.000001;
+}
 
 // Constants
 $laugh_end_date = '2026-08-31';
@@ -374,33 +385,47 @@ $all_transactions = $wpdb->get_results($wpdb->prepare("
     WHERE sender_id = %d OR receiver_id = %d
 ", $user_id, $user_id), ARRAY_A);
 
-$total_xp_sent = 0;
-$total_xp_received = 0;
+$total_xp_sent = '0';
+$total_xp_received = '0';
 $total_transactions_sent = 0;
 $total_transactions_received = 0;
 
 if (is_array($all_transactions)) {
-    foreach ($all_transactions as $transaction) {
-        $xp_amount = floatval($transaction['xp_amount']);
-        $trans_sender_id = intval($transaction['sender_id']);
-        $trans_receiver_id = intval($transaction['receiver_id']);
-        
-        if ($trans_sender_id === $user_id) {
-            $total_xp_sent += $xp_amount;
-            $total_transactions_sent++;
-        } elseif ($trans_receiver_id === $user_id) {
-            $total_xp_received += $xp_amount;
-            $total_transactions_received++;
-        }
+  foreach ($all_transactions as $transaction) {
+    $xp_amount = isset($transaction['xp_amount']) ? (string)$transaction['xp_amount'] : '0';
+    $trans_sender_id = intval($transaction['sender_id']);
+    $trans_receiver_id = intval($transaction['receiver_id']);
+
+    if ($trans_sender_id === $user_id) {
+      if (function_exists('bcadd')) {
+        $total_xp_sent = bcadd($total_xp_sent, $xp_amount, 20);
+      } else {
+        $total_xp_sent += floatval($xp_amount);
+      }
+      $total_transactions_sent++;
+    } elseif ($trans_receiver_id === $user_id) {
+      if (function_exists('bcadd')) {
+        $total_xp_received = bcadd($total_xp_received, $xp_amount, 20);
+      } else {
+        $total_xp_received += floatval($xp_amount);
+      }
+      $total_transactions_received++;
     }
+  }
 }
 
-// Calculate available XP: (All sources + XP received) - XP transfer
+// Calculate available XP: (All sources + XP received) - XP transfer using BCMath
 // Formula: XP Balance = (_discord_invite + _talentshow_entry + _discord_poll + seller_scan + buyer_scan + personal_scan + xp_received) - xp_transfer
-$available_xp = ($total_xp + $total_xp_received) - $total_xp_sent;
-// Ensure it doesn't go below 0
-if ($available_xp < 0) {
+if (function_exists('bcadd') && function_exists('bcsub')) {
+  $available_xp = bcsub(bcadd((string)$total_xp, (string)$total_xp_received, 20), (string)$total_xp_sent, 20);
+  if (function_exists('bccomp') && bccomp($available_xp, '0', 20) === -1) {
+    $available_xp = '0';
+  }
+} else {
+  $available_xp = ((float)$total_xp + (float)$total_xp_received) - (float)$total_xp_sent;
+  if ($available_xp < 0) {
     $available_xp = 0;
+  }
 }
 
 // Debug: Uncomment to check values
@@ -412,11 +437,16 @@ if ($available_xp < 0) {
 // Recalculate YAM equivalent and USD trade value based on available XP - NEW CONVERSION
 // USD = XP / 10^23 (using new conversion function)
 $available_xp_str = (string)$available_xp;
-$available_usd_trade_value_raw = $available_xp > 0 ? dongtrader_xp_to_usd($available_xp_str) : 0;
-// Convert to float for proper formatting (function may return string for precision)
-$available_usd_trade_value = is_numeric($available_usd_trade_value_raw) ? floatval($available_usd_trade_value_raw) : 0;
-// NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-$available_yam_equivalent = $available_xp > 0 ? dongtrader_xp_to_yam($available_xp_str) : 0;
+if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (!function_exists('bccomp') && floatval($available_xp_str) > 0)) {
+  $available_usd_trade_value_raw = dongtrader_xp_to_usd($available_xp_str);
+  // Convert to float for proper formatting (function may return string for precision)
+  $available_usd_trade_value = is_numeric($available_usd_trade_value_raw) ? floatval($available_usd_trade_value_raw) : 0;
+  // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
+  $available_yam_equivalent = dongtrader_xp_to_yam($available_xp_str);
+} else {
+  $available_usd_trade_value = 0;
+  $available_yam_equivalent = '0';
+}
 ?>
 
 <style>

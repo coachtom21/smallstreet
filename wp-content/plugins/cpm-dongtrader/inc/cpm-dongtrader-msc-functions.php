@@ -1324,7 +1324,10 @@ function dongtrader_send_xp_transfer() {
     
     $sender_id = get_current_user_id();
     $receiver_id = isset($_POST['receiver_id']) ? intval($_POST['receiver_id']) : 0;
-    $xp_amount = isset($_POST['xp_amount']) ? floatval($_POST['xp_amount']) : 0;
+    // Keep the raw xp_amount as a sanitized string to preserve precision
+    $xp_amount_raw = isset($_POST['xp_amount']) ? sanitize_text_field((string)$_POST['xp_amount']) : '0';
+    // Normalized numeric string (strip any unexpected chars but keep decimal/exponent)
+    $xp_amount_str = preg_replace('/[^0-9+\-\.eE]/', '', $xp_amount_raw);
     $memo = isset($_POST['memo']) ? sanitize_text_field($_POST['memo']) : '';
     
     // Validation
@@ -1338,16 +1341,24 @@ function dongtrader_send_xp_transfer() {
         return;
     }
     
-    if ($xp_amount <= 0) {
+    // Validate xp amount string -> must be numeric and > 0
+    if ($xp_amount_str === '' || !is_numeric($xp_amount_str) || floatval($xp_amount_str) <= 0) {
         wp_send_json_error(array('message' => __('Please enter a valid XP amount.', 'cpm-dongtrader')));
         return;
     }
-    
-    // Check minimum transfer (0.000001 XP = 1 YAM)
-    $min_transfer = 0.000001;
-    if ($xp_amount < $min_transfer) {
-        wp_send_json_error(array('message' => sprintf(__('Minimum transfer: %s XP', 'cpm-dongtrader'), number_format($min_transfer, 6))));
-        return;
+
+    // Check minimum transfer (0.000001 XP = 1 YAM) using string-aware comparison
+    $min_transfer_str = '0.000001';
+    if (extension_loaded('bcmath')) {
+        if (bccomp($xp_amount_str, $min_transfer_str, 18) === -1) {
+            wp_send_json_error(array('message' => sprintf(__('Minimum transfer: %s XP', 'cpm-dongtrader'), number_format((float)$min_transfer_str, 6))));
+            return;
+        }
+    } else {
+        if (floatval($xp_amount_str) < (float)$min_transfer_str) {
+            wp_send_json_error(array('message' => sprintf(__('Minimum transfer: %s XP', 'cpm-dongtrader'), number_format((float)$min_transfer_str, 6))));
+            return;
+        }
     }
     
     // Get sender's balance
@@ -1363,15 +1374,17 @@ function dongtrader_send_xp_transfer() {
     if (!is_array($buyer_scan_data)) $buyer_scan_data = array();
     if (!is_array($personal_scan_data)) $personal_scan_data = array();
     
-    $sender_total_xp = 0;
+    // Sum base XP from scans using string-based arithmetic to preserve precision
+    $sender_total_xp_str = '0';
     foreach ($seller_scan_data as $entry) {
         if (is_array($entry) && !empty($entry)) {
             // Skip XP transfer entries - these are already accounted for in transactions table
             if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
                 continue;
             }
-            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
-            $sender_total_xp += $xp;
+            $xp_str = isset($entry['xp_units']) ? (string)$entry['xp_units'] : '0';
+            $xp_str = preg_replace('/[^0-9+\-\.eE]/', '', $xp_str);
+            $sender_total_xp_str = dongtrader_bc_add($sender_total_xp_str, $xp_str, 18);
         }
     }
     foreach ($buyer_scan_data as $entry) {
@@ -1380,8 +1393,9 @@ function dongtrader_send_xp_transfer() {
             if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
                 continue;
             }
-            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
-            $sender_total_xp += $xp;
+            $xp_str = isset($entry['xp_units']) ? (string)$entry['xp_units'] : '0';
+            $xp_str = preg_replace('/[^0-9+\-\.eE]/', '', $xp_str);
+            $sender_total_xp_str = dongtrader_bc_add($sender_total_xp_str, $xp_str, 18);
         }
     }
     foreach ($personal_scan_data as $entry) {
@@ -1390,8 +1404,9 @@ function dongtrader_send_xp_transfer() {
             if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
                 continue;
             }
-            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
-            $sender_total_xp += $xp;
+            $xp_str = isset($entry['xp_units']) ? (string)$entry['xp_units'] : '0';
+            $xp_str = preg_replace('/[^0-9+\-\.eE]/', '', $xp_str);
+            $sender_total_xp_str = dongtrader_bc_add($sender_total_xp_str, $xp_str, 18);
         }
     }
     
@@ -1404,36 +1419,59 @@ function dongtrader_send_xp_transfer() {
         WHERE sender_id = %d OR receiver_id = %d
     ", $sender_id, $sender_id), ARRAY_A);
     
-    $sender_xp_sent = 0;
-    $sender_xp_received = 0;
+    // Sum transactions using string arithmetic
+    $sender_xp_sent_str = '0';
+    $sender_xp_received_str = '0';
     if (is_array($sender_transactions)) {
         foreach ($sender_transactions as $trans) {
-            $xp_amt = floatval($trans['xp_amount']);
+            $xp_amt_str = isset($trans['xp_amount']) ? (string)$trans['xp_amount'] : '0';
+            $xp_amt_str = preg_replace('/[^0-9+\-\.eE]/', '', $xp_amt_str);
             if (intval($trans['sender_id']) === $sender_id) {
-                $sender_xp_sent += $xp_amt;
+                $sender_xp_sent_str = dongtrader_bc_add($sender_xp_sent_str, $xp_amt_str, 18);
             } else {
-                $sender_xp_received += $xp_amt;
+                $sender_xp_received_str = dongtrader_bc_add($sender_xp_received_str, $xp_amt_str, 18);
             }
         }
     }
-    
-    // Calculate available XP: Total XP - Sent + Received
-    $sender_available_xp = $sender_total_xp - $sender_xp_sent + $sender_xp_received;
-    if ($sender_available_xp < 0) {
-        $sender_available_xp = 0;
+
+    // Calculate available XP: Total XP - Sent + Received (string-based)
+    $sender_available_xp_str = dongtrader_bc_sub(dongtrader_bc_add($sender_total_xp_str, $sender_xp_received_str, 18), $sender_xp_sent_str, 18);
+    // If negative, set to zero
+    if (extension_loaded('bcmath')) {
+        if (bccomp($sender_available_xp_str, '0', 18) === -1) {
+            $sender_available_xp_str = '0';
+        }
+    } else {
+        if ((float)$sender_available_xp_str < 0.0) {
+            $sender_available_xp_str = '0';
+        }
     }
     
-    // Check balance sufficiency
-    if ($xp_amount > $sender_available_xp) {
-        wp_send_json_error(array('message' => __('Insufficient balance.', 'cpm-dongtrader')));
-        return;
+    // Check balance sufficiency using string-aware comparison
+    if (extension_loaded('bcmath')) {
+        if (bccomp($xp_amount_str, $sender_available_xp_str, 18) === 1) {
+            wp_send_json_error(array('message' => __('Insufficient balance.', 'cpm-dongtrader')));
+            return;
+        }
+    } else {
+        if ((float)$xp_amount_str > (float)$sender_available_xp_str) {
+            wp_send_json_error(array('message' => __('Insufficient balance.', 'cpm-dongtrader')));
+            return;
+        }
     }
-    
+
     // Check maximum transfer (50% of available balance)
-    $max_transfer = $sender_available_xp * 0.5;
-    if ($xp_amount > $max_transfer) {
-        wp_send_json_error(array('message' => sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format($max_transfer, 6))));
-        return;
+    $max_transfer_str = dongtrader_bc_mul($sender_available_xp_str, '0.5', 18);
+    if (extension_loaded('bcmath')) {
+        if (bccomp($xp_amount_str, $max_transfer_str, 18) === 1) {
+            wp_send_json_error(array('message' => sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format((float)$max_transfer_str, 6))));
+            return;
+        }
+    } else {
+        if ((float)$xp_amount_str > (float)$max_transfer_str) {
+            wp_send_json_error(array('message' => sprintf(__('Maximum transfer: %s XP (50%% of balance)', 'cpm-dongtrader'), number_format((float)$max_transfer_str, 6))));
+            return;
+        }
     }
     
     // Verify receiver exists and is active
@@ -1445,31 +1483,22 @@ function dongtrader_send_xp_transfer() {
     
     global $wpdb;
     $table_name = $wpdb->prefix . 'xp_transactions';
-    
-    // Calculate YAM equivalent (1 XP = 1,000,000 YAM)
-    // Round to whole number since yam_equivalent is decimal(20,0)
-    $yam_equivalent = round($xp_amount * 1000000, 0);
-    
-    // Insert transaction into database
-    // Field order matches table structure:
-    // 1. id (auto-increment, not included)
-    // 2. sender_id (bigint) - %d
-    // 3. receiver_id (bigint) - %d
-    // 4. xp_amount (decimal(20,6)) - %f
-    // 5. yam_equivalent (decimal(20,0)) - %d (whole number)
-    // 6. memo (text) - %s
-    // 7. transaction_date (timestamp) - %s
+
+    // Calculate YAM equivalent using string-aware arithmetic (existing logic: multiply by 1,000,000)
+    $yam_equivalent_str = dongtrader_bc_mul($xp_amount_str, '1000000', 0);
+
+    // Insert transaction into database using string values for decimal fields
     $result = $wpdb->insert(
         $table_name,
         array(
             'sender_id' => $sender_id,
             'receiver_id' => $receiver_id,
-            'xp_amount' => $xp_amount,
-            'yam_equivalent' => $yam_equivalent,
+            'xp_amount' => $xp_amount_str,
+            'yam_equivalent' => $yam_equivalent_str,
             'memo' => $memo,
             'transaction_date' => current_time('mysql')
         ),
-        array('%d', '%d', '%f', '%d', '%s', '%s')
+        array('%d', '%d', '%s', '%s', '%s', '%s')
     );
     
     if ($result === false) {
@@ -1483,11 +1512,23 @@ function dongtrader_send_xp_transfer() {
     // We don't store transfers in personal_scan usermeta to avoid double-counting
     // Balance is calculated dynamically: Base XP from scans - Sent + Received (from transactions table)
     
-    // Send success response
+    // Compute new balance (string-based)
+    $new_balance_str = dongtrader_bc_sub($sender_available_xp_str, $xp_amount_str, 18);
+    if (extension_loaded('bcmath')) {
+        if (bccomp($new_balance_str, '0', 18) === -1) {
+            $new_balance_str = '0';
+        }
+    } else {
+        if ((float)$new_balance_str < 0.0) {
+            $new_balance_str = '0';
+        }
+    }
+
+    // Send success response with string new balance
     wp_send_json_success(array(
         'message' => __('XP transferred successfully!', 'cpm-dongtrader'),
         'transaction_id' => $transaction_id,
-        'new_balance' => $sender_available_xp - $xp_amount
+        'new_balance' => $new_balance_str
     ));
 }
 

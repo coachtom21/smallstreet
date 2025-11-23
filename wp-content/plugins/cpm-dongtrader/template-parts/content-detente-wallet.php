@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Wallet Page Template
  * Displays XP Wallet based on 2-scan Proof of Delivery system
@@ -76,7 +76,7 @@ $discord_invite_raw = get_user_meta($user_id, '_discord_invite', false); // Get 
 if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
     foreach ($discord_invite_raw as $discord_entry_raw) {
         $discord_entry = maybe_unserialize($discord_entry_raw);
-        
+
         // Handle JSON string format
         if (is_string($discord_entry)) {
             $decoded = json_decode($discord_entry, true);
@@ -86,7 +86,7 @@ if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
                 continue;
             }
         }
-        
+
         if (is_array($discord_entry) && !empty($discord_entry)) {
             // NEW CONVERSION: XP is stored directly, or convert from USD if needed
             // If xp_units exists, use it directly (may be string for large numbers)
@@ -101,12 +101,12 @@ if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
             } else {
                 $xp_units = 0;
             }
-            
+
             // Calculate USD from XP using new conversion: USD = XP / 10^23
             $trade_value_usd = dongtrader_xp_to_usd($xp_units);
             // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
             $yam_value = dongtrader_xp_to_yam($xp_units);
-            
+
             $formatted_entry = array(
                 'source' => 'discord_invite',
                 'role' => 'Discord Verification',
@@ -125,13 +125,27 @@ if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
         }
     }
 }
+// Use BCMath-safe formatter when available. Prefer a raw stored string if available to avoid float precision loss.
+$available_xp_raw = get_user_meta($user_id, 'available_xp_raw', true);
+if (!empty($available_xp_raw) && is_string($available_xp_raw)) {
+    $available_xp_str = $available_xp_raw;
+} else {
+    $available_xp_str = isset($available_xp_str) ? $available_xp_str : (string) $available_xp;
+}
+
+// Display with high precision (30 significant digits) so small deltas are visible in the mantissa.
+if ($available_xp_str !== '' && $available_xp_str !== '0') {
+    echo dongtrader_format_decimal_scientific($available_xp_str, 30);
+} else {
+    echo '0';
+}
 
 // Get and add Talent Show entries
 $talentshow_entry_raw = get_user_meta($user_id, '_talentshow_entry', false); // Get all rows
 if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
     foreach ($talentshow_entry_raw as $talent_entry_raw) {
         $talent_entry = maybe_unserialize($talent_entry_raw);
-        
+
         // Handle JSON string format
         if (is_string($talent_entry)) {
             $decoded = json_decode($talent_entry, true);
@@ -141,7 +155,7 @@ if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
                 continue;
             }
         }
-        
+
         if (is_array($talent_entry) && !empty($talent_entry)) {
             // NEW CONVERSION: XP is stored directly
             if (isset($talent_entry['xp_units'])) {
@@ -153,12 +167,12 @@ if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
             } else {
                 $xp_units = 0;
             }
-            
+
             // Calculate USD from XP using new conversion
             $trade_value_usd = dongtrader_xp_to_usd($xp_units);
             // Legacy YAM for display
             $yam_value = $trade_value_usd * 21000;
-            
+
             $formatted_entry = array(
                 'source' => 'talentshow_entry',
                 'role' => 'Talent Show',
@@ -183,7 +197,7 @@ $discord_poll_raw = get_user_meta($user_id, '_discord_poll', false); // Get all 
 if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
     foreach ($discord_poll_raw as $poll_entry_raw) {
         $poll_entry = maybe_unserialize($poll_entry_raw);
-        
+
         // Handle JSON string format
         if (is_string($poll_entry)) {
             $decoded = json_decode($poll_entry, true);
@@ -193,7 +207,7 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
                 continue;
             }
         }
-        
+
         if (is_array($poll_entry) && !empty($poll_entry)) {
             // NEW CONVERSION: XP is stored directly
             if (isset($poll_entry['xp_units'])) {
@@ -205,12 +219,12 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
             } else {
                 $xp_units = 0;
             }
-            
+
             // Calculate USD from XP using new conversion
             $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
             // Legacy YAM for display
             $yam_value = $trade_value_usd * 21000;
-            
+
             $formatted_entry = array(
                 'source' => 'discord_poll',
                 'role' => 'Discord Poll',
@@ -229,18 +243,6 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
     }
 }
 
-// // Debug: Show retrieved data
-// echo '<div style="background: #f3f4f6; padding: 20px; margin: 20px 0; border: 2px solid #10b981; border-radius: 8px;">';
-// echo '<h3 style="color: #065f46; margin-top: 0;">Debug: Usermeta Data Retrieved</h3>';
-// echo '<h4>Seller Scan Data:</h4>';
-// var_dump($seller_scan_data);
-// echo '<h4>Buyer Scan Data:</h4>';
-// var_dump($buyer_scan_data);
-// echo '<h4>Personal Scan Data:</h4>';
-// var_dump($personal_scan_data);
-// echo '<h4>Combined User Treasury Entries:</h4>';
-// var_dump($user_treasury_entries);
-// echo '</div>';
 
 // Calculate totals
 $total_xp = 0;
@@ -273,7 +275,7 @@ foreach ($user_treasury_entries as $entry) {
     if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
         continue;
     }
-    
+
     // For seller_scan, buyer_scan, and personal_scan, only include confirmed entries
     $entry_source = isset($entry['source']) ? $entry['source'] : '';
     if (in_array($entry_source, array('seller_scan', 'buyer_scan', 'personal_scan'))) {
@@ -284,20 +286,22 @@ foreach ($user_treasury_entries as $entry) {
             continue;
         }
     }
-    
+
     // Track unique proof_ids with confirmed status
     // Count personal_scan entries as confirmed deliveries (xp_transfer already excluded above)
     if (isset($entry['source']) && $entry['source'] === 'personal_scan') {
         // Count personal_scan entries as confirmed
-        $proof_id = isset($entry['proof_id']) && !empty($entry['proof_id']) 
-            ? $entry['proof_id'] 
+        $proof_id = isset($entry['proof_id']) && !empty($entry['proof_id'])
+            ? $entry['proof_id']
             : 'personal_' . (isset($entry['timestamp']) ? $entry['timestamp'] : md5(serialize($entry)));
         if (!in_array($proof_id, $confirmed_proof_ids)) {
             $confirmed_proof_ids[] = $proof_id;
             $confirmed_deliveries++;
         }
-    } elseif (isset($entry['proof_id']) && !empty($entry['proof_id']) 
-        && isset($entry['scan_status']) && $entry['scan_status'] === 'confirmed') {
+    } elseif (
+        isset($entry['proof_id']) && !empty($entry['proof_id'])
+        && isset($entry['scan_status']) && $entry['scan_status'] === 'confirmed'
+    ) {
         // Count other entries with confirmed status
         $proof_id = $entry['proof_id'];
         if (!in_array($proof_id, $confirmed_proof_ids)) {
@@ -305,10 +309,9 @@ foreach ($user_treasury_entries as $entry) {
             $confirmed_deliveries++;
         }
     }
-    
+
     // Get values - NEW CONVERSION: XP is primary, calculate USD from XP
-    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? floatval($entry['xp_units']) : floatval($entry['xp_units'])) : 0;
-    
+    $xp = isset($entry['xp_units']) ? ($entry['xp_units']) : 0;
     // Calculate trade_value_usd from XP using new conversion
     if ($xp > 0) {
         $trade_usd = dongtrader_xp_to_usd($xp);
@@ -327,36 +330,35 @@ foreach ($user_treasury_entries as $entry) {
             $trade_usd = 0;
         }
     }
-    
+
     // Calculate YAM for display using new conversion (1 YAM = 1 USD = 10^23 XP)
     $yam = $xp > 0 ? dongtrader_xp_to_yam($xp) : 0;
-    
+
     // Base trade value is $10.30
     $trade_val = isset($entry['trade_value']) ? floatval($entry['trade_value']) : 10.30;
-    
+
     $role = isset($entry['role']) ? strtolower($entry['role']) : '';
-    
     // Add to totals (only confirmed entries reach here for seller_scan, buyer_scan, personal_scan)
-    $total_xp += $xp;
+    $total_xp = bcadd($total_xp, $xp, 30);
     $total_yam += $yam;
     $total_trade_value_usd += $trade_usd;
     $total_trade_value += $trade_val;
-    
+
     // Breakdown by role (only confirmed entries for seller_scan, buyer_scan, personal_scan)
     if (strpos($role, 'buyer') !== false || strpos($role, '7%') !== false) {
-        $buyer_xp += $xp;
-        $buyer_yam += $yam;
+        $buyer_xp = bcadd($buyer_xp, $xp, 20);
+        $buyer_yam = bcadd($buyer_yam, $yam, 20);
         $buyer_trade_value += $trade_usd;
         $buyer_count++;
     } elseif (strpos($role, 'seller') !== false || strpos($role, '3%') !== false) {
-        $seller_xp += $xp;
-        $seller_yam += $yam;
+        $seller_xp = bcadd($seller_xp, $xp, 20);
+        $seller_yam = bcadd($seller_yam, $yam, 20);
         $seller_trade_value += $trade_usd;
         $seller_count++;
     } elseif (strpos($role, 'personal') !== false || strpos($role, '10%') !== false) {
-        $personal_xp += $xp;
-        $personal_yam += $yam;
-        $personal_trade_value += $trade_usd;
+        $personal_xp = bcadd($personal_xp, $xp, 20);
+        $personal_yam = bcadd($personal_yam, $yam, 20);
+        $personal_trade_value = bcadd($personal_trade_value, $trade_usd, 20);
         $personal_count++;
     }
 }
@@ -370,66 +372,103 @@ $user_transactions = $wpdb->get_results($wpdb->prepare("
     WHERE sender_id = %d OR receiver_id = %d
 ", $user_id, $user_id), ARRAY_A);
 
-$total_xp_sent = 0;
-$total_xp_received = 0;
+$total_xp_sent = "0";
+$total_xp_received = "0";
+
 if (is_array($user_transactions)) {
     foreach ($user_transactions as $trans) {
-        $xp_amt = floatval($trans['xp_amount']);
+        $xp_amt = (string) $trans['xp_amount'];
         $trans_sender_id = intval($trans['sender_id']);
         $trans_receiver_id = intval($trans['receiver_id']);
-        
+
         if ($trans_sender_id === $user_id) {
-            $total_xp_sent += $xp_amt;
+            $total_xp_sent = bcadd($total_xp_sent, $xp_amt, 20); // 20 decimal precision
         } elseif ($trans_receiver_id === $user_id) {
-            $total_xp_received += $xp_amt;
+            $total_xp_received = bcadd($total_xp_received, $xp_amt, 20);
         }
     }
 }
 
+
+
 // Calculate available XP: (All sources + XP received) - XP transfer
 // Formula: XP Balance = (_discord_invite + _talentshow_entry + _discord_poll + seller_scan + buyer_scan + personal_scan + xp_received) - xp_transfer
-$available_xp = ($total_xp + $total_xp_received) - $total_xp_sent;
+// $available_xp = ($total_xp + $total_xp_received) - $total_xp_sent;
+$available_xp = bcadd($total_xp, $total_xp_received, 20);
+$available_xp = bcsub($available_xp, $total_xp_sent, 20);
+
 if ($available_xp < 0) {
     $available_xp = 0;
 }
 
+
 // Helper function to format numbers in scientific notation (e.g., "1.03 × 10²³")
-function format_xp_scientific_wallet($num) {
-    if ($num == 0 || $num === null) {
+function format_xp_scientific_wallet($numStr)
+{
+
+    if ($numStr === null)
+        return '0';
+
+    // Force string
+    $numStr = trim((string) $numStr);
+
+    // Zero?
+    if (preg_match('/^0+(\.0+)?$/', $numStr)) {
         return '0';
     }
-    $scientific = sprintf('%.2e', $num);
-    $parts = explode('e', $scientific);
-    $mantissa_raw = $parts[0];
-    
-    // Remove only trailing zeros after decimal point, but preserve decimal places
-    // e.g., "7.21" stays "7.21", "7.20" becomes "7.2", "7.00" becomes "7"
-    if (strpos($mantissa_raw, '.') !== false) {
-        // Has decimal point - remove trailing zeros but keep at least one digit after decimal if non-zero
-        $mantissa = rtrim($mantissa_raw, '0');
-        // If we removed all digits after decimal, remove the decimal point too
-        if (substr($mantissa, -1) === '.') {
-            $mantissa = rtrim($mantissa, '.');
-        }
+
+    // Split integer/decimal parts
+    if (strpos($numStr, ".") !== false) {
+        list($intPart, $decPart) = explode(".", $numStr, 2);
     } else {
-        $mantissa = $mantissa_raw;
+        $intPart = $numStr;
+        $decPart = "";
     }
-    
-    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-    
-    // If exponent is 0, just return the integer value
-    if ($exponent == 0) {
-        $base_value = floatval($mantissa);
-        return ($base_value == floor($base_value)) ? (string)intval($base_value) : (string)$base_value;
+
+    // Remove leading zeros in integer part
+    $intPartTrimmed = ltrim($intPart, "0");
+
+    // Case 1: number >= 1
+    if ($intPartTrimmed !== "") {
+
+        // exponent = digit position
+        $exponent = strlen($intPartTrimmed) - 1;
+
+        $digits = $intPartTrimmed . $decPart;
+        $mantissa = substr($digits, 0, 1);
+        $rest = substr($digits, 1);
+
+        if ($rest !== "") {
+            $mantissa .= "." . $rest;
+        }
+
+    } else {
+        // Number < 1 (e.g. 0.000002)
+
+        // count leading zeros in decimals
+        $zeroCount = strspn($decPart, "0");
+
+        $exponent = -($zeroCount + 1);
+
+        $mantissa = $decPart[$zeroCount];
+        $rest = substr($decPart, $zeroCount + 1);
+
+        if ($rest !== "") {
+            $mantissa .= "." . $rest;
+        }
     }
-    
+
+    // Cleanup trailing zeros and dot
+    $mantissa = rtrim($mantissa, "0");
+    $mantissa = rtrim($mantissa, ".");
+
     return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
 }
 
 // Recalculate YAM and USD based on available XP - NEW CONVERSION
 // USD = XP / 10^23 (using new conversion function)
 // Convert to string for large numbers to maintain precision
-$available_xp_str = (string)$available_xp;
+$available_xp_str = (string) $available_xp;
 $available_usd_trade_value = $available_xp > 0 ? dongtrader_xp_to_usd($available_xp_str) : 0;
 // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
 $available_yam = $available_xp > 0 ? dongtrader_xp_to_yam($available_xp_str) : 0;
@@ -449,7 +488,7 @@ foreach ($all_scan_meta as $meta) {
         if (!isset($all_users_xp[$uid])) {
             $all_users_xp[$uid] = 0;
         }
-        
+
         $scan_data = maybe_unserialize($meta->meta_value);
         if (is_array($scan_data)) {
             foreach ($scan_data as $entry) {
@@ -481,649 +520,732 @@ $cs = get_woocommerce_currency_symbol();
 ?>
 
 <style>
-/* --- XP WALLET UI --- */
-.detente-wallet {
-  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 30px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  font-family: "Inter", system-ui, sans-serif;
-  color: #1f2937;
-}
+    /* --- XP WALLET UI --- */
+    .detente-wallet {
+        background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        font-family: "Inter", system-ui, sans-serif;
+        color: #1f2937;
+    }
 
-/* Headings */
-.detente-wallet h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  color: #111827;
-}
+    /* Headings */
+    .detente-wallet h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        color: #111827;
+    }
 
-/* LAUGH Mode Banner */
-.laugh-mode-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: linear-gradient(90deg, #047857, #059669);
-  color: #ecfdf5;
-  padding: 14px 18px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-}
-.laugh-mode-banner .status-indicator {
-  height: 10px;
-  width: 10px;
-  border-radius: 50%;
-  background: #a7f3d0;
-  margin-top: 6px;
-  box-shadow: 0 0 6px #bbf7d0;
-}
+    /* LAUGH Mode Banner */
+    .laugh-mode-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: linear-gradient(90deg, #047857, #059669);
+        color: #ecfdf5;
+        padding: 14px 18px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
 
-/* Wallet Summary Grid */
-.wallet-summary-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-.wallet-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 18px;
-  text-align: center;
-  transition: all 0.25s ease;
-  flex: 1 1 200px;
-  min-width: 200px;
-  max-width: 100%;
-}
-.wallet-card:hover {
-  transform: translateY(-3px);
-  border-color: #d1fae5;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
-}
-.wallet-card h4 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-}
-.wallet-card .value {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #065f46;
-}
-.wallet-card .sub-value {
-  font-size: 0.8rem;
-  color: #6b7280;
-  margin-top: 3px;
-}
+    .laugh-mode-banner .status-indicator {
+        height: 10px;
+        width: 10px;
+        border-radius: 50%;
+        background: #a7f3d0;
+        margin-top: 6px;
+        box-shadow: 0 0 6px #bbf7d0;
+    }
 
-/* User Info */
-.user-info-section {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 30px;
-}
-.user-info-section h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px 20px;
-}
-.info-item {
-  font-size: 0.9rem;
-}
-.info-label {
-  font-weight: 600;
-  color: #6b7280;
-}
-.info-value {
-  color: #111827;
-}
-.pbtv-badge {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-  color: #fff;
-  font-weight: 600;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-top: 12px;
-  display: inline-block;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-}
+    /* Wallet Summary Grid */
+    .wallet-summary-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 32px;
+    }
 
-/* Role Breakdown */
-.role-breakdown {
-  margin-bottom: 30px;
-}
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-.role-item {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  transition: 0.25s;
-}
-.role-item:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
-}
-.role-label {
-  font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 5px;
-}
-.role-item.buyer .role-label { color: #2563eb; }
-.role-item.seller .role-label { color: #10b981; }
-.role-item.personal .role-label { color: #f59e0b; }
-.role-value {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-}
+    .wallet-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 18px;
+        text-align: center;
+        transition: all 0.25s ease;
+        flex: 1 1 200px;
+        min-width: 200px;
+        max-width: 100%;
+    }
 
-/* Transaction Table */
-.transaction-history {
-  margin-bottom: 30px;
-}
-.transaction-history h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.transaction-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  font-size: 0.9rem;
-}
-.transaction-table th {
-  background: #f3f4f6;
-  color: #374151;
-  text-align: left;
-  padding: 10px 12px;
-  font-weight: 600;
-}
-.transaction-table td {
-  border-top: 1px solid #e5e7eb;
-  padding: 10px 12px;
-  color: #111827;
-}
-.transaction-table tr:hover {
-  background: #f9fafb;
-}
-.status-badge {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.status-badge.pending { background: #fef3c7; color: #92400e; }
-.status-badge.confirmed { background: #d1fae5; color: #065f46; }
-.status-badge.minted { background: #d1fae5; color: #065f46; }
-.status-badge.locked { background: #e0e7ff; color: #3730a3; }
+    .wallet-card:hover {
+        transform: translateY(-3px);
+        border-color: #d1fae5;
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
+    }
 
-/* Transaction Pagination */
-.transaction-pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 32px;
-  padding: 20px 0;
-}
+    .wallet-card h4 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+    }
 
-.transaction-pagination .pagination-link,
-.transaction-pagination .pagination-number,
-.transaction-pagination a.pagination-link,
-.transaction-pagination a.pagination-number {
-  padding: 10px 18px;
-  background: #ffffff;
-  color: #4b5563;
-  text-decoration: none;
-  border-radius: 6px;
-  border: 1.5px solid #e5e7eb;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 42px;
-  height: 42px;
-  text-align: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  position: relative;
-  overflow: hidden;
-}
+    .wallet-card .value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #065f46;
+    }
 
-.transaction-pagination .pagination-link::before,
-.transaction-pagination a.pagination-link::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left 0.5s;
-}
+    .wallet-card .sub-value {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 3px;
+    }
 
-.transaction-pagination .pagination-link:hover::before,
-.transaction-pagination a.pagination-link:hover::before {
-  left: 100%;
-}
+    /* User Info */
+    .user-info-section {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
 
-.transaction-pagination .pagination-link:hover:not(.disabled),
-.transaction-pagination .pagination-number:hover:not(.current),
-.transaction-pagination a.pagination-link:hover:not(.disabled),
-.transaction-pagination a.pagination-number:hover:not(.current) {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #1f2937;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
+    .user-info-section h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
 
-.transaction-pagination .pagination-link:active:not(.disabled),
-.transaction-pagination .pagination-number:active:not(.current),
-.transaction-pagination a.pagination-link:active:not(.disabled),
-.transaction-pagination a.pagination-number:active:not(.current) {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px 20px;
+    }
 
-.transaction-pagination .pagination-number.current {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff;
-  border-color: #667eea;
-  font-weight: 600;
-  cursor: default;
-  box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3), 0 2px 4px -1px rgba(102, 126, 234, 0.2);
-  transform: scale(1.05);
-}
+    .info-item {
+        font-size: 0.9rem;
+    }
 
-.transaction-pagination .pagination-link.disabled {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-color: #e5e7eb;
-  cursor: not-allowed;
-  opacity: 0.7;
-  box-shadow: none;
-  transform: none;
-}
+    .info-label {
+        font-weight: 600;
+        color: #6b7280;
+    }
 
-.transaction-pagination .pagination-link.disabled:hover {
-  transform: none;
-  box-shadow: none;
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
+    .info-value {
+        color: #111827;
+    }
 
-.transaction-pagination .pagination-pages {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 0 8px;
-}
+    .pbtv-badge {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        color: #fff;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-top: 12px;
+        display: inline-block;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    }
 
-.transaction-pagination .pagination-ellipsis {
-  padding: 10px 8px;
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 42px;
-  height: 42px;
-}
+    /* Role Breakdown */
+    .role-breakdown {
+        margin-bottom: 30px;
+    }
 
-.pagination-info {
-  margin-top: 12px;
-  text-align: center;
-  color: #6b7280;
-  font-size: 14px;
-  padding: 8px 0;
-}
+    .role-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    }
 
-.transaction-table.loading {
-  opacity: 0.6;
-  pointer-events: none;
-  position: relative;
-}
+    .role-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        transition: 0.25s;
+    }
 
-.transaction-table.loading tbody::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
-  border: 2px solid #e5e7eb;
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
+    .role-item:hover {
+        border-color: #d1d5db;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    }
 
-@keyframes spin {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
+    .role-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 5px;
+    }
 
-/* Disclaimer */
-.disclaimer-box {
-  background: #f3f4f6;
-  border-left: 4px solid #10b981;
-  padding: 15px 20px;
-  border-radius: 8px;
-  color: #374151;
-  font-size: 0.9rem;
-}
-.disclaimer-box strong {
-  color: #065f46;
-}
+    .role-item.buyer .role-label {
+        color: #2563eb;
+    }
+
+    .role-item.seller .role-label {
+        color: #10b981;
+    }
+
+    .role-item.personal .role-label {
+        color: #f59e0b;
+    }
+
+    .role-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    /* Transaction Table */
+    .transaction-history {
+        margin-bottom: 30px;
+    }
+
+    .transaction-history h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .transaction-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        font-size: 0.9rem;
+    }
+
+    .transaction-table th {
+        background: #f3f4f6;
+        color: #374151;
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+    }
+
+    .transaction-table td {
+        border-top: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        color: #111827;
+    }
+
+    .transaction-table tr:hover {
+        background: #f9fafb;
+    }
+
+    .status-badge {
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+
+    .status-badge.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-badge.confirmed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.minted {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.locked {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+
+    /* Transaction Pagination */
+    .transaction-pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 32px;
+        padding: 20px 0;
+    }
+
+    .transaction-pagination .pagination-link,
+    .transaction-pagination .pagination-number,
+    .transaction-pagination a.pagination-link,
+    .transaction-pagination a.pagination-number {
+        padding: 10px 18px;
+        background: #ffffff;
+        color: #4b5563;
+        text-decoration: none;
+        border-radius: 6px;
+        border: 1.5px solid #e5e7eb;
+        font-weight: 500;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 42px;
+        height: 42px;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .transaction-pagination .pagination-link::before,
+    .transaction-pagination a.pagination-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s;
+    }
+
+    .transaction-pagination .pagination-link:hover::before,
+    .transaction-pagination a.pagination-link:hover::before {
+        left: 100%;
+    }
+
+    .transaction-pagination .pagination-link:hover:not(.disabled),
+    .transaction-pagination .pagination-number:hover:not(.current),
+    .transaction-pagination a.pagination-link:hover:not(.disabled),
+    .transaction-pagination a.pagination-number:hover:not(.current) {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        color: #1f2937;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .transaction-pagination .pagination-link:active:not(.disabled),
+    .transaction-pagination .pagination-number:active:not(.current),
+    .transaction-pagination a.pagination-link:active:not(.disabled),
+    .transaction-pagination a.pagination-number:active:not(.current) {
+        transform: translateY(0);
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .transaction-pagination .pagination-number.current {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        border-color: #667eea;
+        font-weight: 600;
+        cursor: default;
+        box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3), 0 2px 4px -1px rgba(102, 126, 234, 0.2);
+        transform: scale(1.05);
+    }
+
+    .transaction-pagination .pagination-link.disabled {
+        background: #f3f4f6;
+        color: #9ca3af;
+        border-color: #e5e7eb;
+        cursor: not-allowed;
+        opacity: 0.7;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .transaction-pagination .pagination-link.disabled:hover {
+        transform: none;
+        box-shadow: none;
+        background: #f3f4f6;
+        border-color: #e5e7eb;
+    }
+
+    .transaction-pagination .pagination-pages {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin: 0 8px;
+    }
+
+    .transaction-pagination .pagination-ellipsis {
+        padding: 10px 8px;
+        color: #6b7280;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        height: 42px;
+    }
+
+    .pagination-info {
+        margin-top: 12px;
+        text-align: center;
+        color: #6b7280;
+        font-size: 14px;
+        padding: 8px 0;
+    }
+
+    .transaction-table.loading {
+        opacity: 0.6;
+        pointer-events: none;
+        position: relative;
+    }
+
+    .transaction-table.loading tbody::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        border: 2px solid #e5e7eb;
+        border-top-color: #10b981;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: translate(-50%, -50%) rotate(360deg);
+        }
+    }
+
+    /* Disclaimer */
+    .disclaimer-box {
+        background: #f3f4f6;
+        border-left: 4px solid #10b981;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: #374151;
+        font-size: 0.9rem;
+    }
+
+    .disclaimer-box strong {
+        color: #065f46;
+    }
 </style>
 <style>
-/* --- XP WALLET UI --- */
-.detente-wallet {
-  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 30px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  font-family: "Inter", system-ui, sans-serif;
-  color: #1f2937;
-}
+    /* --- XP WALLET UI --- */
+    .detente-wallet {
+        background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        font-family: "Inter", system-ui, sans-serif;
+        color: #1f2937;
+    }
 
-/* Headings */
-.detente-wallet h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  color: #111827;
-}
+    /* Headings */
+    .detente-wallet h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        color: #111827;
+    }
 
-/* LAUGH Mode Banner */
-.laugh-mode-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: linear-gradient(90deg, #047857, #059669);
-  color: #ecfdf5;
-  padding: 14px 18px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-}
-.laugh-mode-banner .status-indicator {
-  height: 10px;
-  width: 10px;
-  border-radius: 50%;
-  background: #a7f3d0;
-  margin-top: 6px;
-  box-shadow: 0 0 6px #bbf7d0;
-}
+    /* LAUGH Mode Banner */
+    .laugh-mode-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: linear-gradient(90deg, #047857, #059669);
+        color: #ecfdf5;
+        padding: 14px 18px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
 
-/* Wallet Summary Grid */
-.wallet-summary-grid {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 16px;
-  margin-bottom: 32px !important;
-}
-.wallet-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 18px;
-  text-align: center;
-  transition: all 0.25s ease;
-  flex: 1 1 200px;
-  min-width: 200px;
-  max-width: 100%;
-}
-.wallet-card:hover {
-  transform: translateY(-3px);
-  border-color: #d1fae5;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
-}
-.wallet-card h4 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-}
-.wallet-card .value {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #065f46;
-}
-.wallet-card .sub-value {
-  font-size: 0.8rem;
-  color: #6b7280;
-  margin-top: 3px;
-}
+    .laugh-mode-banner .status-indicator {
+        height: 10px;
+        width: 10px;
+        border-radius: 50%;
+        background: #a7f3d0;
+        margin-top: 6px;
+        box-shadow: 0 0 6px #bbf7d0;
+    }
 
-/* User Info */
-.user-info-section {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 30px;
-}
-.user-info-section h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px 20px;
-}
-.info-item {
-  font-size: 0.9rem;
-}
-.info-label {
-  font-weight: 600;
-  color: #6b7280;
-}
-.info-value {
-  color: #111827;
-}
-.pbtv-badge {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-  color: #fff;
-  font-weight: 600;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-top: 12px;
-  display: inline-block;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-}
+    /* Wallet Summary Grid */
+    .wallet-summary-grid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 16px;
+        margin-bottom: 32px !important;
+    }
 
-/* Role Breakdown */
-.role-breakdown {
-  margin-bottom: 30px;
-}
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-.role-item {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  transition: 0.25s;
-}
-.role-item:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
-}
-.role-label {
-  font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 5px;
-}
-.role-item.buyer .role-label { color: #2563eb; }
-.role-item.seller .role-label { color: #10b981; }
-.role-item.personal .role-label { color: #f59e0b; }
-.role-value {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-}
+    .wallet-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 18px;
+        text-align: center;
+        transition: all 0.25s ease;
+        flex: 1 1 200px;
+        min-width: 200px;
+        max-width: 100%;
+    }
 
-/* Transaction Table */
-.transaction-history {
-  margin-bottom: 30px;
-}
-.transaction-history h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.transaction-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  font-size: 0.9rem;
-}
-.transaction-table th {
-  background: #f3f4f6;
-  color: #374151;
-  text-align: left;
-  padding: 10px 12px;
-  font-weight: 600;
-}
-.transaction-table td {
-  border-top: 1px solid #e5e7eb;
-  padding: 10px 12px;
-  color: #111827;
-}
-.transaction-table tr:hover {
-  background: #f9fafb;
-}
-.status-badge {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.status-badge.pending { background: #fef3c7; color: #92400e; }
-.status-badge.confirmed { background: #d1fae5; color: #065f46; }
-.status-badge.minted { background: #d1fae5; color: #065f46; }
-.status-badge.locked { background: #e0e7ff; color: #3730a3; }
+    .wallet-card:hover {
+        transform: translateY(-3px);
+        border-color: #d1fae5;
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
+    }
 
-/* Disclaimer */
-.disclaimer-box {
-  background: #f3f4f6;
-  border-left: 4px solid #10b981;
-  padding: 15px 20px;
-  border-radius: 8px;
-  color: #374151;
-  font-size: 0.9rem;
-}
-.disclaimer-box strong {
-  color: #065f46;
-}
+    .wallet-card h4 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+    }
+
+    .wallet-card .value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #065f46;
+    }
+
+    .wallet-card .sub-value {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 3px;
+    }
+
+    /* User Info */
+    .user-info-section {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .user-info-section h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px 20px;
+    }
+
+    .info-item {
+        font-size: 0.9rem;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .info-value {
+        color: #111827;
+    }
+
+    .pbtv-badge {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        color: #fff;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-top: 12px;
+        display: inline-block;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Role Breakdown */
+    .role-breakdown {
+        margin-bottom: 30px;
+    }
+
+    .role-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .role-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        transition: 0.25s;
+    }
+
+    .role-item:hover {
+        border-color: #d1d5db;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .role-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 5px;
+    }
+
+    .role-item.buyer .role-label {
+        color: #2563eb;
+    }
+
+    .role-item.seller .role-label {
+        color: #10b981;
+    }
+
+    .role-item.personal .role-label {
+        color: #f59e0b;
+    }
+
+    .role-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    /* Transaction Table */
+    .transaction-history {
+        margin-bottom: 30px;
+    }
+
+    .transaction-history h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .transaction-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        font-size: 0.9rem;
+    }
+
+    .transaction-table th {
+        background: #f3f4f6;
+        color: #374151;
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+    }
+
+    .transaction-table td {
+        border-top: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        color: #111827;
+    }
+
+    .transaction-table tr:hover {
+        background: #f9fafb;
+    }
+
+    .status-badge {
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+
+    .status-badge.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-badge.confirmed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.minted {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.locked {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+
+    /* Disclaimer */
+    .disclaimer-box {
+        background: #f3f4f6;
+        border-left: 4px solid #10b981;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: #374151;
+        font-size: 0.9rem;
+    }
+
+    .disclaimer-box strong {
+        color: #065f46;
+    }
 </style>
 
 
 <div class="detente-wallet cpm-table-wrap">
     <h2 style="margin-bottom: 20px; color: #1f2937;"><?php esc_html_e('XP Wallet', 'cpm-dongtrader'); ?></h2>
-    
+
     <!-- LAUGH Mode Banner -->
     <div class="laugh-mode-banner">
         <span class="status-indicator"></span>
         <div>
             <strong style="font-size: 16px;">LAUGH Mode Active</strong>
             <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.95;">
-                Trade credits only until <?php echo esc_html($laugh_end_date); ?> • No money moves — trade value accrues until <?php echo esc_html($detente_2030_date); ?>
+                Trade credits only until <?php echo esc_html($laugh_end_date); ?> • No money moves — trade value accrues
+                until <?php echo esc_html($detente_2030_date); ?>
             </p>
         </div>
     </div>
 
     <!-- Wallet Summary Cards -->
-    <div class="wallet-summary-grid" style="display:flex; flex-wrap:wrap; gap:10px;">
-        <div class="wallet-card">
-            <h4><?php esc_html_e('XP Balance', 'cpm-dongtrader'); ?></h4>
-            <div class="value">
-                <?php 
-                // Display XP in scientific notation
-                if ($available_xp > 0 && is_numeric($available_xp)) {
-                    $xp_scientific = sprintf('%.2e', (float)$available_xp);
-                    $parts = explode('e', $xp_scientific);
-                    if (count($parts) == 2) {
-                        $mantissa_raw = $parts[0];
-                        
-                        // Remove only trailing zeros after decimal point, but preserve decimal places
-                        if (strpos($mantissa_raw, '.') !== false) {
-                            $mantissa = rtrim($mantissa_raw, '0');
-                            if (substr($mantissa, -1) === '.') {
-                                $mantissa = rtrim($mantissa, '.');
-                            }
-                        } else {
-                            $mantissa = $mantissa_raw;
-                        }
-                        
-                        $exponent = intval($parts[1]);
-                        
-                        // If exponent is 0, just display the integer
-                        if ($exponent == 0) {
-                            $base_value = floatval($mantissa);
-                            echo ($base_value == floor($base_value)) ? esc_html((int)$base_value) : esc_html($base_value);
-                        } else {
-                            echo esc_html($mantissa) . ' × 10<sup>' . esc_html($exponent) . '</sup>';
-                        }
-                    } else {
-                        echo esc_html(number_format($available_xp, 0));
-                    }
-                } else {
-                    echo '0';
-                }
-                ?>
+    <div class="wallet-summary-grid" style="display:flex; flex-wrap:wrap; gap:15px; margin-top:20px;">
+
+        <!-- XP Balance -->
+        <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb; 
+        padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
+                <?php esc_html_e('XP Balance', 'cpm-dongtrader'); ?>
+            </h4>
+
+            <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                <?php echo format_xp_scientific_wallet($available_xp); ?>
             </div>
-            <div class="sub-value"><?php esc_html_e('Available XP (after transfers)', 'cpm-dongtrader'); ?></div>
+
+            <div class="sub-value" style="font-size:12px; color:#6b7280;">
+                <?php esc_html_e('Available XP (after transfers)', 'cpm-dongtrader'); ?>
+            </div>
         </div>
-        
-        <div class="wallet-card">
-            <h4><?php esc_html_e('YAM Equivalent', 'cpm-dongtrader'); ?></h4>
-            <div class="value">
-                <?php 
+
+
+        <!-- YAM Equivalent -->
+        <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb;
+        padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
+                <?php esc_html_e('YAM Equivalent', 'cpm-dongtrader'); ?>
+            </h4>
+
+            <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                <?php
                 // Display YAM in scientific notation
                 if ($available_yam > 0 && is_numeric($available_yam)) {
-                    $yam_scientific = sprintf('%.2e', (float)$available_yam);
+                    $yam_scientific = sprintf('%.2e', (float) $available_yam);
                     $parts = explode('e', $yam_scientific);
                     if (count($parts) == 2) {
                         $mantissa_raw = $parts[0];
-                        
-                        // Remove only trailing zeros after decimal point, but preserve decimal places
                         if (strpos($mantissa_raw, '.') !== false) {
                             $mantissa = rtrim($mantissa_raw, '0');
                             if (substr($mantissa, -1) === '.') {
@@ -1132,13 +1254,10 @@ $cs = get_woocommerce_currency_symbol();
                         } else {
                             $mantissa = $mantissa_raw;
                         }
-                        
                         $exponent = intval($parts[1]);
-                        
-                        // If exponent is 0, just display the integer
                         if ($exponent == 0) {
                             $base_value = floatval($mantissa);
-                            echo ($base_value == floor($base_value)) ? esc_html((int)$base_value) : esc_html($base_value);
+                            echo ($base_value == floor($base_value)) ? esc_html((int) $base_value) : esc_html($base_value);
                         } else {
                             echo esc_html($mantissa) . ' × 10<sup>' . esc_html($exponent) . '</sup>';
                         }
@@ -1150,485 +1269,654 @@ $cs = get_woocommerce_currency_symbol();
                 }
                 ?>
             </div>
-            <div class="sub-value"><?php esc_html_e('1 YAM = 1 USD = 10²³ XP', 'cpm-dongtrader'); ?></div>
+
+            <div class="sub-value" style="font-size:12px; color:#6b7280;">
+                <?php esc_html_e('1 YAM = 1 USD = 10²³ XP', 'cpm-dongtrader'); ?>
+            </div>
         </div>
-        
-        <div class="wallet-card">
-            <h4><?php esc_html_e('Confirmed Deliveries', 'cpm-dongtrader'); ?></h4>
-            <div class="value"><?php echo $confirmed_deliveries; ?></div>
-            <div class="sub-value"><?php esc_html_e('2-scan PoDs recorded', 'cpm-dongtrader'); ?></div>
+
+
+        <!-- Confirmed Deliveries -->
+        <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb;
+        padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
+                <?php esc_html_e('Confirmed Deliveries', 'cpm-dongtrader'); ?>
+            </h4>
+
+            <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                <?php echo $confirmed_deliveries; ?>
+            </div>
+
+            <div class="sub-value" style="font-size:12px; color:#6b7280;">
+                <?php esc_html_e('2-scan PoDs recorded', 'cpm-dongtrader'); ?>
+            </div>
         </div>
-        
-        <div class="wallet-card" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #fecaca;">
-            <h4 style="color: #991b1b;"><?php esc_html_e('XP Sent', 'cpm-dongtrader'); ?></h4>
-            <div class="value" style="color: #dc2626;"><?php echo format_xp_scientific_wallet($total_xp_sent); ?></div>
-            <div class="sub-value" style="color: #991b1b;"><?php esc_html_e('Total transferred out', 'cpm-dongtrader'); ?></div>
+
+
+        <!-- XP Sent -->
+        <div class="wallet-card" style="flex:1 1 250px; background:linear-gradient(135deg,#fff5f5 0%,#ffe6e6 100%);
+        border:1px solid #fcd4d4; padding:18px; border-radius:10px; 
+        box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#b91c1c;">
+                <?php esc_html_e('XP Sent', 'cpm-dongtrader'); ?>
+            </h4>
+
+            <div class="value" style="font-size:22px; font-weight:700; color:#dc2626; margin-bottom:5px;">
+                <?php echo format_xp_scientific_wallet($total_xp_sent); ?>
+            </div>
+
+            <div class="sub-value" style="font-size:12px; color:#b91c1c;">
+                <?php esc_html_e('Total transferred out', 'cpm-dongtrader'); ?>
+            </div>
         </div>
-        
-        <div class="wallet-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #bbf7d0;">
-            <h4 style="color: #065f46;"><?php esc_html_e('XP Received', 'cpm-dongtrader'); ?></h4>
-            <div class="value" style="color: #059669;"><?php echo format_xp_scientific_wallet($total_xp_received); ?></div>
-            <div class="sub-value" style="color: #065f46;"><?php esc_html_e('Total received from others', 'cpm-dongtrader'); ?></div>
+
+
+        <!-- XP Received -->
+        <div class="wallet-card" style="flex:1 1 250px; background:linear-gradient(135deg,#f0fff4 0%,#dcfce7 100%);
+        border:1px solid #bbf7d0; padding:18px; border-radius:10px; 
+        box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#065f46;">
+                <?php esc_html_e('XP Received', 'cpm-dongtrader'); ?>
+            </h4>
+
+            <div class="value" style="font-size:22px; font-weight:700; color:#059669; margin-bottom:5px;">
+                <?php echo format_xp_scientific_wallet($total_xp_received); ?>
+            </div>
+
+            <div class="sub-value" style="font-size:12px; color:#065f46;">
+                <?php esc_html_e('Total received from others', 'cpm-dongtrader'); ?>
+            </div>
         </div>
+
     </div>
 
     <!-- User Information -->
-    <div class="user-info-section">
-        <h3><?php esc_html_e('Wallet Information', 'cpm-dongtrader'); ?></h3>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label"><?php esc_html_e('Holder', 'cpm-dongtrader'); ?></div>
-                <div class="info-value"><?php echo esc_html($user_name); ?></div>
+  <div class="user-info-section" 
+    style="background:#ffffff; border:1px solid #e5e7eb; 
+    padding:20px; border-radius:10px; margin-top:25px; 
+    box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+    <h3 style="margin:0 0 15px 0; font-size:18px; font-weight:700; color:#111827;">
+        <?php esc_html_e('Wallet Information', 'cpm-dongtrader'); ?>
+    </h3>
+
+    <div class="info-grid" 
+        style="display:flex; flex-wrap:wrap; gap:12px;">
+
+        <!-- Holder -->
+        <div class="info-item" 
+            style="flex:1 1 180px; background:#f9fafb; padding:10px 14px; 
+            border-radius:8px; border:1px solid #e5e7eb;">
+            <div class="info-label" 
+                style="font-size:12px; color:#6b7280; margin-bottom:3px;">
+                <?php esc_html_e('Holder', 'cpm-dongtrader'); ?>
             </div>
-            <?php if ($user_phone): ?>
-            <div class="info-item">
-                <div class="info-label"><?php esc_html_e('Phone', 'cpm-dongtrader'); ?></div>
-                <div class="info-value"><?php echo esc_html($user_phone); ?></div>
-            </div>
-            <?php endif; ?>
-            <?php if ($user_fonepay): ?>
-            <div class="info-item">
-                <div class="info-label"><?php esc_html_e('FonePay ID', 'cpm-dongtrader'); ?></div>
-                <div class="info-value"><?php echo esc_html($user_fonepay); ?></div>
-            </div>
-            <?php endif; ?>
-            <?php if ($user_poc): ?>
-            <div class="info-item">
-                <div class="info-label"><?php esc_html_e('POC', 'cpm-dongtrader'); ?></div>
-                <div class="info-value"><?php echo esc_html($user_poc); ?></div>
-            </div>
-            <?php endif; ?>
-            <div class="info-item">
-                <div class="info-label"><?php esc_html_e('Leaderboard Rank', 'cpm-dongtrader'); ?></div>
-                <div class="info-value">#<?php echo $user_rank; ?></div>
+            <div class="info-value" 
+                style="font-size:15px; font-weight:600; color:#111827;">
+                <?php echo esc_html($user_name); ?>
             </div>
         </div>
-        <?php if ($pbtv_eligible): ?>
-        <div class="pbtv-badge">
-            🏆 <?php esc_html_e('PBTV NFT Eligible', 'cpm-dongtrader'); ?> — <?php esc_html_e('Top 30 on', 'cpm-dongtrader'); ?> <?php echo esc_html($pbtv_snapshot_date); ?>
-        </div>
+
+        <?php if ($user_phone): ?>
+            <div class="info-item"
+                style="flex:1 1 180px; background:#f9fafb; padding:10px 14px; 
+                border-radius:8px; border:1px solid #e5e7eb;">
+                <div class="info-label" 
+                    style="font-size:12px; color:#6b7280; margin-bottom:3px;">
+                    <?php esc_html_e('Phone', 'cpm-dongtrader'); ?>
+                </div>
+                <div class="info-value" 
+                    style="font-size:15px; font-weight:600; color:#111827;">
+                    <?php echo esc_html($user_phone); ?>
+                </div>
+            </div>
         <?php endif; ?>
+
+        <?php if ($user_fonepay): ?>
+            <div class="info-item"
+                style="flex:1 1 180px; background:#f9fafb; padding:10px 14px; 
+                border-radius:8px; border:1px solid #e5e7eb;">
+                <div class="info-label" 
+                    style="font-size:12px; color:#6b7280; margin-bottom:3px;">
+                    <?php esc_html_e('FonePay ID', 'cpm-dongtrader'); ?>
+                </div>
+                <div class="info-value" 
+                    style="font-size:15px; font-weight:600; color:#111827;">
+                    <?php echo esc_html($user_fonepay); ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($user_poc): ?>
+            <div class="info-item"
+                style="flex:1 1 180px; background:#f9fafb; padding:10px 14px; 
+                border-radius:8px; border:1px solid #e5e7eb;">
+                <div class="info-label" 
+                    style="font-size:12px; color:#6b7280; margin-bottom:3px;">
+                    <?php esc_html_e('POC', 'cpm-dongtrader'); ?>
+                </div>
+                <div class="info-value" 
+                    style="font-size:15px; font-weight:600; color:#111827;">
+                    <?php echo esc_html($user_poc); ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Leaderboard Rank -->
+        <div class="info-item"
+            style="flex:1 1 180px; background:#f9fafb; padding:10px 14px; 
+            border-radius:8px; border:1px solid #e5e7eb;">
+            <div class="info-label" 
+                style="font-size:12px; color:#6b7280; margin-bottom:3px;">
+                <?php esc_html_e('Leaderboard Rank', 'cpm-dongtrader'); ?>
+            </div>
+            <div class="info-value" 
+                style="font-size:15px; font-weight:700; color:#1d4ed8;">
+                #<?php echo $user_rank; ?>
+            </div>
+        </div>
     </div>
 
+    <?php if ($pbtv_eligible): ?>
+        <div class="pbtv-badge"
+            style="margin-top:18px; background:linear-gradient(135deg,#fff8e1,#ffefc4);
+            border:1px solid #ffe29a; padding:10px 14px; border-radius:8px;
+            font-size:14px; font-weight:600; color:#8a5800;">
+            🏆 <?php esc_html_e('PBTV NFT Eligible', 'cpm-dongtrader'); ?> —
+            <?php esc_html_e('Top 30 on', 'cpm-dongtrader'); ?>
+            <?php echo esc_html($pbtv_snapshot_date); ?>
+        </div>
+    <?php endif; ?>
+
+</div>
+
+
     <!-- XP Breakdown by Role -->
-    <div class="role-breakdown">
-        <h3><?php esc_html_e('XP Breakdown by Role', 'cpm-dongtrader'); ?></h3>
-        <div class="role-grid">
-            <div class="role-item buyer">
-                <div class="role-label"><?php esc_html_e('Buyer (7%)', 'cpm-dongtrader'); ?></div>
-                <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $buyer_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
-                    }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
-                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
-                ?> XP</div>
-                <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-                    <?php 
-                    // Buyer: 7% of $10.30 per delivery
-                    $buyer_trade_value_corrected = $buyer_count * (0.07 * 10.30);
-                    echo $cs . number_format($buyer_trade_value_corrected, 2); 
-                    ?> • <?php echo $buyer_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
-                </div>
+  <div class="role-breakdown" 
+    style="background:#ffffff; border:1px solid #e5e7eb; 
+    padding:20px; border-radius:10px; margin-top:25px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+    <h3 style="margin:0 0 18px 0; font-size:18px; font-weight:700; color:#111827;">
+        <?php esc_html_e('XP Breakdown by Role', 'cpm-dongtrader'); ?>
+    </h3>
+
+    <div class="role-grid" style="display:flex; flex-wrap:wrap; gap:14px;">
+
+        <!-- BUYER -->
+        <div class="role-item buyer"
+            style="flex:1 1 250px; background:#f0f9ff; padding:15px 18px; 
+            border-radius:10px; border:1px solid #bae6fd;">            
+            <div class="role-label"
+                style="font-size:14px; font-weight:600; color:#0369a1; margin-bottom:6px;">
+                <?php esc_html_e('Buyer (7%)', 'cpm-dongtrader'); ?>
             </div>
-            
-            <div class="role-item seller">
-                <div class="role-label"><?php esc_html_e('Seller (3%)', 'cpm-dongtrader'); ?></div>
-                <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $seller_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
+
+            <div class="role-value" style="font-size:17px; font-weight:700; color:#0c4a6e;">
+                <?php
+                $scientific = sprintf('%.2e', $buyer_xp);
+                $parts = explode('e', $scientific);
+                $mantissa_raw = $parts[0];
+
+                if (strpos($mantissa_raw, '.') !== false) {
+                    $mantissa = rtrim($mantissa_raw, '0');
+                    if (substr($mantissa, -1) === '.') {
+                        $mantissa = rtrim($mantissa, '.');
                     }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
+                } else {
+                    $mantissa = $mantissa_raw;
+                }
+
+                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+                if ($exponent == 0) {
+                    $base_value = floatval($mantissa);
+                    echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+                } else {
                     echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
-                ?> XP</div>
-                <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-                    <?php 
-                    // Seller: 3% of $10.30 per delivery
-                    $seller_trade_value_corrected = $seller_count * (0.03 * 10.30);
-                    echo $cs . number_format($seller_trade_value_corrected, 2); 
-                    ?> • <?php echo $seller_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
-                </div>
+                }
+                ?> XP
             </div>
-            
-            <div class="role-item personal">
-                <div class="role-label"><?php esc_html_e('Personal (10%)', 'cpm-dongtrader'); ?></div>
-                <div class="role-value"><?php 
-                    $scientific = sprintf('%.2e', $personal_xp);
-                    $parts = explode('e', $scientific);
-                    $mantissa_raw = $parts[0];
-                    
-                    // Remove only trailing zeros after decimal point, but preserve decimal places
-                    if (strpos($mantissa_raw, '.') !== false) {
-                        $mantissa = rtrim($mantissa_raw, '0');
-                        if (substr($mantissa, -1) === '.') {
-                            $mantissa = rtrim($mantissa, '.');
-                        }
-                    } else {
-                        $mantissa = $mantissa_raw;
-                    }
-                    
-                    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                    if ($exponent == 0) {
-                        $base_value = floatval($mantissa);
-                        echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                    } else {
-                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                    }
-                ?> XP</div>
-                <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-                    <?php 
-                    // Personal: 10% of $10.30 per delivery
-                    $personal_trade_value_corrected = $personal_count * (0.10 * 10.30);
-                    echo $cs . number_format($personal_trade_value_corrected, 2); 
-                    ?> • <?php echo $personal_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
-                </div>
+
+            <div style="font-size:12px; color:#475569; margin-top:6px;">
+                <?php
+                $buyer_trade_value_corrected = $buyer_count * (0.07 * 10.30);
+                echo $cs . number_format($buyer_trade_value_corrected, 2);
+                ?> • <?php echo $buyer_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
             </div>
         </div>
+
+        <!-- SELLER -->
+        <div class="role-item seller"
+            style="flex:1 1 250px; background:#fef3c7; padding:15px 18px; 
+            border-radius:10px; border:1px solid #fde68a;">
+            <div class="role-label"
+                style="font-size:14px; font-weight:600; color:#b45309; margin-bottom:6px;">
+                <?php esc_html_e('Seller (3%)', 'cpm-dongtrader'); ?>
+            </div>
+
+            <div class="role-value" style="font-size:17px; font-weight:700; color:#92400e;">
+                <?php
+                $scientific = sprintf('%.2e', $seller_xp);
+                $parts = explode('e', $scientific);
+                $mantissa_raw = $parts[0];
+
+                if (strpos($mantissa_raw, '.') !== false) {
+                    $mantissa = rtrim($mantissa_raw, '0');
+                    if (substr($mantissa, -1) === '.') {
+                        $mantissa = rtrim($mantissa, '.');
+                    }
+                } else {
+                    $mantissa = $mantissa_raw;
+                }
+
+                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+                if ($exponent == 0) {
+                    $base_value = floatval($mantissa);
+                    echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+                } else {
+                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+                }
+                ?> XP
+            </div>
+
+            <div style="font-size:12px; color:#6b7280; margin-top:6px;">
+                <?php
+                $seller_trade_value_corrected = $seller_count * (0.03 * 10.30);
+                echo $cs . number_format($seller_trade_value_corrected, 2);
+                ?> • <?php echo $seller_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
+            </div>
+        </div>
+
+        <!-- PERSONAL -->
+        <div class="role-item personal"
+            style="flex:1 1 250px; background:#ecfdf5; padding:15px 18px; 
+            border-radius:10px; border:1px solid #bbf7d0;">
+            <div class="role-label"
+                style="font-size:14px; font-weight:600; color:#047857; margin-bottom:6px;">
+                <?php esc_html_e('Personal (10%)', 'cpm-dongtrader'); ?>
+            </div>
+
+            <div class="role-value" style="font-size:17px; font-weight:700; color:#065f46;">
+                <?php
+                $scientific = sprintf('%.2e', $personal_xp);
+                $parts = explode('e', $scientific);
+                $mantissa_raw = $parts[0];
+
+                if (strpos($mantissa_raw, '.') !== false) {
+                    $mantissa = rtrim($mantissa_raw, '0');
+                    if (substr($mantissa, -1) === '.') {
+                        $mantissa = rtrim($mantissa, '.');
+                    }
+                } else {
+                    $mantissa = $mantissa_raw;
+                }
+
+                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+                if ($exponent == 0) {
+                    $base_value = floatval($mantissa);
+                    echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+                } else {
+                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+                }
+                ?> XP
+            </div>
+
+            <div style="font-size:12px; color:#475569; margin-top:6px;">
+                <?php
+                $personal_trade_value_corrected = $personal_count * (0.10 * 10.30);
+                echo $cs . number_format($personal_trade_value_corrected, 2);
+                ?> • <?php echo $personal_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
+            </div>
+        </div>
+
     </div>
+</div>
+
 
     <!-- Transaction History -->
     <div class="transaction-history">
         <h3><?php esc_html_e('Transaction History', 'cpm-dongtrader'); ?></h3>
         <?php if (!empty($user_treasury_entries)): ?>
             <div id="transaction-table-wrapper">
-            <table class="transaction-table">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e('S.No.', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('Date', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('Transaction ID', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('Role', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('XP Minted', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('YAM', 'cpm-dongtrader'); ?></th>
-                        <th><?php esc_html_e('Status', 'cpm-dongtrader'); ?></th>
-                    </tr>
-                </thead>
-                <tbody id="transaction-table-body">
-                    <?php 
-                    // Sort by timestamp (newest first)
-                    usort($user_treasury_entries, function($a, $b) {
-                        $time_a = 0;
-                        $time_b = 0;
-                        
-                        // Try timestamp first
-                        if (isset($a['timestamp']) && !empty($a['timestamp'])) {
-                            $time_a = strtotime($a['timestamp']);
-                        } elseif (isset($a['date']) && !empty($a['date'])) {
-                            $time_a = strtotime($a['date']);
-                        }
-                        
-                        if (isset($b['timestamp']) && !empty($b['timestamp'])) {
-                            $time_b = strtotime($b['timestamp']);
-                        } elseif (isset($b['date']) && !empty($b['date'])) {
-                            $time_b = strtotime($b['date']);
-                        }
-                        
-                        return $time_b - $time_a;
-                    });
-                    
-                    // Pagination setup
-                    $per_page = 8;
-                    $current_page = isset($_GET['txn_page']) ? max(1, intval($_GET['txn_page'])) : 1;
-                    $total_entries = count($user_treasury_entries);
-                    $total_pages = ceil($total_entries / $per_page);
-                    $offset = ($current_page - 1) * $per_page;
-                    $paginated_entries = array_slice($user_treasury_entries, $offset, $per_page);
-                    
-                    // All entries will be stored in a script tag for JavaScript (no need to encode here)
-                    
-                    $serial_number = $offset + 1; // Start serial number from offset + 1
-                    foreach ($paginated_entries as $entry): 
-                        // Get timestamp - try multiple possible field names
-                        $timestamp = '';
-                        if (isset($entry['timestamp']) && !empty($entry['timestamp'])) {
-                            $timestamp = $entry['timestamp'];
-                        } elseif (isset($entry['date']) && !empty($entry['date'])) {
-                            $timestamp = $entry['date'];
-                        }
-                        
-                        // Format date
-                        if ($timestamp) {
-                            // Handle ISO format (with T) or MySQL format
-                            $date_obj = strtotime($timestamp);
-                            if ($date_obj !== false) {
-                                $date = date('Y-m-d H:i', $date_obj);
+                <table class="transaction-table">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('S.No.', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('Date', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('Transaction ID', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('Role', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('XP Minted', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('YAM', 'cpm-dongtrader'); ?></th>
+                            <th><?php esc_html_e('Status', 'cpm-dongtrader'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-table-body">
+                        <?php
+                        // Sort by timestamp (newest first)
+                        usort($user_treasury_entries, function ($a, $b) {
+                            $time_a = 0;
+                            $time_b = 0;
+
+                            // Try timestamp first
+                            if (isset($a['timestamp']) && !empty($a['timestamp'])) {
+                                $time_a = strtotime($a['timestamp']);
+                            } elseif (isset($a['date']) && !empty($a['date'])) {
+                                $time_a = strtotime($a['date']);
+                            }
+
+                            if (isset($b['timestamp']) && !empty($b['timestamp'])) {
+                                $time_b = strtotime($b['timestamp']);
+                            } elseif (isset($b['date']) && !empty($b['date'])) {
+                                $time_b = strtotime($b['date']);
+                            }
+
+                            return $time_b - $time_a;
+                        });
+                        // Pagination setup
+                        $per_page = 8;
+                        $current_page = isset($_GET['txn_page']) ? max(1, intval($_GET['txn_page'])) : 1;
+                        $total_entries = count($user_treasury_entries);
+                        $total_pages = ceil($total_entries / $per_page);
+                        $offset = ($current_page - 1) * $per_page;
+                        $paginated_entries = array_slice($user_treasury_entries, $offset, $per_page);
+
+
+                        $serial_number = $offset + 1; // Start serial number from offset + 1
+                        foreach ($paginated_entries as $entry):
+                            // Get timestamp - try multiple possible field names
+                            $timestamp = '';
+                            if (isset($entry['timestamp']) && !empty($entry['timestamp'])) {
+                                $timestamp = $entry['timestamp'];
+                            } elseif (isset($entry['date']) && !empty($entry['date'])) {
+                                $timestamp = $entry['date'];
+                            }
+
+                            // Format date
+                            if ($timestamp) {
+                                // Handle ISO format (with T) or MySQL format
+                                $date_obj = strtotime($timestamp);
+                                if ($date_obj !== false) {
+                                    $date = date('Y-m-d H:i', $date_obj);
+                                } else {
+                                    $date = 'N/A';
+                                }
                             } else {
                                 $date = 'N/A';
                             }
-                        } else {
-                            $date = 'N/A';
-                        }
-                        
-                        // Get transaction_id, fallback to proof_id for backward compatibility
-                        $transaction_id = '';
-                        if (isset($entry['transaction_id']) && !empty($entry['transaction_id'])) {
-                            $transaction_id = esc_html($entry['transaction_id']);
-                        } elseif (isset($entry['proof_id']) && !empty($entry['proof_id'])) {
-                            $transaction_id = esc_html($entry['proof_id']);
-                        } else {
-                            $transaction_id = 'N/A';
-                        }
-                        
-                        // Format role display
-                        $role = isset($entry['role']) ? strtolower($entry['role']) : '';
-                        $source = isset($entry['source']) ? strtolower($entry['source']) : '';
-                        $role_display = 'N/A';
-                        
-                        // Check source first for special entries
-                        if ($source === 'discord_invite') {
-                            $role_display = 'Discord Verification';
-                        } elseif ($source === 'talentshow_entry') {
-                            $role_display = 'Talent Show';
-                        } elseif ($source === 'discord_poll') {
-                            $role_display = 'Discord Poll';
-                        } elseif (strpos($role, 'seller') !== false) {
-                            $role_display = 'Seller (3%)';
-                        } elseif (strpos($role, 'buyer') !== false) {
-                            $role_display = 'Buyer (7%)';
-                        } elseif (strpos($role, 'personal') !== false) {
-                            $role_display = 'Personal (10%)';
-                        } else {
-                            $role_display = isset($entry['role']) ? esc_html(ucfirst($entry['role'])) : 'N/A';
-                        }
-                        
-                        // Get YAM value
-                        $yam = isset($entry['yam_value']) ? floatval($entry['yam_value']) : 0;
-                        
-                        // Calculate trade value - try multiple sources
-                        $trade_val = 0;
-                        if (isset($entry['trade_value_usd']) && floatval($entry['trade_value_usd']) > 0) {
-                            $trade_val = floatval($entry['trade_value_usd']);
-                        } elseif (isset($entry['trade_value']) && floatval($entry['trade_value']) > 0) {
-                            $trade_val = floatval($entry['trade_value']);
-                        } elseif ($yam > 0) {
-                            // Calculate from YAM (1 YAM = 1 USD)
-                            $trade_val = $yam;
-                        }
-                        
-                        // Get XP units
-                        $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
-                        
-                        // Get status - prioritize scan_status over status
-                        $status = 'pending';
-                        if (isset($entry['scan_status']) && !empty($entry['scan_status'])) {
-                            $status = strtolower($entry['scan_status']);
-                        } elseif (isset($entry['status']) && !empty($entry['status'])) {
-                            $status = strtolower($entry['status']);
-                        }
-                        
-                        // Format status display text
-                        $status_display = '';
-                        if ($status === 'pending') {
-                            $status_display = 'Waiting for buyer scan';
-                        } elseif ($status === 'confirmed') {
-                            $status_display = 'Confirmed';
-                        } elseif ($status === 'completed') {
-                            $status_display = 'Completed';
-                        } elseif ($status === 'submitted') {
-                            $status_display = 'Submitted';
-                        } elseif ($status === 'verified') {
-                            $status_display = 'Verified';
-                        } else {
-                            $status_display = ucfirst($status);
-                        }
-                    ?>
-                    <tr>
-                        <td><?php echo $serial_number; ?></td>
-                        <td><?php echo esc_html($date); ?></td>
-                        <td style="font-family: monospace; font-size: 11px;"><?php echo $transaction_id; ?></td>
-                        <td><?php echo esc_html($role_display); ?></td>
-                        <td>
-                            <?php 
-                            // Display XP in scientific notation
-                            $xp_value = 0;
-                            if (isset($entry['xp_display_value'])) {
-                                $xp_value = floatval($entry['xp_display_value']);
+
+                            // Get transaction_id, fallback to proof_id for backward compatibility
+                            $transaction_id = '';
+                            if (isset($entry['transaction_id']) && !empty($entry['transaction_id'])) {
+                                $transaction_id = esc_html($entry['transaction_id']);
+                            } elseif (isset($entry['proof_id']) && !empty($entry['proof_id'])) {
+                                $transaction_id = esc_html($entry['proof_id']);
                             } else {
-                                $xp_value = $xp;
+                                $transaction_id = 'N/A';
                             }
-                            
-                            if ($xp_value > 0) {
-                                $scientific = sprintf('%.2e', $xp_value);
-                                $parts = explode('e', $scientific);
-                                $mantissa_raw = $parts[0];
-                                
-                                // Remove only trailing zeros after decimal point, but preserve decimal places
-                                if (strpos($mantissa_raw, '.') !== false) {
-                                    $mantissa = rtrim($mantissa_raw, '0');
-                                    if (substr($mantissa, -1) === '.') {
-                                        $mantissa = rtrim($mantissa, '.');
-                                    }
-                                } else {
-                                    $mantissa = $mantissa_raw;
-                                }
-                                
-                                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                                if ($exponent == 0) {
-                                    $base_value = floatval($mantissa);
-                                    echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                                } else {
-                                echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                                }
+
+                            // Format role display
+                            $role = isset($entry['role']) ? strtolower($entry['role']) : '';
+                            $source = isset($entry['source']) ? strtolower($entry['source']) : '';
+                            $role_display = 'N/A';
+
+                            // Check source first for special entries
+                            if ($source === 'discord_invite') {
+                                $role_display = 'Discord Verification';
+                            } elseif ($source === 'talentshow_entry') {
+                                $role_display = 'Talent Show';
+                            } elseif ($source === 'discord_poll') {
+                                $role_display = 'Discord Poll';
+                            } elseif (strpos($role, 'seller') !== false) {
+                                $role_display = 'Seller (3%)';
+                            } elseif (strpos($role, 'buyer') !== false) {
+                                $role_display = 'Buyer (7%)';
+                            } elseif (strpos($role, 'personal') !== false) {
+                                $role_display = 'Personal (10%)';
                             } else {
-                                echo '0';
+                                $role_display = isset($entry['role']) ? esc_html(ucfirst($entry['role'])) : 'N/A';
+                            }
+
+                            // Get YAM value
+                            $yam = isset($entry['yam_value']) ? floatval($entry['yam_value']) : 0;
+
+                            // Calculate trade value - try multiple sources
+                            $trade_val = 0;
+                            if (isset($entry['trade_value_usd']) && floatval($entry['trade_value_usd']) > 0) {
+                                $trade_val = floatval($entry['trade_value_usd']);
+                            } elseif (isset($entry['trade_value']) && floatval($entry['trade_value']) > 0) {
+                                $trade_val = floatval($entry['trade_value']);
+                            } elseif ($yam > 0) {
+                                // Calculate from YAM (1 YAM = 1 USD)
+                                $trade_val = $yam;
+                            }
+
+                            // Get XP units
+                            $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
+
+                            // Get status - prioritize scan_status over status
+                            $status = 'pending';
+                            if (isset($entry['scan_status']) && !empty($entry['scan_status'])) {
+                                $status = strtolower($entry['scan_status']);
+                            } elseif (isset($entry['status']) && !empty($entry['status'])) {
+                                $status = strtolower($entry['status']);
+                            }
+
+                            // Format status display text
+                            $status_display = '';
+                            if ($status === 'pending') {
+                                $status_display = 'Waiting for buyer scan';
+                            } elseif ($status === 'confirmed') {
+                                $status_display = 'Confirmed';
+                            } elseif ($status === 'completed') {
+                                $status_display = 'Completed';
+                            } elseif ($status === 'submitted') {
+                                $status_display = 'Submitted';
+                            } elseif ($status === 'verified') {
+                                $status_display = 'Verified';
+                            } else {
+                                $status_display = ucfirst($status);
                             }
                             ?>
-                        </td>
-                        <td>
-                            <?php 
-                            // Display YAM in scientific notation
-                            if ($yam > 0) {
-                                $scientific = sprintf('%.2e', $yam);
-                                $parts = explode('e', $scientific);
-                                $mantissa_raw = $parts[0];
-                                
-                                // Remove only trailing zeros after decimal point, but preserve decimal places
-                                if (strpos($mantissa_raw, '.') !== false) {
-                                    $mantissa = rtrim($mantissa_raw, '0');
-                                    if (substr($mantissa, -1) === '.') {
-                                        $mantissa = rtrim($mantissa, '.');
+                            <tr>
+                                <td><?php echo $serial_number; ?></td>
+                                <td><?php echo esc_html($date); ?></td>
+                                <td style="font-family: monospace; font-size: 11px;"><?php echo $transaction_id; ?></td>
+                                <td><?php echo esc_html($role_display); ?></td>
+                                <td>
+                                    <?php
+                                    // Display XP in scientific notation
+                                    $xp_value = 0;
+                                    if (isset($entry['xp_display_value'])) {
+                                        $xp_value = floatval($entry['xp_display_value']);
+                                    } else {
+                                        $xp_value = $xp;
                                     }
-                                } else {
-                                    $mantissa = $mantissa_raw;
-                                }
-                                
-                                $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                                if ($exponent == 0) {
-                                    $base_value = floatval($mantissa);
-                                    echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                                } else {
-                                echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                                }
-                            } else {
-                                echo '0';
-                            }
-                            ?>
-                        </td>
-                        <td>
-                            <span class="status-badge <?php echo esc_attr($status); ?>">
-                                <?php echo esc_html($status_display); ?>
-                            </span>
-                        </td>
-                    </tr>
-                    <?php 
-                        $serial_number++; // Increment serial number for next row
-                        endforeach; 
+
+                                    if ($xp_value > 0) {
+                                        $scientific = sprintf('%.2e', $xp_value);
+                                        $parts = explode('e', $scientific);
+                                        $mantissa_raw = $parts[0];
+
+                                        // Remove only trailing zeros after decimal point, but preserve decimal places
+                                        if (strpos($mantissa_raw, '.') !== false) {
+                                            $mantissa = rtrim($mantissa_raw, '0');
+                                            if (substr($mantissa, -1) === '.') {
+                                                $mantissa = rtrim($mantissa, '.');
+                                            }
+                                        } else {
+                                            $mantissa = $mantissa_raw;
+                                        }
+
+                                        $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+                                        if ($exponent == 0) {
+                                            $base_value = floatval($mantissa);
+                                            echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+                                        } else {
+                                            echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+                                        }
+                                    } else {
+                                        echo '0';
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    // Display YAM in scientific notation
+                                    if ($yam > 0) {
+                                        $scientific = sprintf('%.2e', $yam);
+                                        $parts = explode('e', $scientific);
+                                        $mantissa_raw = $parts[0];
+
+                                        // Remove only trailing zeros after decimal point, but preserve decimal places
+                                        if (strpos($mantissa_raw, '.') !== false) {
+                                            $mantissa = rtrim($mantissa_raw, '0');
+                                            if (substr($mantissa, -1) === '.') {
+                                                $mantissa = rtrim($mantissa, '.');
+                                            }
+                                        } else {
+                                            $mantissa = $mantissa_raw;
+                                        }
+
+                                        $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+                                        if ($exponent == 0) {
+                                            $base_value = floatval($mantissa);
+                                            echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+                                        } else {
+                                            echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+                                        }
+                                    } else {
+                                        echo '0';
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <span class="status-badge <?php echo esc_attr($status); ?>">
+                                        <?php echo esc_html($status_display); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php
+                            $serial_number++; // Increment serial number for next row
+                        endforeach;
+                        ?>
+                    </tbody>
+                </table>
+
+                <?php
+                // Pagination controls
+                if ($total_pages > 1):
+                    // Get current URL and build pagination URLs
+                    $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                    $url_parts = parse_url($current_url);
+                    $query_params = array();
+                    if (isset($url_parts['query'])) {
+                        parse_str($url_parts['query'], $query_params);
+                    }
+
+                    // Function to build pagination URL
+                    $build_pagination_url = function ($page) use ($query_params, $url_parts) {
+                        $query_params['txn_page'] = $page;
+                        $path = isset($url_parts['path']) ? $url_parts['path'] : '/';
+                        return $path . '?' . http_build_query($query_params);
+                    };
                     ?>
-                </tbody>
-            </table>
-            
-            <?php 
-            // Pagination controls
-            if ($total_pages > 1): 
-                // Get current URL and build pagination URLs
-                $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-                $url_parts = parse_url($current_url);
-                $query_params = array();
-                if (isset($url_parts['query'])) {
-                    parse_str($url_parts['query'], $query_params);
-                }
-                
-                // Function to build pagination URL
-                $build_pagination_url = function($page) use ($query_params, $url_parts) {
-                    $query_params['txn_page'] = $page;
-                    $path = isset($url_parts['path']) ? $url_parts['path'] : '/';
-                    return $path . '?' . http_build_query($query_params);
-                };
-            ?>
-            <div class="transaction-pagination" style="display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap; margin-top: 32px; padding: 20px 0;" data-total-pages="<?php echo $total_pages; ?>" data-current-page="<?php echo $current_page; ?>" data-total-entries="<?php echo $total_entries; ?>" data-per-page="<?php echo $per_page; ?>">
-                <?php if ($current_page > 1): ?>
-                    <a href="<?php echo esc_url($build_pagination_url($current_page - 1)); ?>" style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';" onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';">
-                        ← Previous
-                    </a>
-                <?php else: ?>
-                    <span style="padding: 10px 18px; background: #f3f4f6; color: #9ca3af; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: not-allowed; opacity: 0.7; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        ← Previous
-                    </span>
-                <?php endif; ?>
-                
-                <div style="display: flex; flex-direction: row; gap: 6px; align-items: center; margin: 0 8px; flex-wrap: nowrap;">
-                    <?php
-                    // Show page numbers
-                    $start_page = max(1, $current_page - 2);
-                    $end_page = min($total_pages, $current_page + 2);
-                    
-                    if ($start_page > 1): ?>
-                        <a href="<?php echo esc_url($build_pagination_url(1)); ?>" style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';" onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
-                            1
-                        </a>
-                        <?php if ($start_page > 2): ?>
-                            <span style="padding: 10px 8px; color: #6b7280; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px; flex-shrink: 0;">...</span>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                    
-                    <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
-                        <?php if ($i == $current_page): ?>
-                            <span style="padding: 10px 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; border-radius: 6px; border: 1.5px solid #667eea; font-weight: 600; font-size: 14px; cursor: default; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3), 0 2px 4px -1px rgba(102, 126, 234, 0.2); transform: scale(1.05); flex-shrink: 0;">
-                                <?php echo $i; ?>
-                            </span>
-                        <?php else: ?>
-                            <a href="<?php echo esc_url($build_pagination_url($i)); ?>" style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';" onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
-                                <?php echo $i; ?>
+                    <div class="transaction-pagination"
+                        style="display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap; margin-top: 32px; padding: 20px 0;"
+                        data-total-pages="<?php echo $total_pages; ?>" data-current-page="<?php echo $current_page; ?>"
+                        data-total-entries="<?php echo $total_entries; ?>" data-per-page="<?php echo $per_page; ?>">
+                        <?php if ($current_page > 1): ?>
+                            <a href="<?php echo esc_url($build_pagination_url($current_page - 1)); ?>"
+                                style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;"
+                                onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';"
+                                onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';">
+                                ← Previous
                             </a>
+                        <?php else: ?>
+                            <span
+                                style="padding: 10px 18px; background: #f3f4f6; color: #9ca3af; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: not-allowed; opacity: 0.7; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                ← Previous
+                            </span>
                         <?php endif; ?>
-                    <?php endfor; ?>
-                    
-                    <?php if ($end_page < $total_pages): ?>
-                        <?php if ($end_page < $total_pages - 1): ?>
-                            <span style="padding: 10px 8px; color: #6b7280; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px; flex-shrink: 0;">...</span>
+
+                        <div
+                            style="display: flex; flex-direction: row; gap: 6px; align-items: center; margin: 0 8px; flex-wrap: nowrap;">
+                            <?php
+                            // Show page numbers
+                            $start_page = max(1, $current_page - 2);
+                            $end_page = min($total_pages, $current_page + 2);
+
+                            if ($start_page > 1): ?>
+                                <a href="<?php echo esc_url($build_pagination_url(1)); ?>"
+                                    style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;"
+                                    onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';"
+                                    onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                    onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                    onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
+                                    1
+                                </a>
+                                <?php if ($start_page > 2): ?>
+                                    <span
+                                        style="padding: 10px 8px; color: #6b7280; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px; flex-shrink: 0;">...</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+
+                            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                <?php if ($i == $current_page): ?>
+                                    <span
+                                        style="padding: 10px 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; border-radius: 6px; border: 1.5px solid #667eea; font-weight: 600; font-size: 14px; cursor: default; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3), 0 2px 4px -1px rgba(102, 126, 234, 0.2); transform: scale(1.05); flex-shrink: 0;">
+                                        <?php echo $i; ?>
+                                    </span>
+                                <?php else: ?>
+                                    <a href="<?php echo esc_url($build_pagination_url($i)); ?>"
+                                        style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;"
+                                        onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';"
+                                        onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                        onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                        onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+
+                            <?php if ($end_page < $total_pages): ?>
+                                <?php if ($end_page < $total_pages - 1): ?>
+                                    <span
+                                        style="padding: 10px 8px; color: #6b7280; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px; flex-shrink: 0;">...</span>
+                                <?php endif; ?>
+                                <a href="<?php echo esc_url($build_pagination_url($total_pages)); ?>"
+                                    style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;"
+                                    onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';"
+                                    onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                    onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';"
+                                    onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
+                                    <?php echo $total_pages; ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($current_page < $total_pages): ?>
+                            <a href="<?php echo esc_url($build_pagination_url($current_page + 1)); ?>"
+                                style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;"
+                                onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';"
+                                onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';">
+                                Next →
+                            </a>
+                        <?php else: ?>
+                            <span
+                                style="padding: 10px 18px; background: #f3f4f6; color: #9ca3af; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: not-allowed; opacity: 0.7; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                Next →
+                            </span>
                         <?php endif; ?>
-                        <a href="<?php echo esc_url($build_pagination_url($total_pages)); ?>" style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';" onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
-                            <?php echo $total_pages; ?>
-                        </a>
-                    <?php endif; ?>
-                </div>
-                
-                <?php if ($current_page < $total_pages): ?>
-                    <a href="<?php echo esc_url($build_pagination_url($current_page + 1)); ?>" style="padding: 10px 18px; background: #ffffff; color: #4b5563; text-decoration: none; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); flex-shrink: 0;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db'; this.style.color='#1f2937'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';" onmouseout="this.style.background='#ffffff'; this.style.borderColor='#e5e7eb'; this.style.color='#4b5563'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0, 0, 0, 0.05)';">
-                        Next →
-                    </a>
-                <?php else: ?>
-                    <span style="padding: 10px 18px; background: #f3f4f6; color: #9ca3af; border-radius: 6px; border: 1.5px solid #e5e7eb; font-weight: 500; font-size: 14px; cursor: not-allowed; opacity: 0.7; min-width: 42px; height: 42px; text-align: center; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        Next →
-                    </span>
+                    </div>
+                    <div class="pagination-info">
+                        Showing <span class="pagination-start"><?php echo $offset + 1; ?></span> - <span
+                            class="pagination-end"><?php echo min($offset + $per_page, $total_entries); ?></span> of <span
+                            class="pagination-total"><?php echo $total_entries; ?></span> transactions
+                    </div>
                 <?php endif; ?>
-            </div>
-            <div class="pagination-info">
-                Showing <span class="pagination-start"><?php echo $offset + 1; ?></span> - <span class="pagination-end"><?php echo min($offset + $per_page, $total_entries); ?></span> of <span class="pagination-total"><?php echo $total_entries; ?></span> transactions
-            </div>
-            <?php endif; ?>
             </div>
         <?php else: ?>
             <p style="color: #6b7280; padding: 20px; text-align: center;">
@@ -1641,12 +1929,14 @@ $cs = get_woocommerce_currency_symbol();
     <div class="disclaimer-box">
         <p><strong><?php esc_html_e('Important:', 'cpm-dongtrader'); ?></strong></p>
         <p><?php esc_html_e('Your XP balance reflects action, not money.', 'cpm-dongtrader'); ?></p>
-        <p><?php esc_html_e('XP represents your verified 2-scan Proofs of Delivery under the LAUGH Fund system.', 'cpm-dongtrader'); ?></p>
-        <p><?php esc_html_e('Until', 'cpm-dongtrader'); ?> <?php echo esc_html($laugh_end_date); ?>, <?php esc_html_e('XP remains trade credit only — no cash value, no redemption.', 'cpm-dongtrader'); ?></p>
+        <p><?php esc_html_e('XP represents your verified 2-scan Proofs of Delivery under the LAUGH Fund system.', 'cpm-dongtrader'); ?>
+        </p>
+        <p><?php esc_html_e('Until', 'cpm-dongtrader'); ?> <?php echo esc_html($laugh_end_date); ?>,
+            <?php esc_html_e('XP remains trade credit only — no cash value, no redemption.', 'cpm-dongtrader'); ?>
+        </p>
         <p style="margin-top: 10px;">
-            <strong><?php esc_html_e('On', 'cpm-dongtrader'); ?> <?php echo esc_html($pbtv_snapshot_date); ?>:</strong> 
+            <strong><?php esc_html_e('On', 'cpm-dongtrader'); ?> <?php echo esc_html($pbtv_snapshot_date); ?>:</strong>
             <?php esc_html_e('Top 30 XP wallets receive PBTV NFT minting authority for Detente 2030.', 'cpm-dongtrader'); ?>
         </p>
     </div>
 </div>
-
