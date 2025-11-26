@@ -1099,32 +1099,32 @@ function add_custom_tab_to_my_account()
         ],
 
         [
+            'name' => __('Redemption', 'cpm-dongtrader'),
+            'slug' => 'redemption',
+            'position' => 4,
+        ],
+
+        [
             'name' => __('My Treasury', 'cpm-dongtrader'),
             'slug' => 'detente-treasury',
-            'position' => 4,
+            'position' => 5,
         ],
 
         [
             'name' => __('Group', 'cpm-dongtrader'),
             'slug' => 'detente-group',
-            'position' => 5,
+            'position' => 6,
         ],
 
         [
             'name' => __('Seller Income', 'cpm-dongtrader'),
             'slug' => 'detente-commission',
-            'position' => 6,
+            'position' => 7,
         ],
 
         [
             'name' => __('POC Pooling', 'cpm-dongtrader'),
             'slug' => 'poc-pooling',
-            'position' => 7,
-        ],
-
-        [
-            'name' => __('Redemption', 'cpm-dongtrader'),
-            'slug' => 'redemption',
             'position' => 8,
         ],
     ];
@@ -1688,6 +1688,11 @@ function dongtrader_xp_transfers_script() {
     
     $total_xp = 0;
     foreach ($user_treasury_entries as $entry) {
+        // Skip if entry is not an array
+        if (!is_array($entry) || empty($entry)) {
+            continue;
+        }
+        
         // Skip XP transfer entries - these are already accounted for in transactions table
         // XP transfers are stored in personal_scan with source='xp_transfer'
         if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
@@ -1695,39 +1700,66 @@ function dongtrader_xp_transfers_script() {
         }
         
         $xp = isset($entry['xp_units']) ? floatval($entry['xp_units']) : 0;
-        $total_xp += $xp;
+        if ($xp > 0) {
+            $total_xp += $xp;
+        }
     }
     
     // Get transactions to calculate available XP
     global $wpdb;
     $table_name = $wpdb->prefix . 'xp_transactions';
-    $user_transactions = $wpdb->get_results($wpdb->prepare("
-        SELECT xp_amount, sender_id, receiver_id
-        FROM {$table_name}
-        WHERE sender_id = %d OR receiver_id = %d
-    ", $user_id, $user_id), ARRAY_A);
+    $user_transactions = array();
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name));
+    if ($table_exists) {
+        $user_transactions = $wpdb->get_results($wpdb->prepare("
+            SELECT xp_amount, sender_id, receiver_id
+            FROM {$table_name}
+            WHERE sender_id = %d OR receiver_id = %d
+        ", $user_id, $user_id), ARRAY_A);
+        
+        if (!is_array($user_transactions)) {
+            $user_transactions = array();
+        }
+    }
     
     $total_xp_sent_js = 0;
     $total_xp_received_js = 0;
     if (is_array($user_transactions)) {
         foreach ($user_transactions as $trans) {
-            $xp_amt = floatval($trans['xp_amount']);
-            if (intval($trans['sender_id']) === $user_id) {
+            // Safety checks for transaction data
+            if (!isset($trans['xp_amount']) || !isset($trans['sender_id']) || !isset($trans['receiver_id'])) {
+                continue;
+            }
+            $xp_amt = isset($trans['xp_amount']) ? floatval($trans['xp_amount']) : 0;
+            $trans_sender_id = isset($trans['sender_id']) ? intval($trans['sender_id']) : 0;
+            $trans_receiver_id = isset($trans['receiver_id']) ? intval($trans['receiver_id']) : 0;
+            
+            if ($trans_sender_id === $user_id) {
                 $total_xp_sent_js += $xp_amt;
-            } else {
+            } elseif ($trans_receiver_id === $user_id) {
                 $total_xp_received_js += $xp_amt;
             }
         }
     }
     
     // Calculate available XP: Total XP - Sent + Received
+    // Ensure all values are numeric
+    $total_xp = is_numeric($total_xp) ? floatval($total_xp) : 0;
+    $total_xp_sent_js = is_numeric($total_xp_sent_js) ? floatval($total_xp_sent_js) : 0;
+    $total_xp_received_js = is_numeric($total_xp_received_js) ? floatval($total_xp_received_js) : 0;
+    
     $available_xp_js = $total_xp - $total_xp_sent_js + $total_xp_received_js;
-    if ($available_xp_js < 0) {
+    if ($available_xp_js < 0 || !is_numeric($available_xp_js)) {
         $available_xp_js = 0;
     }
     
     // Calculate max transfer (50% of available balance)
-    $max_transfer = $available_xp_js * 0.5;
+    $max_transfer = is_numeric($available_xp_js) ? ($available_xp_js * 0.5) : 0;
+    if ($max_transfer < 0 || !is_numeric($max_transfer)) {
+        $max_transfer = 0;
+    }
     
     ?>
     <script type="text/javascript">
@@ -1945,8 +1977,9 @@ function dongtrader_xp_transfers_script() {
                 // NEW: Calculate USD directly from XP (USD = XP / 10^23)
                 var xpPerDollar = 100000000000000000000000; // 10^23
                 var usd = amount / xpPerDollar;
-                // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-                var yam = usd; // 1 YAM = 1 USD
+                // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+                var yamPerUSD = 21000; // 1 USD = 21,000 YAM
+                var yam = usd * yamPerUSD; // Convert USD to YAM
                 $('#yam_equiv').text(yam.toExponential(2));
                 $('#usd_value').text(usd.toFixed(2));
                 $('#conversion_display').show();

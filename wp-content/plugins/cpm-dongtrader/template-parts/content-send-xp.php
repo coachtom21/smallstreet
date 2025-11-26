@@ -38,7 +38,7 @@ foreach (array_merge($seller_scan_data, $buyer_scan_data, $personal_scan_data) a
 
 // NEW CONVERSION: Calculate USD from XP, then YAM for display
 $usd_trade_value = $total_xp > 0 ? dongtrader_xp_to_usd($total_xp) : 0;
-// NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
+// NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
 $yam_equivalent = $total_xp > 0 ? dongtrader_xp_to_yam($total_xp) : 0;
 
 $max_transfer = $total_xp * 0.5; // 50% of balance
@@ -509,8 +509,8 @@ jQuery(document).ready(function($) {
     // For JavaScript, we'll use: USD = XP / 100000000000000000000000 (10^23)
     const xpPerDollar = 100000000000000000000000; // 10^23 XP per USD
     const usdPerXP = 1 / xpPerDollar; // USD per XP
-    // NEW CONVERSION: YAM = USD (1 YAM = 1 USD = 10^23 XP)
-    const yamPerUSD = 1; // 1 YAM = 1 USD
+    // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+    const yamPerUSD = 21000; // 1 USD = 21,000 YAM
 
     // Receiver search
     $('#receiver_search').on('input', function() {
@@ -612,8 +612,8 @@ jQuery(document).ready(function($) {
         if (amount > 0) {
             // NEW CONVERSION: Calculate USD directly from XP (USD = XP / 10^23)
             const usd = amount * usdPerXP;
-            // NEW CONVERSION: YAM = USD (1 YAM = 1 USD = 10^23 XP)
-            const yam = usd; // 1 YAM = 1 USD
+            // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+            const yam = usd * yamPerUSD; // 1 USD = 21,000 YAM
             $('#yam_equiv').text(yam.toExponential(2));
             $('#usd_value').text(usd.toFixed(2));
             $('#conversion_display').show();
@@ -627,7 +627,7 @@ jQuery(document).ready(function($) {
         if (selectedReceiver && amount > 0) {
             // NEW CONVERSION: Calculate USD from XP, then YAM for display
             const usd = amount * usdPerXP;
-            const yam = usd; // 1 YAM = 1 USD
+            const yam = usd * yamPerUSD; // 1 USD = 21,000 YAM
             const newBalance = currentBalance - amount;
             
             $('#summary_receiver').text(selectedReceiver.name);

@@ -1,12 +1,12 @@
 <?php
+
 /**
  * XP Transfers Page Template
  * Redesigned according to XP_TRANSFER_SYSTEM_SPEC.md
  */
-
 if (!is_user_logged_in()) {
-    echo '<p>' . esc_html__('Please log in to view XP transfers.', 'cpm-dongtrader') . '</p>';
-    return;
+  echo '<p>' . esc_html__('Please log in to view XP transfers.', 'cpm-dongtrader') . '</p>';
+  return;
 }
 
 $user_id = get_current_user_id();
@@ -17,12 +17,11 @@ $user = wp_get_current_user();
 // We check if any row exists with meta_key = '_discord_invite' for this user
 global $wpdb;
 $discord_invite_count = $wpdb->get_var($wpdb->prepare(
-    "SELECT COUNT(*) FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s",
-    $user_id,
-    '_discord_invite'
+  "SELECT COUNT(*) FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s",
+  $user_id,
+  '_discord_invite'
 ));
 $is_discord_verified = ($discord_invite_count > 0);
-
 
 // Get scan data from usermeta tables
 $seller_scan_raw = get_user_meta($user_id, 'seller_scan', true);
@@ -36,13 +35,13 @@ $personal_scan_data = maybe_unserialize($personal_scan_raw);
 
 // Ensure arrays
 if (!is_array($seller_scan_data)) {
-    $seller_scan_data = array();
+  $seller_scan_data = array();
 }
 if (!is_array($buyer_scan_data)) {
-    $buyer_scan_data = array();
+  $buyer_scan_data = array();
 }
 if (!is_array($personal_scan_data)) {
-    $personal_scan_data = array();
+  $personal_scan_data = array();
 }
 
 // Combine all scan entries into one array
@@ -50,290 +49,387 @@ $user_treasury_entries = array();
 
 // Add seller scans
 foreach ($seller_scan_data as $entry) {
-    if (is_array($entry) && !empty($entry)) {
-        $entry['source'] = 'seller_scan';
-        $entry['role'] = isset($entry['role']) ? $entry['role'] : 'seller';
-        $user_treasury_entries[] = $entry;
-    }
+  if (is_array($entry) && !empty($entry)) {
+    $entry['source'] = 'seller_scan';
+    $entry['role'] = isset($entry['role']) ? $entry['role'] : 'seller';
+    $user_treasury_entries[] = $entry;
+  }
 }
 
 // Add buyer scans
 foreach ($buyer_scan_data as $entry) {
-    if (is_array($entry) && !empty($entry)) {
-        $entry['source'] = 'buyer_scan';
-        $entry['role'] = isset($entry['role']) ? $entry['role'] : 'buyer';
-        $user_treasury_entries[] = $entry;
-    }
+  if (is_array($entry) && !empty($entry)) {
+    $entry['source'] = 'buyer_scan';
+    $entry['role'] = isset($entry['role']) ? $entry['role'] : 'buyer';
+    $user_treasury_entries[] = $entry;
+  }
 }
 
 // Add personal scans
 foreach ($personal_scan_data as $entry) {
-    if (is_array($entry) && !empty($entry)) {
-        $entry['source'] = 'personal_scan';
-        $entry['role'] = isset($entry['role']) ? $entry['role'] : 'personal';
-        $user_treasury_entries[] = $entry;
-    }
+  if (is_array($entry) && !empty($entry)) {
+    $entry['source'] = 'personal_scan';
+    $entry['role'] = isset($entry['role']) ? $entry['role'] : 'personal';
+    $user_treasury_entries[] = $entry;
+  }
 }
 
 // Get and add Discord invite entries
-$discord_invite_raw = get_user_meta($user_id, '_discord_invite', false); // Get all rows
+$discord_invite_raw = get_user_meta($user_id, '_discord_invite', false);  // Get all rows
 if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
-    foreach ($discord_invite_raw as $discord_entry_raw) {
-        $discord_entry = maybe_unserialize($discord_entry_raw);
-        
-        // Handle JSON string format
-        if (is_string($discord_entry)) {
-            $decoded = json_decode($discord_entry, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $discord_entry = $decoded;
-            } else {
-                continue;
-            }
-        }
-        
-        if (is_array($discord_entry) && !empty($discord_entry)) {
-            // NEW CONVERSION: XP is stored directly, or convert from USD if needed
-            if (isset($discord_entry['xp_units'])) {
-                $xp_units = is_string($discord_entry['xp_units']) ? floatval($discord_entry['xp_units']) : floatval($discord_entry['xp_units']);
-            } elseif (isset($discord_entry['xp_awarded'])) {
-                // Legacy: xp_awarded might be in old YAM format, convert to new XP
-                $xp_awarded_yam = intval($discord_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam / 1000000; // Legacy conversion
-            } else {
-                $xp_units = 0;
-            }
-            
-            // Calculate USD from XP using new conversion: USD = XP / 10^23
-            $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-            // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-            $yam_value = dongtrader_xp_to_yam($xp_units);
-            
-            $formatted_entry = array(
-                'source' => 'discord_invite',
-                'role' => 'Discord Verification',
-                'timestamp' => isset($discord_entry['verification_date']) ? $discord_entry['verification_date'] : (isset($discord_entry['joined_at']) ? $discord_entry['joined_at'] : current_time('mysql')),
-                'proof_id' => 'discord_' . (isset($discord_entry['discord_id']) ? $discord_entry['discord_id'] : 'invite'),
-                'xp_units' => $xp_units,
-                'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
-                'yam_value' => $yam_value,
-                'trade_value_usd' => $trade_value_usd,
-                'trade_value' => $trade_value_usd,
-                'status' => isset($discord_entry['status']) ? $discord_entry['status'] : 'completed',
-                'scan_status' => isset($discord_entry['status']) ? $discord_entry['status'] : 'completed',
-            );
-            $user_treasury_entries[] = $formatted_entry;
-        }
-    }
-}
+  foreach ($discord_invite_raw as $discord_entry_raw) {
+    $discord_entry = maybe_unserialize($discord_entry_raw);
 
-// Get and add Talent Show entries
-$talentshow_entry_raw = get_user_meta($user_id, '_talentshow_entry', false); // Get all rows
-if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
-    foreach ($talentshow_entry_raw as $talent_entry_raw) {
-        $talent_entry = maybe_unserialize($talent_entry_raw);
-        
-        // Handle JSON string format
-        if (is_string($talent_entry)) {
-            $decoded = json_decode($talent_entry, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $talent_entry = $decoded;
-            } else {
-                continue;
-            }
-        }
-        
-        if (is_array($talent_entry) && !empty($talent_entry)) {
-            // NEW CONVERSION: XP is stored directly
-            if (isset($talent_entry['xp_units'])) {
-                $xp_units = is_string($talent_entry['xp_units']) ? floatval($talent_entry['xp_units']) : floatval($talent_entry['xp_units']);
-            } elseif (isset($talent_entry['xp_awarded'])) {
-                // Legacy conversion from YAM
-                $xp_awarded_yam = intval($talent_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam / 1000000;
-            } else {
-                $xp_units = 0;
-            }
-            
-            // Calculate USD from XP using new conversion
-            $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-            // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-            $yam_value = dongtrader_xp_to_yam($xp_units);
-            
-            $formatted_entry = array(
-                'source' => 'talentshow_entry',
-                'role' => 'Talent Show',
-                'timestamp' => isset($talent_entry['submission_date']) ? $talent_entry['submission_date'] : current_time('mysql'),
-                'proof_id' => 'talentshow_' . (isset($talent_entry['performance_type']) ? sanitize_title($talent_entry['performance_type']) : 'entry'),
-                'xp_units' => $xp_units,
-                'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
-                'yam_value' => $yam_value,
-                'trade_value_usd' => $trade_value_usd,
-                'trade_value' => $trade_value_usd,
-                'status' => isset($talent_entry['status']) ? $talent_entry['status'] : 'submitted',
-                'scan_status' => isset($talent_entry['status']) ? $talent_entry['status'] : 'submitted',
-            );
-            $user_treasury_entries[] = $formatted_entry;
-        }
-    }
-}
-
-// Get and add Discord Poll entries
-$discord_poll_raw = get_user_meta($user_id, '_discord_poll', false); // Get all rows
-if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
-    foreach ($discord_poll_raw as $poll_entry_raw) {
-        $poll_entry = maybe_unserialize($poll_entry_raw);
-        
-        // Handle JSON string format
-        if (is_string($poll_entry)) {
-            $decoded = json_decode($poll_entry, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $poll_entry = $decoded;
-            } else {
-                continue;
-            }
-        }
-        
-        if (is_array($poll_entry) && !empty($poll_entry)) {
-            // NEW CONVERSION: XP is stored directly
-            if (isset($poll_entry['xp_units'])) {
-                $xp_units = is_string($poll_entry['xp_units']) ? floatval($poll_entry['xp_units']) : floatval($poll_entry['xp_units']);
-            } elseif (isset($poll_entry['xp_awarded'])) {
-                // Legacy conversion from YAM
-                $xp_awarded_yam = intval($poll_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam > 0 ? ($xp_awarded_yam / 1000000) : 0;
-            } else {
-                $xp_units = 0;
-            }
-            
-            // Calculate USD from XP using new conversion
-            $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
-            // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-            $yam_value = dongtrader_xp_to_yam($xp_units);
-            
-            $formatted_entry = array(
-                'source' => 'discord_poll',
-                'role' => 'Discord Poll',
-                'timestamp' => isset($poll_entry['vote_date']) ? $poll_entry['vote_date'] : (isset($poll_entry['submission_date']) ? $poll_entry['submission_date'] : current_time('mysql')),
-                'proof_id' => 'poll_' . (isset($poll_entry['poll_id']) ? $poll_entry['poll_id'] : 'entry'),
-                'xp_units' => $xp_units,
-                'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
-                'yam_value' => $yam_value,
-                'trade_value_usd' => $trade_value_usd,
-                'trade_value' => $trade_value_usd,
-                'status' => isset($poll_entry['status']) ? $poll_entry['status'] : 'completed',
-                'scan_status' => isset($poll_entry['status']) ? $poll_entry['status'] : 'completed',
-            );
-            $user_treasury_entries[] = $formatted_entry;
-        }
-    }
-}
-
-// Calculate totals (use strings for BCMath precision)
-$total_xp = '0';
-$total_yam = '0';
-$total_trade_value_usd = '0';
-
-// Process each entry
-foreach ($user_treasury_entries as $entry) {
-    // Skip XP transfer entries - these are already accounted for in transactions table
-    // XP transfers are stored in personal_scan with source='xp_transfer'
-    if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
-        continue;
-    }
-    
-    // For seller_scan, buyer_scan, and personal_scan, only include confirmed entries
-    $entry_source = isset($entry['source']) ? $entry['source'] : '';
-    if (in_array($entry_source, array('seller_scan', 'buyer_scan', 'personal_scan'))) {
-        $scan_status = isset($entry['scan_status']) ? $entry['scan_status'] : '';
-        if ($scan_status !== 'confirmed') {
-            continue; // Skip non-confirmed entries
-        }
-    }
-    
-    // Get values - NEW CONVERSION: XP is primary. Use strings and BCMath for precision.
-    $xp = isset($entry['xp_units']) ? (is_string($entry['xp_units']) ? $entry['xp_units'] : (string)$entry['xp_units']) : '0';
-
-    // Calculate trade_value_usd from XP using new conversion
-    if (function_exists('bccomp') && bccomp($xp, '0', 20) === 1) {
-      $trade_usd = dongtrader_xp_to_usd($xp);
-    } elseif (isset($entry['trade_value_usd']) && (string)$entry['trade_value_usd'] !== '' && (function_exists('bccomp') ? bccomp((string)$entry['trade_value_usd'], '0', 20) === 1 : floatval($entry['trade_value_usd']) > 0)) {
-      // Fallback: use stored trade_value_usd if XP not available
-      $trade_usd = (string)$entry['trade_value_usd'];
-    } else {
-      // Legacy: calculate from YAM if available
-      $stored_yam = isset($entry['yam_value']) ? (string)$entry['yam_value'] : '0';
-      if (function_exists('bccomp') ? bccomp($stored_yam, '0', 20) === 1 : floatval($stored_yam) > 0) {
-        // Convert YAM to XP (1 YAM = 10^23 XP)
-        $xp_string = dongtrader_yam_to_xp($stored_yam);
-        $xp = (string)$xp_string;
-        $trade_usd = dongtrader_xp_to_usd($xp);
+    // Handle JSON string format
+    if (is_string($discord_entry)) {
+      $decoded = json_decode($discord_entry, true);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $discord_entry = $decoded;
       } else {
-        $trade_usd = '0';
+        continue;
       }
     }
 
-    // Calculate YAM for display using new conversion (1 YAM = 1 USD = 10^23 XP)
-    $yam = (function_exists('bccomp') && bccomp($xp, '0', 20) === 1) ? dongtrader_xp_to_yam($xp) : '0';
+    if (is_array($discord_entry) && !empty($discord_entry)) {
+      // NEW CONVERSION: XP is stored directly, or convert from USD if needed
+      // Match wallet page approach: check xp_units first, then handle legacy xp_awarded
+      if (isset($discord_entry['xp_units'])) {
+        // If xp_units exists, use it directly (may be string for large numbers)
+        $xp_units = is_string($discord_entry['xp_units']) ? (string) $discord_entry['xp_units'] : (string) $discord_entry['xp_units'];
+      } elseif (isset($discord_entry['xp_awarded'])) {
+        // Legacy: xp_awarded might be in old YAM format, convert to new XP
+        // Old: 1 XP = 1,000,000 YAM, so divide by 1,000,000
+        // New: XP stored directly, but if old data exists, convert
+        $xp_awarded_yam = intval($discord_entry['xp_awarded']);
+        $xp_units = (string) ($xp_awarded_yam / 1000000);  // Legacy conversion, convert to string
+      } else {
+        $xp_units = '0';
+      }
 
-    // Add to totals using BCMath
-    if (function_exists('bcadd')) {
-      $total_xp = bcadd($total_xp, (string)$xp, 20);
-      $total_yam = bcadd($total_yam, (string)$yam, 20);
-      $total_trade_value_usd = bcadd($total_trade_value_usd, (string)$trade_usd, 20);
-    } else {
-      $total_xp += floatval($xp);
-      $total_yam += floatval($yam);
-      $total_trade_value_usd += floatval($trade_usd);
+      // Calculate USD from XP using new conversion: USD = XP / 10^23
+      $trade_value_usd = dongtrader_xp_to_usd($xp_units);
+      // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+      $yam_value = dongtrader_xp_to_yam($xp_units);
+
+      $formatted_entry = array(
+        'source' => 'discord_invite',
+        'role' => 'Discord Verification',
+        'timestamp' => isset($discord_entry['verification_date']) ? $discord_entry['verification_date'] : (isset($discord_entry['joined_at']) ? $discord_entry['joined_at'] : current_time('mysql')),
+        'proof_id' => 'discord_' . (isset($discord_entry['discord_id']) ? $discord_entry['discord_id'] : 'invite'),
+        'xp_units' => $xp_units,
+        'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
+        'yam_value' => $yam_value,
+        'trade_value_usd' => $trade_value_usd,
+        'trade_value' => $trade_value_usd,
+        'status' => isset($discord_entry['status']) ? $discord_entry['status'] : 'completed',
+        'scan_status' => isset($discord_entry['status']) ? $discord_entry['status'] : 'completed',
+      );
+      $user_treasury_entries[] = $formatted_entry;
     }
+  }
 }
 
-// Calculate YAM equivalent (1 XP = 1,000,000 YAM) using BCMath when available
-if (function_exists('bcmul')) {
-  $yam_equivalent = bcmul((string)$total_xp, '1000000', 0);
-  // Calculate max and min transfer amounts
-  $max_transfer = bcmul((string)$total_xp, '0.5', 20);
-  $min_transfer = '0.000001';
-} else {
-  $yam_equivalent = floatval($total_xp) * 1000000;
-  $max_transfer = floatval($total_xp) * 0.5;
-  $min_transfer = 0.000001;
+// Get and add Talent Show entries
+$talentshow_entry_raw = get_user_meta($user_id, '_talentshow_entry', false);  // Get all rows
+if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
+  foreach ($talentshow_entry_raw as $talent_entry_raw) {
+    $talent_entry = maybe_unserialize($talent_entry_raw);
+
+    // Handle JSON string format
+    if (is_string($talent_entry)) {
+      $decoded = json_decode($talent_entry, true);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $talent_entry = $decoded;
+      } else {
+        continue;
+      }
+    }
+
+    if (is_array($talent_entry) && !empty($talent_entry)) {
+      // NEW CONVERSION: XP is stored directly
+      if (isset($talent_entry['xp_units'])) {
+        $xp_units = is_string($talent_entry['xp_units']) ? ($talent_entry['xp_units']) : ($talent_entry['xp_units']);
+      } elseif (isset($talent_entry['xp_awarded'])) {
+        // Legacy conversion from YAM
+        $xp_awarded_yam = intval($talent_entry['xp_awarded']);
+        $xp_units = $xp_awarded_yam / 1000000;
+      } else {
+        $xp_units = 0;
+      }
+
+      // Calculate USD from XP using new conversion
+      $trade_value_usd = dongtrader_xp_to_usd($xp_units);
+      // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+      $yam_value = dongtrader_xp_to_yam($xp_units);
+
+      $formatted_entry = array(
+        'source' => 'talentshow_entry',
+        'role' => 'Talent Show',
+        'timestamp' => isset($talent_entry['submission_date']) ? $talent_entry['submission_date'] : current_time('mysql'),
+        'proof_id' => 'talentshow_' . (isset($talent_entry['performance_type']) ? sanitize_title($talent_entry['performance_type']) : 'entry'),
+        'xp_units' => $xp_units,
+        'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
+        'yam_value' => $yam_value,
+        'trade_value_usd' => $trade_value_usd,
+        'trade_value' => $trade_value_usd,
+        'status' => isset($talent_entry['status']) ? $talent_entry['status'] : 'submitted',
+        'scan_status' => isset($talent_entry['status']) ? $talent_entry['status'] : 'submitted',
+      );
+      $user_treasury_entries[] = $formatted_entry;
+    }
+  }
 }
+
+// Get and add Discord Poll entries
+$discord_poll_raw = get_user_meta($user_id, '_discord_poll', false);  // Get all rows
+if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
+  foreach ($discord_poll_raw as $poll_entry_raw) {
+    $poll_entry = maybe_unserialize($poll_entry_raw);
+
+    // Handle JSON string format
+    if (is_string($poll_entry)) {
+      $decoded = json_decode($poll_entry, true);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $poll_entry = $decoded;
+      } else {
+        continue;
+      }
+    }
+
+    if (is_array($poll_entry) && !empty($poll_entry)) {
+      // NEW CONVERSION: XP is stored directly
+      if (isset($poll_entry['xp_units'])) {
+        $xp_units = is_string($poll_entry['xp_units']) ? ($poll_entry['xp_units']) : ($poll_entry['xp_units']);
+      } elseif (isset($poll_entry['xp_awarded'])) {
+        // Legacy conversion from YAM
+        $xp_awarded_yam = intval($poll_entry['xp_awarded']);
+        $xp_units = $xp_awarded_yam > 0 ? ($xp_awarded_yam / 1000000) : 0;
+      } else {
+        $xp_units = 0;
+      }
+
+      // Calculate USD from XP using new conversion
+      $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+      // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+      $yam_value = dongtrader_xp_to_yam($xp_units);
+
+      $formatted_entry = array(
+        'source' => 'discord_poll',
+        'role' => 'Discord Poll',
+        'timestamp' => isset($poll_entry['vote_date']) ? $poll_entry['vote_date'] : (isset($poll_entry['submission_date']) ? $poll_entry['submission_date'] : current_time('mysql')),
+        'proof_id' => 'poll_' . (isset($poll_entry['poll_id']) ? $poll_entry['poll_id'] : 'entry'),
+        'xp_units' => $xp_units,
+        'xp_display_value' => isset($xp_awarded_yam) ? $xp_awarded_yam : 0,
+        'yam_value' => $yam_value,
+        'trade_value_usd' => $trade_value_usd,
+        'trade_value' => $trade_value_usd,
+        'status' => isset($poll_entry['status']) ? $poll_entry['status'] : 'completed',
+        'scan_status' => isset($poll_entry['status']) ? $poll_entry['status'] : 'completed',
+      );
+      $user_treasury_entries[] = $formatted_entry;
+    }
+  }
+}
+// Calculate totals
+// Initialize as 0 (integer) - BCMath functions will handle type conversion (matching wallet.php exactly)
+$total_xp = 0;
+$total_yam = 0;
+$total_trade_value_usd = 0;
+
+// Process each entry
+foreach ($user_treasury_entries as $entry) {
+  // Skip XP transfer entries - these are already accounted for in transactions table
+  // XP transfers are stored in personal_scan with source='xp_transfer'
+  if (isset($entry['source']) && $entry['source'] === 'xp_transfer') {
+    continue;
+  }
+
+  // For seller_scan, buyer_scan, and personal_scan, only include confirmed entries
+  $entry_source = isset($entry['source']) ? $entry['source'] : '';
+  if (in_array($entry_source, array('seller_scan', 'buyer_scan', 'personal_scan'))) {
+    $scan_status = isset($entry['scan_status']) ? $entry['scan_status'] : '';
+    if ($scan_status !== 'confirmed') {
+      continue;  // Skip non-confirmed entries
+    }
+  }
+
+  // Get values - NEW CONVERSION: XP is primary, calculate USD from XP
+  // Match wallet.php exactly: don't cast to string initially
+  $xp = isset($entry['xp_units']) ? ($entry['xp_units']) : 0;
+  // Calculate trade_value_usd from XP using new conversion
+  // Use floatval for comparison to handle both string and numeric types
+  if (floatval($xp) > 0) {
+    $trade_usd = dongtrader_xp_to_usd($xp);
+  } elseif (isset($entry['trade_value_usd']) && floatval($entry['trade_value_usd']) > 0) {
+    // Fallback: use stored trade_value_usd if XP not available
+    $trade_usd = floatval($entry['trade_value_usd']);
+  } else {
+    // Legacy: calculate from YAM if available
+    $stored_yam = isset($entry['yam_value']) ? floatval($entry['yam_value']) : 0;
+    if ($stored_yam > 0) {
+      // Convert YAM to XP (1 YAM = 10^23 XP)
+      $xp_string = dongtrader_yam_to_xp($stored_yam);
+      $xp = floatval($xp_string);
+      $trade_usd = dongtrader_xp_to_usd($xp);
+    } else {
+      $trade_usd = 0;
+    }
+  }
+
+  // Calculate YAM for display using new conversion (1 USD = 21,000 YAM = 10^23 XP)
+  // Use floatval for comparison to handle both string and numeric types
+  $yam = floatval($xp) > 0 ? dongtrader_xp_to_yam($xp) : 0;
+
+  // Add to totals using BCMath-safe functions to prevent float precision loss
+  // Match wallet.php exactly: BCMath functions handle type conversion internally
+  if (function_exists('dongtrader_num_add')) {
+    $total_xp = dongtrader_num_add($total_xp, $xp, 30);
+  } elseif (extension_loaded('bcmath')) {
+    $total_xp = bcadd($total_xp, $xp, 30);
+  } else {
+    $total_xp = (string)(floatval($total_xp) + floatval($xp));
+  }
+  $total_yam += $yam;
+  $total_trade_value_usd += $trade_usd;
+}
+
+// Min transfer amount (will calculate max after available_xp is calculated)
+$min_transfer = 0.000001;  // Minimum transfer amount
 
 // Constants
 $laugh_end_date = '2026-08-31';
 $pbtv_snapshot_date = '2026-08-11';
 
 // Helper function to format numbers in scientific notation (e.g., "1.03 × 10²³")
-function format_xp_scientific($num) {
-    if ($num == 0 || $num === null) {
-        return '0';
+// Match wallet.php exactly
+if (!function_exists('format_xp_scientific_wallet')) {
+  function format_xp_scientific_wallet($numStr)
+  {
+    if ($numStr === null)
+      return '0';
+
+    // Force string
+    $numStr = trim((string) $numStr);
+
+    // Zero?
+    if (preg_match('/^0+(\.0+)?$/', $numStr)) {
+      return '0';
     }
-    $scientific = sprintf('%.2e', $num);
-    $parts = explode('e', $scientific);
-    $mantissa_raw = $parts[0];
-    
-    // Remove only trailing zeros after decimal point, but preserve decimal places
-    // e.g., "7.21" stays "7.21", "7.20" becomes "7.2", "7.00" becomes "7"
-    if (strpos($mantissa_raw, '.') !== false) {
-        // Has decimal point - remove trailing zeros but keep at least one digit after decimal if non-zero
-        $mantissa = rtrim($mantissa_raw, '0');
-        // If we removed all digits after decimal, remove the decimal point too
-        if (substr($mantissa, -1) === '.') {
-            $mantissa = rtrim($mantissa, '.');
-        }
+
+    // Split integer/decimal parts
+    if (strpos($numStr, '.') !== false) {
+      list($intPart, $decPart) = explode('.', $numStr, 2);
     } else {
-        $mantissa = $mantissa_raw;
+      $intPart = $numStr;
+      $decPart = '';
+    }
+
+    // Remove leading zeros in integer part
+    $intPartTrimmed = ltrim($intPart, '0');
+
+    // Case 1: number >= 1
+    if ($intPartTrimmed !== '') {
+      // exponent = digit position
+      $exponent = strlen($intPartTrimmed) - 1;
+
+      $digits = $intPartTrimmed . $decPart;
+      // Safety check: ensure we have at least one digit
+      if (strlen($digits) === 0) {
+        return '0';
+      }
+      $mantissa = substr($digits, 0, 1);
+      $rest = substr($digits, 1);
+
+      if ($rest !== '') {
+        $mantissa .= '.' . $rest;
+      }
+    } else {
+      // Number < 1 (e.g. 0.000002)
+
+      // count leading zeros in decimals
+      $zeroCount = strspn($decPart, '0');
+      
+      // Safety check: ensure decPart has enough characters
+      if (strlen($decPart) === 0 || $zeroCount >= strlen($decPart)) {
+        return '0';
+      }
+
+      $exponent = -($zeroCount + 1);
+      
+      // Safety check before array access
+      if (!isset($decPart[$zeroCount])) {
+        return '0';
+      }
+
+      $mantissa = $decPart[$zeroCount];
+      $rest = substr($decPart, $zeroCount + 1);
+
+      if ($rest !== '') {
+        $mantissa .= '.' . $rest;
+      }
+    }
+
+    // Cleanup trailing zeros and dot
+    $mantissa = rtrim($mantissa, '0');
+    $mantissa = rtrim($mantissa, '.');
+    
+    // Ensure mantissa is not empty
+    if (empty($mantissa) || $mantissa === '') {
+      return '0';
     }
     
-    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-    
-    // If exponent is 0, just return the integer value
-    if ($exponent == 0) {
-        $base_value = floatval($mantissa);
-        return ($base_value == floor($base_value)) ? (string)intval($base_value) : (string)$base_value;
+    // Ensure exponent is set
+    if (!isset($exponent)) {
+      return '0';
     }
-    
-    return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+
+    $result = $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    return is_string($result) && $result !== '' ? $result : '0';
+  }
+}
+
+// Helper function to format numbers in scientific notation (e.g., "1.03 × 10²³")
+// Handles both string and numeric inputs to preserve precision
+function format_xp_scientific($num)
+{
+  if ($num == 0 || $num === null || $num === '0' || $num === '') {
+    return '0';
+  }
+
+  // Convert to string to preserve precision, then to float for sprintf
+  $numStr = trim((string) $num);
+  $numFloat = floatval($numStr);
+
+  if ($numFloat == 0) {
+    return '0';
+  }
+
+  $scientific = sprintf('%.2e', $numFloat);
+  $parts = explode('e', $scientific);
+  $mantissa_raw = $parts[0];
+
+  // Remove only trailing zeros after decimal point, but preserve decimal places
+  // e.g., "7.21" stays "7.21", "7.20" becomes "7.2", "7.00" becomes "7"
+  if (strpos($mantissa_raw, '.') !== false) {
+    // Has decimal point - remove trailing zeros but keep at least one digit after decimal if non-zero
+    $mantissa = rtrim($mantissa_raw, '0');
+    // If we removed all digits after decimal, remove the decimal point too
+    if (substr($mantissa, -1) === '.') {
+      $mantissa = rtrim($mantissa, '.');
+    }
+  } else {
+    $mantissa = $mantissa_raw;
+  }
+
+  $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+
+  // If exponent is 0, just return the integer value
+  if ($exponent == 0) {
+    $base_value = floatval($mantissa);
+    return ($base_value == floor($base_value)) ? (string) intval($base_value) : (string) $base_value;
+  }
+
+  return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
 }
 
 // Get currency symbol
@@ -348,42 +444,60 @@ $offset = ($current_page - 1) * $items_per_page;
 global $wpdb;
 $table_name = $wpdb->prefix . 'xp_transactions';
 
-// Get total count
-$total_transactions = $wpdb->get_var($wpdb->prepare("
-    SELECT COUNT(*)
-    FROM {$table_name} t
-    WHERE t.sender_id = %d OR t.receiver_id = %d
-", $user_id, $user_id));
+// Get total count with error handling
+$total_transactions = 0;
+$transactions = array();
+$all_transactions = array();
 
-$total_transactions = intval($total_transactions);
-$total_pages = ceil($total_transactions / $items_per_page);
-
-// Get paginated transactions
-$transactions = $wpdb->get_results($wpdb->prepare("
-    SELECT 
-        t.*,
-        sender.display_name as sender_name,
-        sender.user_email as sender_email,
-        receiver.display_name as receiver_name,
-        receiver.user_email as receiver_email
-    FROM {$table_name} t
-    LEFT JOIN {$wpdb->users} sender ON t.sender_id = sender.ID
-    LEFT JOIN {$wpdb->users} receiver ON t.receiver_id = receiver.ID
-    WHERE t.sender_id = %d OR t.receiver_id = %d
-    ORDER BY t.transaction_date DESC
-    LIMIT %d OFFSET %d
-", $user_id, $user_id, $items_per_page, $offset), ARRAY_A);
-
-if (!is_array($transactions)) {
-    $transactions = array();
+// Check if table exists before querying
+$table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name));
+if ($table_exists) {
+    $total_transactions = $wpdb->get_var($wpdb->prepare("
+        SELECT COUNT(*)
+        FROM {$table_name} t
+        WHERE t.sender_id = %d OR t.receiver_id = %d
+    ", $user_id, $user_id));
+    
+    if ($total_transactions === false || $total_transactions === null) {
+        $total_transactions = 0;
+    }
+    
+    $total_transactions = intval($total_transactions);
+    $total_pages = ceil($total_transactions / $items_per_page);
+    
+    // Get paginated transactions
+    $transactions = $wpdb->get_results($wpdb->prepare("
+        SELECT 
+            t.*,
+            sender.display_name as sender_name,
+            sender.user_email as sender_email,
+            receiver.display_name as receiver_name,
+            receiver.user_email as receiver_email
+        FROM {$table_name} t
+        LEFT JOIN {$wpdb->users} sender ON t.sender_id = sender.ID
+        LEFT JOIN {$wpdb->users} receiver ON t.receiver_id = receiver.ID
+        WHERE t.sender_id = %d OR t.receiver_id = %d
+        ORDER BY t.transaction_date DESC
+        LIMIT %d OFFSET %d
+    ", $user_id, $user_id, $items_per_page, $offset), ARRAY_A);
+    
+    if (!is_array($transactions)) {
+        $transactions = array();
+    }
+    
+    // Calculate totals from ALL transactions (not just current page)
+    $all_transactions = $wpdb->get_results($wpdb->prepare("
+        SELECT xp_amount, sender_id, receiver_id
+        FROM {$table_name}
+        WHERE sender_id = %d OR receiver_id = %d
+    ", $user_id, $user_id), ARRAY_A);
+    
+    if (!is_array($all_transactions)) {
+        $all_transactions = array();
+    }
+} else {
+    $total_pages = 0;
 }
-
-// Calculate totals from ALL transactions (not just current page)
-$all_transactions = $wpdb->get_results($wpdb->prepare("
-    SELECT xp_amount, sender_id, receiver_id
-    FROM {$table_name}
-    WHERE sender_id = %d OR receiver_id = %d
-", $user_id, $user_id), ARRAY_A);
 
 $total_xp_sent = '0';
 $total_xp_received = '0';
@@ -392,61 +506,69 @@ $total_transactions_received = 0;
 
 if (is_array($all_transactions)) {
   foreach ($all_transactions as $transaction) {
-    $xp_amount = isset($transaction['xp_amount']) ? (string)$transaction['xp_amount'] : '0';
-    $trans_sender_id = intval($transaction['sender_id']);
-    $trans_receiver_id = intval($transaction['receiver_id']);
+    // Safety check: ensure xp_amount exists and is valid
+    $xp_amt = isset($transaction['xp_amount']) ? (string) $transaction['xp_amount'] : '0';
+    if (empty($xp_amt) || !is_numeric($xp_amt)) {
+      $xp_amt = '0';
+    }
+    $trans_sender_id = isset($transaction['sender_id']) ? intval($transaction['sender_id']) : 0;
+    $trans_receiver_id = isset($transaction['receiver_id']) ? intval($transaction['receiver_id']) : 0;
 
     if ($trans_sender_id === $user_id) {
-      if (function_exists('bcadd')) {
-        $total_xp_sent = bcadd($total_xp_sent, $xp_amount, 20);
+      if (function_exists('dongtrader_num_add')) {
+        $total_xp_sent = dongtrader_num_add($total_xp_sent, $xp_amt, 20);
+      } elseif (extension_loaded('bcmath')) {
+        $total_xp_sent = bcadd($total_xp_sent, $xp_amt, 20);
       } else {
-        $total_xp_sent += floatval($xp_amount);
+        $total_xp_sent = (string) (floatval($total_xp_sent) + floatval($xp_amt));
       }
       $total_transactions_sent++;
     } elseif ($trans_receiver_id === $user_id) {
-      if (function_exists('bcadd')) {
-        $total_xp_received = bcadd($total_xp_received, $xp_amount, 20);
+      if (function_exists('dongtrader_num_add')) {
+        $total_xp_received = dongtrader_num_add($total_xp_received, $xp_amt, 20);
+      } elseif (extension_loaded('bcmath')) {
+        $total_xp_received = bcadd($total_xp_received, $xp_amt, 20);
       } else {
-        $total_xp_received += floatval($xp_amount);
+        $total_xp_received = (string) (floatval($total_xp_received) + floatval($xp_amt));
       }
       $total_transactions_received++;
     }
   }
 }
 
-// Calculate available XP: (All sources + XP received) - XP transfer using BCMath
+// Calculate available XP: (All sources + XP received) - XP transfer
 // Formula: XP Balance = (_discord_invite + _talentshow_entry + _discord_poll + seller_scan + buyer_scan + personal_scan + xp_received) - xp_transfer
-if (function_exists('bcadd') && function_exists('bcsub')) {
-  $available_xp = bcsub(bcadd((string)$total_xp, (string)$total_xp_received, 20), (string)$total_xp_sent, 20);
-  if (function_exists('bccomp') && bccomp($available_xp, '0', 20) === -1) {
-    $available_xp = '0';
-  }
+// Match wallet.php exactly
+if (function_exists('dongtrader_num_add') && function_exists('dongtrader_num_sub')) {
+  $available_xp = dongtrader_num_add($total_xp, $total_xp_received, 20);
+  $available_xp = dongtrader_num_sub($available_xp, $total_xp_sent, 20);
+} elseif (extension_loaded('bcmath')) {
+  $available_xp = bcadd($total_xp, $total_xp_received, 20);
+  $available_xp = bcsub($available_xp, $total_xp_sent, 20);
 } else {
-  $available_xp = ((float)$total_xp + (float)$total_xp_received) - (float)$total_xp_sent;
-  if ($available_xp < 0) {
-    $available_xp = 0;
-  }
+  $available_xp = (string)((floatval($total_xp) + floatval($total_xp_received)) - floatval($total_xp_sent));
 }
 
-// Debug: Uncomment to check values
-// error_log("Total XP: " . $total_xp);
-// error_log("Total XP Sent: " . $total_xp_sent);
-// error_log("Total XP Received: " . $total_xp_received);
-// error_log("Available XP: " . $available_xp);
+if ($available_xp < 0) {
+  $available_xp = 0;
+}
 
-// Recalculate YAM equivalent and USD trade value based on available XP - NEW CONVERSION
+// Calculate max transfer amount - 50% of available XP (after accounting for sent/received transfers)
+if (function_exists('dongtrader_num_mul')) {
+  $max_transfer = dongtrader_num_mul($available_xp, '0.5', 20);  // 50% of available balance
+} elseif (extension_loaded('bcmath')) {
+  $max_transfer = bcmul($available_xp, '0.5', 20);  // 50% of available balance
+} else {
+  $max_transfer = (string) (floatval($available_xp) * 0.5);
+}
+
+// Recalculate YAM and USD based on available XP - NEW CONVERSION
 // USD = XP / 10^23 (using new conversion function)
-$available_xp_str = (string)$available_xp;
-if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (!function_exists('bccomp') && floatval($available_xp_str) > 0)) {
-  $available_usd_trade_value_raw = dongtrader_xp_to_usd($available_xp_str);
-  // Convert to float for proper formatting (function may return string for precision)
-  $available_usd_trade_value = is_numeric($available_usd_trade_value_raw) ? floatval($available_usd_trade_value_raw) : 0;
-  // NEW CONVERSION: YAM = XP / 10^23 (1 YAM = 1 USD = 10^23 XP)
-  $available_yam_equivalent = dongtrader_xp_to_yam($available_xp_str);
-} else {
-  $available_usd_trade_value = 0;
-  $available_yam_equivalent = '0';
-}
+// Convert to string for large numbers to maintain precision
+$available_xp_str = (string) $available_xp;
+$available_usd_trade_value = $available_xp > 0 ? dongtrader_xp_to_usd($available_xp_str) : 0;
+// NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+$available_yam_equivalent = $available_xp > 0 ? dongtrader_xp_to_yam($available_xp_str) : 0;
 ?>
 
 <style>
@@ -1784,100 +1906,64 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
             </div>
     </div>
 
-        <!-- Balance Display -->
-        <div class="balance-display" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-            <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #bfdbfe; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 0.75rem; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-                    <?php esc_html_e('Available XP', 'cpm-dongtrader'); ?>
+        <!-- Balance Display (Matching Wallet Page Style) -->
+        <div class="wallet-summary-grid" style="display:flex; flex-wrap:wrap; gap:15px; margin-top:20px; margin-bottom:24px;">
+
+            <!-- XP Balance -->
+            <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb; 
+            padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+                <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
+                    <?php esc_html_e('XP Balance', 'cpm-dongtrader'); ?>
+                </h4>
+
+                <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                    <?php echo format_xp_scientific_wallet($available_xp); ?>
                 </div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2563eb; font-family: 'Courier New', monospace;">
-                    <?php 
-                    // Display available XP in scientific notation (matches wallet page format)
-                    if ($available_xp > 0) {
-                        $scientific = sprintf('%.2e', $available_xp);
-                        $parts = explode('e', $scientific);
-                        $mantissa_raw = $parts[0];
-                        
-                        // Remove only trailing zeros after decimal point, but preserve decimal places
-                        if (strpos($mantissa_raw, '.') !== false) {
-                            $mantissa = rtrim($mantissa_raw, '0');
-                            if (substr($mantissa, -1) === '.') {
-                                $mantissa = rtrim($mantissa, '.');
-                            }
-                        } else {
-                            $mantissa = $mantissa_raw;
-                        }
-                        
-                        $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                        if ($exponent == 0) {
-                            $base_value = floatval($mantissa);
-                            echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                        } else {
-                        echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                        }
-                    } else {
-                        echo '0';
-                    }
-                    ?> XP
+
+                <div class="sub-value" style="font-size:12px; color:#6b7280;">
+                    <?php esc_html_e('Available XP (after transfers)', 'cpm-dongtrader'); ?>
                 </div>
             </div>
-            
-            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #bbf7d0; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 0.75rem; font-weight: 600; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+
+
+            <!-- YAM Equivalent -->
+            <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb;
+            padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+                <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
                     <?php esc_html_e('YAM Equivalent', 'cpm-dongtrader'); ?>
-                </div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #059669; font-family: 'Courier New', monospace; line-height: 1.4;">
-                    <?php 
-                    // Display YAM in scientific notation (matches wallet page format exactly)
+                </h4>
+
+                <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                    <?php
+                    // Display YAM in regular decimal notation (not scientific notation)
                     if ($available_yam_equivalent > 0 && is_numeric($available_yam_equivalent)) {
-                        $yam_scientific = sprintf('%.2e', (float)$available_yam_equivalent);
-                        $parts = explode('e', $yam_scientific);
-                        if (count($parts) == 2) {
-                            $mantissa_raw = $parts[0];
-                            
-                            // Remove only trailing zeros after decimal point, but preserve decimal places
-                            if (strpos($mantissa_raw, '.') !== false) {
-                                $mantissa = rtrim($mantissa_raw, '0');
-                                if (substr($mantissa, -1) === '.') {
-                                    $mantissa = rtrim($mantissa, '.');
-                                }
-                            } else {
-                                $mantissa = $mantissa_raw;
-                            }
-                            
-                            $exponent = intval($parts[1]);
-                            
-                            // If exponent is 0, just display the integer
-                            if ($exponent == 0) {
-                                $base_value = floatval($mantissa);
-                                echo ($base_value == floor($base_value)) ? esc_html((int)$base_value) : esc_html($base_value);
-                            } else {
-                                echo esc_html($mantissa) . ' × 10<sup>' . esc_html($exponent) . '</sup>';
-                            }
+                        // Check if it's a whole number
+                        if ($available_yam_equivalent == floor($available_yam_equivalent)) {
+                            // Whole number - display without decimals
+                            echo esc_html(number_format($available_yam_equivalent, 0));
+                        } elseif ($available_yam_equivalent >= 1) {
+                            // For values >= 1 with decimals, show with 2 decimal places
+                            echo esc_html(number_format($available_yam_equivalent, 2));
+                        } elseif ($available_yam_equivalent >= 0.01) {
+                            // For values >= 0.01, show with 4 decimal places
+                            echo esc_html(number_format($available_yam_equivalent, 4));
                         } else {
-                            echo esc_html(number_format($available_yam_equivalent, 18));
+                            // For very small values, show with 6 decimal places
+                            echo esc_html(number_format($available_yam_equivalent, 6));
                         }
                     } else {
                         echo '0';
                     }
                     ?>
                 </div>
-            </div>
-            
-            <div style="background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%); border: 2px solid #fde047; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 0.75rem; font-weight: 600; color: #854d0e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-                    <?php esc_html_e('USD Trade Value', 'cpm-dongtrader'); ?>
-                </div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #ca8a04; font-family: 'Courier New', monospace;">
-                    <?php 
-                    // USD Trade Value calculated using conversion rate: 1 USD = 10^23 XP
-                    // Uses dongtrader_xp_to_usd() function with string precision (matches wallet page)
-                    // Ensure value is numeric before formatting
-                    $usd_value = is_numeric($available_usd_trade_value) ? floatval($available_usd_trade_value) : 0;
-                    echo esc_html($cs) . number_format($usd_value, 2); 
-                    ?>
+
+                <div class="sub-value" style="font-size:12px; color:#6b7280;">
+                    <?php esc_html_e('1 USD = 21,000 YAM = 10²³ XP', 'cpm-dongtrader'); ?>
                 </div>
             </div>
+
         </div>
 
         <!-- Transactions List -->
@@ -1886,49 +1972,94 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                 <?php esc_html_e('Transfer History', 'cpm-dongtrader'); ?>
             </h3>
             
-            <!-- Transaction Summary -->
+            <!-- Transaction Summary (Matching Wallet Page Style) -->
             <?php if (!empty($transactions)): ?>
-                <div class="transaction-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                    <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #fecaca; border-radius: 12px; padding: 16px;">
-                        <div style="font-size: 0.75rem; font-weight: 600; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-                            <?php esc_html_e('Total XP Sent', 'cpm-dongtrader'); ?>
+                <div class="wallet-summary-grid" style="display:flex; flex-wrap:wrap; gap:15px; margin-top:20px; margin-bottom:24px;">
+                    
+                    <!-- XP Sent -->
+                    <div class="wallet-card" style="flex:1 1 250px; background:linear-gradient(135deg,#fff5f5 0%,#ffe6e6 100%);
+                    border:1px solid #fcd4d4; padding:18px; border-radius:10px; 
+                    box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+                        <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#b91c1c;">
+                            <?php esc_html_e('XP Sent', 'cpm-dongtrader'); ?>
+                        </h4>
+
+                        <div class="value" style="font-size:22px; font-weight:700; color:#dc2626; margin-bottom:5px;">
+                            <?php
+                            $sent_formatted = format_xp_scientific_wallet($total_xp_sent);
+                            // Remove "× 10^0" when exponent is 0
+                            $sent_formatted = preg_replace('/\s*×\s*10<sup>0<\/sup>/', '', $sent_formatted);
+                            $sent_formatted = preg_replace('/\s*×\s*10\^0/', '', $sent_formatted);
+                            echo $sent_formatted;
+                            ?>
                         </div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626; font-family: 'Courier New', monospace;">
-                            <?php echo format_xp_scientific($total_xp_sent); ?> XP
-                        </div>
-                        <div style="font-size: 0.75rem; color: #991b1b; margin-top: 4px;">
+
+                        <div class="sub-value" style="font-size:12px; color:#b91c1c;">
                             <?php echo sprintf(_n('%d transaction', '%d transactions', $total_transactions_sent, 'cpm-dongtrader'), $total_transactions_sent); ?>
                         </div>
                     </div>
-                    
-                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #bbf7d0; border-radius: 12px; padding: 16px;">
-                        <div style="font-size: 0.75rem; font-weight: 600; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-                            <?php esc_html_e('Total XP Received', 'cpm-dongtrader'); ?>
+
+
+                    <!-- XP Received -->
+                    <div class="wallet-card" style="flex:1 1 250px; background:linear-gradient(135deg,#f0fff4 0%,#dcfce7 100%);
+                    border:1px solid #bbf7d0; padding:18px; border-radius:10px; 
+                    box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+                        <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#065f46;">
+                            <?php esc_html_e('XP Received', 'cpm-dongtrader'); ?>
+                        </h4>
+
+                        <div class="value" style="font-size:22px; font-weight:700; color:#059669; margin-bottom:5px;">
+                            <?php
+                            $received_formatted = format_xp_scientific_wallet($total_xp_received);
+                            // Remove "× 10^0" when exponent is 0
+                            $received_formatted = preg_replace('/\s*×\s*10<sup>0<\/sup>/', '', $received_formatted);
+                            $received_formatted = preg_replace('/\s*×\s*10\^0/', '', $received_formatted);
+                            echo $received_formatted;
+                            ?>
                         </div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #059669; font-family: 'Courier New', monospace;">
-                            <?php echo format_xp_scientific($total_xp_received); ?> XP
-                        </div>
-                        <div style="font-size: 0.75rem; color: #065f46; margin-top: 4px;">
+
+                        <div class="sub-value" style="font-size:12px; color:#065f46;">
                             <?php echo sprintf(_n('%d transaction', '%d transactions', $total_transactions_received, 'cpm-dongtrader'), $total_transactions_received); ?>
                         </div>
                     </div>
-                    
-                    <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 2px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-                        <div style="font-size: 0.75rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+
+
+                    <!-- Net XP -->
+                    <div class="wallet-card" style="flex:1 1 250px; background:#ffffff; border:1px solid #e5e7eb;
+                    padding:18px; border-radius:10px; box-shadow:0px 2px 8px rgba(0,0,0,0.07);">
+
+                        <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#6b7280;">
                             <?php esc_html_e('Net XP', 'cpm-dongtrader'); ?>
+                        </h4>
+
+                        <div class="value" style="font-size:22px; font-weight:700; color:#111827; margin-bottom:5px;">
+                            <?php
+                            // Use BCMath-safe functions to prevent float precision loss
+                            if (function_exists('dongtrader_num_sub')) {
+                              $net_xp = dongtrader_num_sub($total_xp_received, $total_xp_sent, 20);
+                            } elseif (extension_loaded('bcmath')) {
+                              $net_xp = bcsub($total_xp_received, $total_xp_sent, 20);
+                            } else {
+                              $net_xp = (string) (floatval($total_xp_received) - floatval($total_xp_sent));
+                            }
+                            $net_xp_float = floatval($net_xp);
+                            $sign = ($net_xp_float >= 0 && $net_xp !== '-0' && $net_xp !== '0') ? '+' : '';
+                            $abs_net_xp = ($net_xp_float < 0 || $net_xp === '-0') ? ltrim($net_xp, '-') : $net_xp;
+                            $net_formatted = format_xp_scientific_wallet($abs_net_xp);
+                            // Remove "× 10^0" when exponent is 0
+                            $net_formatted = preg_replace('/\s*×\s*10<sup>0<\/sup>/', '', $net_formatted);
+                            $net_formatted = preg_replace('/\s*×\s*10\^0/', '', $net_formatted);
+                            echo $sign . $net_formatted;
+                            ?>
                         </div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #334155; font-family: 'Courier New', monospace;">
-                            <?php 
-                            $net_xp = $total_xp_received - $total_xp_sent;
-                            $sign = ($net_xp >= 0 ? '+' : '');
-                            $abs_net_xp = abs($net_xp);
-                            echo $sign . format_xp_scientific($abs_net_xp); 
-                            ?> XP
-                        </div>
-                        <div style="font-size: 0.75rem; color: #475569; margin-top: 4px;">
+
+                        <div class="sub-value" style="font-size:12px; color:#6b7280;">
                             <?php esc_html_e('Received - Sent', 'cpm-dongtrader'); ?>
                         </div>
                     </div>
+
                 </div>
             <?php endif; ?>
             
@@ -1960,22 +2091,53 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                                 <th style="padding: 16px; text-align: left; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('Type', 'cpm-dongtrader'); ?></th>
                                 <th style="padding: 16px; text-align: left; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('User', 'cpm-dongtrader'); ?></th>
                                 <th style="padding: 16px; text-align: right; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('XP Amount', 'cpm-dongtrader'); ?></th>
-                                <th style="padding: 16px; text-align: right; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('YAM', 'cpm-dongtrader'); ?></th>
                                 <th style="padding: 16px; text-align: left; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('Memo', 'cpm-dongtrader'); ?></th>
                                 <th style="padding: 16px; text-align: left; font-weight: 600; color: #374151; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;"><?php esc_html_e('Date', 'cpm-dongtrader'); ?></th>
                 </tr>
             </thead>
                         <tbody>
-                            <?php foreach ($transactions as $transaction): 
-                                $is_sent = intval($transaction['sender_id']) === $user_id;
-                                $other_user_name = $is_sent ? $transaction['receiver_name'] : $transaction['sender_name'];
-                                $other_user_email = $is_sent ? $transaction['receiver_email'] : $transaction['sender_email'];
-                                $xp_amount = floatval($transaction['xp_amount']);
-                                $yam_equivalent = floatval($transaction['yam_equivalent']);
-                                $memo = !empty($transaction['memo']) ? esc_html($transaction['memo']) : '—';
-                                $transaction_date = !empty($transaction['transaction_date']) ? strtotime($transaction['transaction_date']) : time();
-                                $transaction_type = $is_sent ? 'sent' : 'received';
-                            ?>
+                            <?php
+                            foreach ($transactions as $transaction):
+                              // Safety checks for transaction data
+                              $sender_id = isset($transaction['sender_id']) ? intval($transaction['sender_id']) : 0;
+                              $receiver_id = isset($transaction['receiver_id']) ? intval($transaction['receiver_id']) : 0;
+                              $is_sent = $sender_id === $user_id;
+                              $other_user_name = $is_sent ? (isset($transaction['receiver_name']) ? $transaction['receiver_name'] : 'Unknown') : (isset($transaction['sender_name']) ? $transaction['sender_name'] : 'Unknown');
+                              $other_user_email = $is_sent ? (isset($transaction['receiver_email']) ? $transaction['receiver_email'] : '') : (isset($transaction['sender_email']) ? $transaction['sender_email'] : '');
+                              $xp_amount = isset($transaction['xp_amount']) ? (string) $transaction['xp_amount'] : '0';
+                              // Ensure xp_amount is a valid numeric string
+                              if (empty($xp_amount) || !is_numeric($xp_amount)) {
+                                  $xp_amount = '0';
+                              }
+                              // Recalculate YAM from XP using new conversion rate (1 USD = 21,000 YAM = 10^23 XP)
+                              // Use string-based calculation for precision with very small values
+                              $xp_amount_float = floatval($xp_amount);
+                              $yam_equivalent = 0;
+                              
+                              if ($xp_amount_float > 0 && $xp_amount !== '0' && $xp_amount !== '') {
+                                  if (function_exists('dongtrader_xp_to_yam_string')) {
+                                      try {
+                                          // Use BCMath for precise calculation with very small numbers
+                                          $yam_equivalent_str = dongtrader_xp_to_yam_string($xp_amount, 30);
+                                          if (!empty($yam_equivalent_str) && is_numeric($yam_equivalent_str)) {
+                                              $yam_equivalent = floatval($yam_equivalent_str);
+                                          } else {
+                                              // Fallback if result is invalid
+                                              $yam_equivalent = dongtrader_xp_to_yam($xp_amount_float);
+                                          }
+                                      } catch (Throwable $e) {
+                                          // Catch both Exception and Error (PHP 7+) if string calculation fails
+                                          $yam_equivalent = dongtrader_xp_to_yam($xp_amount_float);
+                                      }
+                                  } else {
+                                      // Fallback to regular function
+                                      $yam_equivalent = dongtrader_xp_to_yam($xp_amount_float);
+                                  }
+                              }
+                              $memo = !empty($transaction['memo']) ? esc_html($transaction['memo']) : '—';
+                              $transaction_date = !empty($transaction['transaction_date']) ? strtotime($transaction['transaction_date']) : time();
+                              $transaction_type = $is_sent ? 'sent' : 'received';
+                              ?>
                                 <tr class="transaction-row" data-transaction-type="<?php echo esc_attr($transaction_type); ?>" style="border-bottom: 1px solid #f3f4f6; transition: background 0.2s ease;">
                                     <td style="padding: 16px;">
                                         <span style="display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; <?php echo $is_sent ? 'background: #fef2f2; color: #dc2626;' : 'background: #f0fdf4; color: #059669;'; ?>">
@@ -1988,9 +2150,6 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                                     </td>
                                     <td style="padding: 16px; text-align: right; font-family: 'Courier New', monospace; font-weight: 600; <?php echo $is_sent ? 'color: #dc2626;' : 'color: #059669;'; ?>">
                                         <?php echo $is_sent ? '-' : '+'; ?><?php echo format_xp_scientific($xp_amount); ?> XP
-                                    </td>
-                                    <td style="padding: 16px; text-align: right; font-family: 'Courier New', monospace; color: #6b7280; font-size: 0.875rem;">
-                                        <?php echo number_format($yam_equivalent, 0); ?>
                                     </td>
                                     <td style="padding: 16px; color: #6b7280; font-size: 0.875rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($memo); ?>">
                                         <?php echo $memo; ?>
@@ -2010,8 +2169,8 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                 <?php
                 // Previous button
                 if ($current_page > 1):
-                    $prev_url = add_query_arg('txn_page', $current_page - 1);
-                ?>
+                  $prev_url = add_query_arg('txn_page', $current_page - 1);
+                  ?>
                     <a href="<?php echo esc_url($prev_url); ?>" class="pagination-btn pagination-prev" style="background: #ffffff; border: 2px solid #e5e7eb; border-radius: 8px; padding: 8px 16px; font-size: 0.875rem; font-weight: 600; color: #374151; text-decoration: none; transition: all 0.3s ease; cursor: pointer;">
                         <?php esc_html_e('← Previous', 'cpm-dongtrader'); ?>
                     </a>
@@ -2026,11 +2185,11 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                     <?php
                     $start_page = max(1, $current_page - 2);
                     $end_page = min($total_pages, $current_page + 2);
-                    
+
                     // Show first page if not in range
                     if ($start_page > 1):
-                        $first_url = add_query_arg('txn_page', 1);
-                    ?>
+                      $first_url = add_query_arg('txn_page', 1);
+                      ?>
                         <a href="<?php echo esc_url($first_url); ?>" class="pagination-number" style="background: #ffffff; border: 2px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 0.875rem; font-weight: 600; color: #374151; text-decoration: none; min-width: 40px; text-align: center; transition: all 0.3s ease;">
                             1
                         </a>
@@ -2039,10 +2198,11 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                         <?php endif; ?>
                     <?php endif; ?>
                     
-                    <?php for ($i = $start_page; $i <= $end_page; $i++): 
-                        $page_url = add_query_arg('txn_page', $i);
-                        $is_active = ($i == $current_page);
-                    ?>
+                    <?php
+                    for ($i = $start_page; $i <= $end_page; $i++):
+                      $page_url = add_query_arg('txn_page', $i);
+                      $is_active = ($i == $current_page);
+                      ?>
                         <a href="<?php echo esc_url($page_url); ?>" class="pagination-number <?php echo $is_active ? 'active' : ''; ?>" style="background: <?php echo $is_active ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : '#ffffff'; ?>; border: 2px solid <?php echo $is_active ? '#047857' : '#e5e7eb'; ?>; border-radius: 8px; padding: 8px 12px; font-size: 0.875rem; font-weight: 600; color: <?php echo $is_active ? '#ffffff' : '#374151'; ?>; text-decoration: none; min-width: 40px; text-align: center; transition: all 0.3s ease; box-shadow: <?php echo $is_active ? '0 2px 8px rgba(5, 150, 105, 0.25)' : 'none'; ?>;">
                             <?php echo $i; ?>
                         </a>
@@ -2065,8 +2225,8 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                 <?php
                 // Next button
                 if ($current_page < $total_pages):
-                    $next_url = add_query_arg('txn_page', $current_page + 1);
-                ?>
+                  $next_url = add_query_arg('txn_page', $current_page + 1);
+                  ?>
                     <a href="<?php echo esc_url($next_url); ?>" class="pagination-btn pagination-next" style="background: #ffffff; border: 2px solid #e5e7eb; border-radius: 8px; padding: 8px 16px; font-size: 0.875rem; font-weight: 600; color: #374151; text-decoration: none; transition: all 0.3s ease; cursor: pointer;">
                         <?php esc_html_e('Next →', 'cpm-dongtrader'); ?>
                     </a>
@@ -2079,14 +2239,14 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
             
             <!-- Pagination Info -->
             <div class="pagination-info" style="text-align: center; margin-top: 12px; color: #6b7280; font-size: 0.875rem;">
-                <?php 
+                <?php
                 $start_item = $offset + 1;
                 $end_item = min($offset + $items_per_page, $total_transactions);
                 echo sprintf(
-                    esc_html__('Showing %d-%d of %d transactions', 'cpm-dongtrader'),
-                    $start_item,
-                    $end_item,
-                    $total_transactions
+                  esc_html__('Showing %d-%d of %d transactions', 'cpm-dongtrader'),
+                  $start_item,
+                  $end_item,
+                  $total_transactions
                 );
                 ?>
         </div>
@@ -2158,33 +2318,35 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
                 </div>
                 <div class="limit-info">
                     <span>Min: <?php echo number_format($min_transfer, 6); ?> XP</span>
-                    <span>Max: <?php 
-                        if ($max_transfer > 0) {
-                            $scientific = sprintf('%.2e', $max_transfer);
-                            $parts = explode('e', $scientific);
-                            $mantissa_raw = $parts[0];
-                            
-                            // Remove only trailing zeros after decimal point, but preserve decimal places
-                            if (strpos($mantissa_raw, '.') !== false) {
-                                $mantissa = rtrim($mantissa_raw, '0');
-                                if (substr($mantissa, -1) === '.') {
-                                    $mantissa = rtrim($mantissa, '.');
-                                }
-                            } else {
-                                $mantissa = $mantissa_raw;
-                            }
-                            
-                            $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                            if ($exponent == 0) {
-                                $base_value = floatval($mantissa);
-                                echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                            } else {
-                                echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                            }
-                        } else {
-                            echo '0';
-                        }
-                    ?> XP (50% of balance)</span>
+                    <span>Max: <?php
+// Handle string values from BCMath operations
+$max_transfer_float = floatval($max_transfer);
+if ($max_transfer_float > 0) {
+  $scientific = sprintf('%.2e', $max_transfer_float);
+  $parts = explode('e', $scientific);
+  $mantissa_raw = $parts[0];
+
+  // Remove only trailing zeros after decimal point, but preserve decimal places
+  if (strpos($mantissa_raw, '.') !== false) {
+    $mantissa = rtrim($mantissa_raw, '0');
+    if (substr($mantissa, -1) === '.') {
+      $mantissa = rtrim($mantissa, '.');
+    }
+  } else {
+    $mantissa = $mantissa_raw;
+  }
+
+  $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+  if ($exponent == 0) {
+    $base_value = floatval($mantissa);
+    echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+  } else {
+    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+  }
+} else {
+  echo '0';
+}
+?> XP (50% of balance)</span>
                 </div>
                 <div class="error-text" id="amount_error" style="display: none;"></div>
                 
@@ -2238,33 +2400,35 @@ if ((function_exists('bccomp') && bccomp($available_xp_str, '0', 20) === 1) || (
             </div>
             <div class="summary-row">
                 <span class="summary-label"><?php esc_html_e('Your New Balance:', 'cpm-dongtrader'); ?></span>
-                <span class="summary-value" id="summary_new_balance"><?php 
-                    if ($total_xp > 0) {
-                        $scientific = sprintf('%.2e', $total_xp);
-                        $parts = explode('e', $scientific);
-                        $mantissa_raw = $parts[0];
-                        
-                        // Remove only trailing zeros after decimal point, but preserve decimal places
-                        if (strpos($mantissa_raw, '.') !== false) {
-                            $mantissa = rtrim($mantissa_raw, '0');
-                            if (substr($mantissa, -1) === '.') {
-                                $mantissa = rtrim($mantissa, '.');
-                            }
-                        } else {
-                            $mantissa = $mantissa_raw;
-                        }
-                        
-                        $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-                        if ($exponent == 0) {
-                            $base_value = floatval($mantissa);
-                            echo ($base_value == floor($base_value)) ? (int)$base_value : $base_value;
-                        } else {
-                            echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                        }
-                    } else {
-                        echo '0';
-                    }
-                ?></span>
+                <span class="summary-value" id="summary_new_balance"><?php
+// Handle string values from BCMath operations
+$total_xp_float = floatval($total_xp);
+if ($total_xp_float > 0) {
+  $scientific = sprintf('%.2e', $total_xp_float);
+  $parts = explode('e', $scientific);
+  $mantissa_raw = $parts[0];
+
+  // Remove only trailing zeros after decimal point, but preserve decimal places
+  if (strpos($mantissa_raw, '.') !== false) {
+    $mantissa = rtrim($mantissa_raw, '0');
+    if (substr($mantissa, -1) === '.') {
+      $mantissa = rtrim($mantissa, '.');
+    }
+  } else {
+    $mantissa = $mantissa_raw;
+  }
+
+  $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
+  if ($exponent == 0) {
+    $base_value = floatval($mantissa);
+    echo ($base_value == floor($base_value)) ? (int) $base_value : $base_value;
+  } else {
+    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+  }
+} else {
+  echo '0';
+}
+?></span>
             </div>
             
             <!-- Confirm Button -->

@@ -366,8 +366,8 @@ jQuery(document).ready(function($) {
     // NEW CONVERSION: XP to USD directly
     const xpPerDollar = 100000000000000000000000; // 10^23 XP per USD
     const usdPerXP = 1 / xpPerDollar; // USD per XP
-    // NEW CONVERSION: YAM = USD (1 YAM = 1 USD = 10^23 XP)
-    const yamPerUSD = 1; // 1 YAM = 1 USD
+    // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+    const yamPerUSD = 21000; // 1 USD = 21,000 YAM
 
     // Recipient search (same as send-xp.php)
     $('#recipient_search').on('input', function() {
@@ -397,8 +397,8 @@ jQuery(document).ready(function($) {
         if (amount > 0) {
             // NEW CONVERSION: Calculate USD directly from XP (USD = XP / 10^23)
             const usd = amount * usdPerXP;
-            // NEW CONVERSION: YAM = USD (1 YAM = 1 USD = 10^23 XP)
-            const yam = usd; // 1 YAM = 1 USD
+            // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
+            const yam = usd * yamPerUSD; // 1 USD = 21,000 YAM
             $('#award_yam_equiv').text(yam.toExponential(2));
             $('#award_usd_value').text(usd.toFixed(2));
             $('#award_conversion_display').show();

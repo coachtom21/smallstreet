@@ -245,19 +245,51 @@ function dongtrader_xp_to_usd_string($xp_string, $scale = 30) {
  */
 function dongtrader_usd_to_xp_string($usd_string) {
     $xp_per_usd = (string)dongtrader_xp_per_dollar();
-    if (!extension_loaded('bcmath')) {
+    // Use wrapper function for safe multiplication
+    if (function_exists('dongtrader_num_mul')) {
+        $raw = dongtrader_num_mul((string)$usd_string, $xp_per_usd, 0);
+    } elseif (extension_loaded('bcmath')) {
+        $raw = bcmul((string)$usd_string, $xp_per_usd, 0);
+    } else {
         return (string)intval((float)$usd_string * (float)$xp_per_usd);
     }
-    // Multiply and remove decimal fraction by using scale 0 then flooring via intval on string
-    $raw = bcmul((string)$usd_string, $xp_per_usd, 0);
+    // Remove decimal fraction by removing non-numeric characters except minus sign
     return preg_replace('/[^0-9-]/', '', $raw);
 }
 
 /**
- * Convert XP integer-string to YAM decimal string (1 YAM = 10^23 XP)
+ * Convert XP integer-string to YAM decimal string using new conversion (1 USD = 21,000 YAM = 10^23 XP)
+ * YAM = XP × 21,000 / 10^23
  */
 function dongtrader_xp_to_yam_string($xp_string, $scale = 30) {
-    return dongtrader_xp_to_usd_string($xp_string, $scale);
+    // Ensure input is a string and valid
+    $xp_string = (string)$xp_string;
+    if (empty($xp_string) || !is_numeric($xp_string) || floatval($xp_string) <= 0) {
+        return '0';
+    }
+    
+    $xp_per_usd = (string)dongtrader_xp_per_dollar(); // 10^23
+    $yam_per_usd = (string)dongtrader_yam_per_usd(); // 21,000
+    
+    // First convert XP to USD: USD = XP / 10^23
+    $usd_string = dongtrader_bc_div($xp_string, $xp_per_usd, $scale);
+    
+    // Validate USD result
+    if (empty($usd_string) || !is_numeric($usd_string)) {
+        return '0';
+    }
+    
+    // Then convert USD to YAM: YAM = USD × 21,000
+    if (function_exists('dongtrader_num_mul')) {
+        $result = dongtrader_num_mul($usd_string, $yam_per_usd, $scale);
+    } elseif (extension_loaded('bcmath')) {
+        $result = bcmul($usd_string, $yam_per_usd, $scale);
+    } else {
+        $result = (string)(floatval($usd_string) * floatval($yam_per_usd));
+    }
+    
+    // Ensure we return a valid string
+    return !empty($result) ? (string)$result : '0';
 }
 
 
@@ -273,11 +305,16 @@ function dongtrader_xp_to_yam_string($xp_string, $scale = 30) {
 function dongtrader_format_decimal_scientific($decimal_string, $frac_digits = 18) {
     $s = trim((string)$decimal_string);
     if ($s === '' || $s === '0' || $s === '0.0') return '0';
+    
+    // Safety check: ensure string is not empty after trim
+    if (strlen($s) === 0) return '0';
 
     $sign = '';
-    if ($s[0] === '+' || $s[0] === '-') {
+    if (strlen($s) > 0 && ($s[0] === '+' || $s[0] === '-')) {
         if ($s[0] === '-') $sign = '-';
         $s = substr($s, 1);
+        // Safety check after removing sign
+        if (strlen($s) === 0) return '0';
     }
 
     // If scientific notation already provided (e.g. 1.23e45)
@@ -332,13 +369,16 @@ function dongtrader_format_decimal_scientific($decimal_string, $frac_digits = 18
 
     // Ensure we have only digits
     $digits = preg_replace('/[^0-9]/', '', $digits);
-    if ($digits === '') return '0';
+    if ($digits === '' || strlen($digits) === 0) return '0';
 
     // Prepare mantissa: one digit, dot, then $frac_digits digits
     $total_needed = 1 + $frac_digits; // total digits to take
     if (strlen($digits) < $total_needed) {
         $digits = str_pad($digits, $total_needed, '0');
     }
+    
+    // Safety check: ensure we have at least one digit
+    if (strlen($digits) === 0) return '0';
 
     $first = $digits[0];
     $rest = substr($digits, 1, $frac_digits);
@@ -362,7 +402,7 @@ function qrtiger_upload_logo()
 
 /**
  * YAM JAM XP Conversion Rate Helper Functions
- * New conversion rate: 1 USD = 1 YAM = 10^23 XP
+ * New conversion rate: 1 USD = 21,000 YAM = 10^23 XP
  */
 
 /**
@@ -374,11 +414,21 @@ function dongtrader_xp_per_dollar() {
 }
 
 /**
+ * Get YAM per USD
+ * @return int YAM per USD
+ */
+function dongtrader_yam_per_usd() {
+    return 21000; // 1 USD = 21,000 YAM
+}
+
+/**
  * Get XP per YAM token
- * @return int XP per YAM
+ * @return float XP per YAM (10^23 / 21,000)
  */
 function dongtrader_xp_per_yam() {
-    return 100000000000000000000000; // 1 YAM = 100,000,000,000,000,000,000,000 XP (10^23) - same as USD
+    // 1 USD = 21,000 YAM = 10^23 XP
+    // Therefore: 1 YAM = 10^23 / 21,000 XP
+    return 100000000000000000000000 / 21000; // Approximately 4,761,904,761,904,761,904,761.904... XP per YAM
 }
 
 /**
@@ -415,6 +465,24 @@ function dongtrader_xp_to_yam($xp_amount) {
  */
 function dongtrader_yam_to_xp($yam_amount) {
     return intval($yam_amount * dongtrader_xp_per_yam());
+}
+
+/**
+ * Convert USD to YAM
+ * @param float $usd_amount USD amount
+ * @return float YAM amount
+ */
+function dongtrader_usd_to_yam($usd_amount) {
+    return $usd_amount * dongtrader_yam_per_usd();
+}
+
+/**
+ * Convert YAM to USD
+ * @param float $yam_amount YAM amount
+ * @return float USD amount
+ */
+function dongtrader_yam_to_usd($yam_amount) {
+    return $yam_amount / dongtrader_yam_per_usd();
 }
 
 /**
@@ -5077,11 +5145,14 @@ function dongtrader_redemption_popup_script() {
     // Store redemption data globally
     window.currentRedemptionData = {};
     
-    // Function to format numbers in scientific notation
-    function formatScientificNotation(num) {
+    // Function to format numbers in scientific notation (matching PHP format)
+    function formatScientificNotation(num, fracDigits) {
         if (num == 0 || num === null || num === undefined) {
             return '0';
         }
+        
+        // Default to 30 fractional digits for XP amounts
+        fracDigits = fracDigits || 30;
         
         // Convert to number if string
         var numValue = typeof num === 'string' ? parseFloat(num) : num;
@@ -5090,14 +5161,15 @@ function dongtrader_redemption_popup_script() {
             return '0';
         }
         
-        // Use toExponential to get scientific notation
-        var scientific = numValue.toExponential(2);
+        // Use toExponential with specified fractional digits
+        var scientific = numValue.toExponential(fracDigits);
         var parts = scientific.split('e');
         var mantissa = parts[0];
         var exponent = parts.length > 1 ? parseInt(parts[1].replace('+', '')) : 0;
         
-        // Remove trailing zeros from mantissa
-        if (mantissa.indexOf('.') !== -1) {
+        // For XP amounts, preserve trailing zeros to match PHP format
+        // Don't remove trailing zeros when fracDigits is 30
+        if (fracDigits < 30 && mantissa.indexOf('.') !== -1) {
             mantissa = mantissa.replace(/\.?0+$/, '');
         }
         
@@ -5115,7 +5187,7 @@ function dongtrader_redemption_popup_script() {
     }
     
     // Redemption popup functions
-    window.showRedemptionPopup = function(xpAmount, yamAmount, usdAmount, xpPerYam, yamPerUsd) {
+    window.showRedemptionPopup = function(xpAmount, yamAmount, usdAmount, xpPerYam, yamPerUsd, formattedXp, formattedXpPerYam) {
         console.log("showRedemptionPopup called");
         
         // Store the original values globally
@@ -5136,12 +5208,24 @@ function dongtrader_redemption_popup_script() {
         var popupXpYamRate = document.getElementById("popup-xp-yam-rate");
         var popupYamUsdRate = document.getElementById("popup-yam-usd-rate");
         
-        // Format XP amount in scientific notation
-        if (popupXpAmount) popupXpAmount.innerHTML = formatScientificNotation(xpAmount);
+        // Use formatted XP string from PHP if provided (matches the display format exactly)
+        if (popupXpAmount) {
+            if (formattedXp && formattedXp !== '') {
+                popupXpAmount.innerHTML = formattedXp;
+            } else {
+                popupXpAmount.innerHTML = formatScientificNotation(xpAmount, 30);
+            }
+        }
         if (popupYamAmount) popupYamAmount.textContent = yamAmount.toLocaleString();
         if (popupUsdAmount) popupUsdAmount.textContent = "$" + usdAmount.toLocaleString();
-        // Format conversion rates in scientific notation
-        if (popupXpYamRate) popupXpYamRate.innerHTML = formatScientificNotation(xpPerYam);
+        // Use formatted XP per YAM from PHP if provided
+        if (popupXpYamRate) {
+            if (formattedXpPerYam && formattedXpPerYam !== '') {
+                popupXpYamRate.innerHTML = formattedXpPerYam;
+            } else {
+                popupXpYamRate.innerHTML = formatScientificNotation(xpPerYam, 30);
+            }
+        }
         if (popupYamUsdRate) popupYamUsdRate.textContent = yamPerUsd.toLocaleString();
         
         // Get umeta_id values via AJAX
@@ -5685,7 +5769,7 @@ function dongtrader_display_public_leaderboard($atts = array()) {
         
         // Calculate YAM and USD
         $yam_equivalent = dongtrader_xp_to_yam($total_xp);
-        $usd_value = $yam_equivalent; // 1 YAM = 1 USD (new conversion rate)
+        $usd_value = dongtrader_yam_to_usd($yam_equivalent); // 1 USD = 21,000 YAM (new conversion rate)
         
         // Format XP in scientific notation
         $xp_formatted = cpm_format_xp_scientific($total_xp);
