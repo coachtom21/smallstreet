@@ -626,7 +626,7 @@ function ct_insert_scan_data() {
             'scan_type' => $new_scan_entry['scan_type'],
             'status' => $new_scan_entry['status'],
             'timestamp' => $new_scan_entry['timestamp'],
-            'trade_value' => isset($scan_data['trade_value']) ? floatval($scan_data['trade_value']) : 10.30,
+            'trade_value' => isset($scan_data['trade_value']) ? floatval($scan_data['trade_value']) : 10.00,
             'trade_value_usd' => isset($scan_data['trade_value_usd']) ? floatval($scan_data['trade_value_usd']) : 0,
             'treasury_distributed' => $new_scan_entry['treasury_distributed'],
             'treasury_reminder' => isset($scan_data['treasury_reminder']) ? floatval($scan_data['treasury_reminder']) : 0,

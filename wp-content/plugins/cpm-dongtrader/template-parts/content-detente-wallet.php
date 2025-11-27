@@ -88,24 +88,30 @@ if (!empty($discord_invite_raw) && is_array($discord_invite_raw)) {
         }
 
         if (is_array($discord_entry) && !empty($discord_entry)) {
-            // NEW CONVERSION: XP is stored directly, or convert from USD if needed
+            // NEW CONVERSION: XP is stored directly
             // If xp_units exists, use it directly (may be string for large numbers)
             if (isset($discord_entry['xp_units'])) {
-                $xp_units = is_string($discord_entry['xp_units']) ? floatval($discord_entry['xp_units']) : floatval($discord_entry['xp_units']);
+                $xp_units = is_string($discord_entry['xp_units']) ? ($discord_entry['xp_units']) : ($discord_entry['xp_units']);
             } elseif (isset($discord_entry['xp_awarded'])) {
-                // Legacy: xp_awarded might be in old YAM format, convert to new XP
-                // Old: 1 XP = 1,000,000 YAM, so divide by 1,000,000
-                // New: XP stored directly, but if old data exists, convert
-                $xp_awarded_yam = intval($discord_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam / 1000000;  // Legacy conversion
+                // xp_awarded is stored as XP directly (e.g., 5000000 = 5 × 10^6 XP)
+                $xp_units = is_string($discord_entry['xp_awarded']) ? ($discord_entry['xp_awarded']) : (string)($discord_entry['xp_awarded']);
             } else {
-                $xp_units = 0;
+                $xp_units = '0';
             }
+            
+            // Ensure xp_units is a string for BCMath compatibility
+            if (!is_string($xp_units)) {
+                $xp_units = (string)$xp_units;
+            }
+            
+            // Store xp_awarded for display reference
+            $xp_awarded_yam = isset($discord_entry['xp_awarded']) ? intval($discord_entry['xp_awarded']) : 0;
 
             // Calculate USD from XP using new conversion: USD = XP / 10^23
-            $trade_value_usd = dongtrader_xp_to_usd($xp_units);
+            $xp_units_float = floatval($xp_units);
+            $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
             // NEW CONVERSION: 1 USD = 21,000 YAM = 10^23 XP
-            $yam_value = dongtrader_xp_to_yam($xp_units);
+            $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
 
             $formatted_entry = array(
                 'source' => 'discord_invite',
@@ -153,19 +159,27 @@ if (!empty($talentshow_entry_raw) && is_array($talentshow_entry_raw)) {
         if (is_array($talent_entry) && !empty($talent_entry)) {
             // NEW CONVERSION: XP is stored directly
             if (isset($talent_entry['xp_units'])) {
-                $xp_units = is_string($talent_entry['xp_units']) ? floatval($talent_entry['xp_units']) : floatval($talent_entry['xp_units']);
+                $xp_units = is_string($talent_entry['xp_units']) ? ($talent_entry['xp_units']) : (string)($talent_entry['xp_units']);
             } elseif (isset($talent_entry['xp_awarded'])) {
-                // Legacy conversion from YAM
-                $xp_awarded_yam = intval($talent_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam / 1000000;
+                // xp_awarded is stored as XP directly
+                $xp_units = is_string($talent_entry['xp_awarded']) ? ($talent_entry['xp_awarded']) : (string)($talent_entry['xp_awarded']);
             } else {
-                $xp_units = 0;
+                $xp_units = '0';
             }
+            
+            // Ensure xp_units is a string for BCMath compatibility
+            if (!is_string($xp_units)) {
+                $xp_units = (string)$xp_units;
+            }
+            
+            // Store xp_awarded for display reference
+            $xp_awarded_yam = isset($talent_entry['xp_awarded']) ? intval($talent_entry['xp_awarded']) : 0;
 
             // Calculate USD from XP using new conversion
-            $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-            // Calculate YAM from USD (1 USD = 21,000 YAM)
-            $yam_value = dongtrader_usd_to_yam($trade_value_usd);
+            $xp_units_float = floatval($xp_units);
+            $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+            // Calculate YAM from XP (1 USD = 21,000 YAM = 10^23 XP)
+            $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
 
             $formatted_entry = array(
                 'source' => 'talentshow_entry',
@@ -205,19 +219,27 @@ if (!empty($discord_poll_raw) && is_array($discord_poll_raw)) {
         if (is_array($poll_entry) && !empty($poll_entry)) {
             // NEW CONVERSION: XP is stored directly
             if (isset($poll_entry['xp_units'])) {
-                $xp_units = is_string($poll_entry['xp_units']) ? floatval($poll_entry['xp_units']) : floatval($poll_entry['xp_units']);
+                $xp_units = is_string($poll_entry['xp_units']) ? ($poll_entry['xp_units']) : (string)($poll_entry['xp_units']);
             } elseif (isset($poll_entry['xp_awarded'])) {
-                // Legacy conversion from YAM
-                $xp_awarded_yam = intval($poll_entry['xp_awarded']);
-                $xp_units = $xp_awarded_yam > 0 ? ($xp_awarded_yam / 1000000) : 0;
+                // xp_awarded is stored as XP directly
+                $xp_units = is_string($poll_entry['xp_awarded']) ? ($poll_entry['xp_awarded']) : (string)($poll_entry['xp_awarded']);
             } else {
-                $xp_units = 0;
+                $xp_units = '0';
             }
+            
+            // Ensure xp_units is a string for BCMath compatibility
+            if (!is_string($xp_units)) {
+                $xp_units = (string)$xp_units;
+            }
+            
+            // Store xp_awarded for display reference
+            $xp_awarded_yam = isset($poll_entry['xp_awarded']) ? intval($poll_entry['xp_awarded']) : 0;
 
             // Calculate USD from XP using new conversion
-            $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
-            // Calculate YAM from USD (1 USD = 21,000 YAM)
-            $yam_value = dongtrader_usd_to_yam($trade_value_usd);
+            $xp_units_float = floatval($xp_units);
+            $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+            // Calculate YAM from XP (1 USD = 21,000 YAM = 10^23 XP)
+            $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
 
             $formatted_entry = array(
                 'source' => 'discord_poll',
@@ -336,8 +358,8 @@ foreach ($user_treasury_entries as $entry) {
     // Calculate YAM for display using new conversion (1 USD = 21,000 YAM = 10^23 XP)
     $yam = $xp > 0 ? dongtrader_xp_to_yam($xp) : 0;
 
-    // Base trade value is $10.30
-    $trade_val = isset($entry['trade_value']) ? floatval($entry['trade_value']) : 10.3;
+    // Base trade value is $10.00
+    $trade_val = isset($entry['trade_value']) ? floatval($entry['trade_value']) : 10.0;
 
     $role = isset($entry['role']) ? strtolower($entry['role']) : '';
     // Add to totals (only confirmed entries reach here for seller_scan, buyer_scan, personal_scan)
@@ -1546,7 +1568,7 @@ $cs = get_woocommerce_currency_symbol();
 
             <div style="font-size:12px; color:#475569; margin-top:6px;">
                 <?php
-                $buyer_trade_value_corrected = $buyer_count * (0.07 * 10.3);
+                $buyer_trade_value_corrected = $buyer_count * (0.07 * 10.0);
                 echo $cs . number_format($buyer_trade_value_corrected, 2);
                 ?> • <?php echo $buyer_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
             </div>
@@ -1588,7 +1610,7 @@ $cs = get_woocommerce_currency_symbol();
 
             <div style="font-size:12px; color:#6b7280; margin-top:6px;">
                 <?php
-                $seller_trade_value_corrected = $seller_count * (0.03 * 10.3);
+                $seller_trade_value_corrected = $seller_count * (0.03 * 10.0);
                 echo $cs . number_format($seller_trade_value_corrected, 2);
                 ?> • <?php echo $seller_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
             </div>
@@ -1630,7 +1652,7 @@ $cs = get_woocommerce_currency_symbol();
 
             <div style="font-size:12px; color:#475569; margin-top:6px;">
                 <?php
-                $personal_trade_value_corrected = $personal_count * (0.1 * 10.3);
+                $personal_trade_value_corrected = $personal_count * (0.1 * 10.0);
                 echo $cs . number_format($personal_trade_value_corrected, 2);
                 ?> • <?php echo $personal_count; ?> <?php esc_html_e('deliveries', 'cpm-dongtrader'); ?>
             </div>

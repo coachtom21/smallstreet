@@ -407,10 +407,10 @@ function qrtiger_upload_logo()
 
 /**
  * Get XP per dollar (sextillionth precision)
- * @return int XP per USD
+ * @return string XP per USD (as string to avoid integer overflow)
  */
 function dongtrader_xp_per_dollar() {
-    return 100000000000000000000000; // 1 USD = 100,000,000,000,000,000,000,000 XP (10^23)
+    return '100000000000000000000000'; // 1 USD = 100,000,000,000,000,000,000,000 XP (10^23)
 }
 
 /**
@@ -423,12 +423,35 @@ function dongtrader_yam_per_usd() {
 
 /**
  * Get XP per YAM token
- * @return float XP per YAM (10^23 / 21,000)
+ * @return string XP per YAM (10^23 / 21,000) as string to preserve precision
  */
 function dongtrader_xp_per_yam() {
     // 1 USD = 21,000 YAM = 10^23 XP
     // Therefore: 1 YAM = 10^23 / 21,000 XP
-    return 100000000000000000000000 / 21000; // Approximately 4,761,904,761,904,761,904,761.904... XP per YAM
+    // Use BCMath for precision
+    $xp_per_usd = '100000000000000000000000'; // 10^23
+    $yam_per_usd = '21000';
+    
+    try {
+        if (function_exists('dongtrader_bc_div')) {
+            $result = dongtrader_bc_div($xp_per_usd, $yam_per_usd, 30);
+            if ($result !== null && $result !== false && $result !== '') {
+                return $result;
+            }
+        }
+        if (extension_loaded('bcmath')) {
+            $result = bcdiv($xp_per_usd, $yam_per_usd, 30);
+            if ($result !== null && $result !== false && $result !== '') {
+                return $result;
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Error calculating xp_per_yam: ' . $e->getMessage());
+    }
+    
+    // Fallback: return hardcoded string to avoid float precision loss
+    // 10^23 / 21000 = 4761904761904761904761.9047619047619047619047619047619...
+    return '4761904761904761904761.9047619047619047619047619047619';
 }
 
 /**
@@ -437,25 +460,48 @@ function dongtrader_xp_per_yam() {
  * @return int XP amount
  */
 function dongtrader_usd_to_xp($usd_amount) {
-    return intval($usd_amount * dongtrader_xp_per_dollar());
+    $xp_per_dollar = dongtrader_xp_per_dollar();
+    // Handle string return from dongtrader_xp_per_dollar()
+    $xp_per_dollar_float = is_string($xp_per_dollar) ? floatval($xp_per_dollar) : $xp_per_dollar;
+    return intval($usd_amount * $xp_per_dollar_float);
 }
 
 /**
  * Convert XP to USD
- * @param int $xp_amount XP amount
+ * @param int|string $xp_amount XP amount
  * @return float USD amount
  */
 function dongtrader_xp_to_usd($xp_amount) {
-    return $xp_amount / dongtrader_xp_per_dollar();
+    $xp_per_dollar = dongtrader_xp_per_dollar();
+    // Handle string return from dongtrader_xp_per_dollar()
+    $xp_per_dollar_float = is_string($xp_per_dollar) ? floatval($xp_per_dollar) : $xp_per_dollar;
+    $xp_amount_float = is_string($xp_amount) ? floatval($xp_amount) : $xp_amount;
+    
+    // Prevent division by zero
+    if ($xp_per_dollar_float == 0 || !is_numeric($xp_per_dollar_float) || !is_numeric($xp_amount_float)) {
+        return 0;
+    }
+    
+    return $xp_amount_float / $xp_per_dollar_float;
 }
 
 /**
  * Convert XP to YAM
- * @param int $xp_amount XP amount
+ * @param int|string $xp_amount XP amount
  * @return float YAM amount
  */
 function dongtrader_xp_to_yam($xp_amount) {
-    return $xp_amount / dongtrader_xp_per_yam();
+    $xp_per_yam = dongtrader_xp_per_yam();
+    // Handle string return from dongtrader_xp_per_yam()
+    $xp_per_yam_float = is_string($xp_per_yam) ? floatval($xp_per_yam) : $xp_per_yam;
+    $xp_amount_float = is_string($xp_amount) ? floatval($xp_amount) : $xp_amount;
+    
+    // Prevent division by zero
+    if ($xp_per_yam_float == 0 || !is_numeric($xp_per_yam_float) || !is_numeric($xp_amount_float)) {
+        return 0;
+    }
+    
+    return $xp_amount_float / $xp_per_yam_float;
 }
 
 /**
@@ -464,7 +510,10 @@ function dongtrader_xp_to_yam($xp_amount) {
  * @return int XP amount
  */
 function dongtrader_yam_to_xp($yam_amount) {
-    return intval($yam_amount * dongtrader_xp_per_yam());
+    $xp_per_yam = dongtrader_xp_per_yam();
+    // Handle string return from dongtrader_xp_per_yam()
+    $xp_per_yam_float = is_string($xp_per_yam) ? floatval($xp_per_yam) : $xp_per_yam;
+    return intval($yam_amount * $xp_per_yam_float);
 }
 
 /**
@@ -6071,13 +6120,20 @@ function dongtrader_get_transaction_page() {
                 }
             }
             if (is_array($discord_entry) && !empty($discord_entry)) {
-                $xp_units = isset($discord_entry['xp_units']) ? floatval($discord_entry['xp_units']) : 0;
-                if (isset($discord_entry['xp_awarded'])) {
-                    $xp_awarded_yam = intval($discord_entry['xp_awarded']);
-                    $xp_units = $xp_awarded_yam / 1000000;
+                // xp_awarded is stored as XP directly (e.g., 5000000 = 5 × 10^6 XP)
+                if (isset($discord_entry['xp_units'])) {
+                    $xp_units = is_string($discord_entry['xp_units']) ? ($discord_entry['xp_units']) : (string)($discord_entry['xp_units']);
+                } elseif (isset($discord_entry['xp_awarded'])) {
+                    $xp_units = is_string($discord_entry['xp_awarded']) ? ($discord_entry['xp_awarded']) : (string)($discord_entry['xp_awarded']);
+                } else {
+                    $xp_units = '0';
                 }
-                $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-                $yam_value = dongtrader_xp_to_yam($xp_units);
+                
+                // Store xp_awarded for display reference
+                $xp_awarded_yam = isset($discord_entry['xp_awarded']) ? intval($discord_entry['xp_awarded']) : 0;
+                $xp_units_float = floatval($xp_units);
+                $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+                $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
                 $formatted_entry = array(
                     'source' => 'discord_invite',
                     'role' => 'Discord Verification',
@@ -6110,13 +6166,26 @@ function dongtrader_get_transaction_page() {
                 }
             }
             if (is_array($talent_entry) && !empty($talent_entry)) {
-                $xp_units = isset($talent_entry['xp_units']) ? floatval($talent_entry['xp_units']) : 0;
-                if (isset($talent_entry['xp_awarded'])) {
-                    $xp_awarded_yam = intval($talent_entry['xp_awarded']);
-                    $xp_units = $xp_awarded_yam / 1000000;
+                // xp_awarded is stored as XP directly
+                if (isset($talent_entry['xp_units'])) {
+                    $xp_units = is_string($talent_entry['xp_units']) ? ($talent_entry['xp_units']) : (string)($talent_entry['xp_units']);
+                } elseif (isset($talent_entry['xp_awarded'])) {
+                    $xp_units = is_string($talent_entry['xp_awarded']) ? ($talent_entry['xp_awarded']) : (string)($talent_entry['xp_awarded']);
+                } else {
+                    $xp_units = '0';
                 }
-                $trade_value_usd = dongtrader_xp_to_usd($xp_units);
-                $yam_value = $trade_value_usd * 21000;
+                
+                // Ensure xp_units is a string for BCMath compatibility
+                if (!is_string($xp_units)) {
+                    $xp_units = (string)$xp_units;
+                }
+                
+                // Store xp_awarded for display reference
+                $xp_awarded_yam = isset($talent_entry['xp_awarded']) ? intval($talent_entry['xp_awarded']) : 0;
+                
+                $xp_units_float = floatval($xp_units);
+                $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+                $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
                 $formatted_entry = array(
                     'source' => 'talentshow_entry',
                     'role' => 'Talent Show',
@@ -6149,13 +6218,26 @@ function dongtrader_get_transaction_page() {
                 }
             }
             if (is_array($poll_entry) && !empty($poll_entry)) {
-                $xp_units = isset($poll_entry['xp_units']) ? floatval($poll_entry['xp_units']) : 0;
-                if (isset($poll_entry['xp_awarded'])) {
-                    $xp_awarded_yam = intval($poll_entry['xp_awarded']);
-                    $xp_units = $xp_awarded_yam > 0 ? ($xp_awarded_yam / 1000000) : 0;
+                // xp_awarded is stored as XP directly
+                if (isset($poll_entry['xp_units'])) {
+                    $xp_units = is_string($poll_entry['xp_units']) ? ($poll_entry['xp_units']) : (string)($poll_entry['xp_units']);
+                } elseif (isset($poll_entry['xp_awarded'])) {
+                    $xp_units = is_string($poll_entry['xp_awarded']) ? ($poll_entry['xp_awarded']) : (string)($poll_entry['xp_awarded']);
+                } else {
+                    $xp_units = '0';
                 }
-                $trade_value_usd = $xp_units > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
-                $yam_value = $trade_value_usd * 21000;
+                
+                // Ensure xp_units is a string for BCMath compatibility
+                if (!is_string($xp_units)) {
+                    $xp_units = (string)$xp_units;
+                }
+                
+                // Store xp_awarded for display reference
+                $xp_awarded_yam = isset($poll_entry['xp_awarded']) ? intval($poll_entry['xp_awarded']) : 0;
+                
+                $xp_units_float = floatval($xp_units);
+                $trade_value_usd = $xp_units_float > 0 ? dongtrader_xp_to_usd($xp_units) : 0;
+                $yam_value = $xp_units_float > 0 ? dongtrader_xp_to_yam($xp_units) : 0;
                 $formatted_entry = array(
                     'source' => 'discord_poll',
                     'role' => 'Discord Poll',

@@ -390,35 +390,89 @@ if (!is_array($redemptions)) {
     $redemptions = array();
 }
 
-// Helper function to format numbers in scientific notation
-function format_xp_scientific_redemption($num)
+// Helper function to format numbers in scientific notation (same as wallet page)
+function format_xp_scientific_wallet($numStr)
 {
-    if ($num == 0 || $num === null) {
+    if ($numStr === null)
+        return '0';
+
+    // Force string
+    $numStr = trim((string) $numStr);
+
+    // Zero?
+    if (preg_match('/^0+(\.0+)?$/', $numStr)) {
         return '0';
     }
-    $scientific = sprintf('%.2e', $num);
-    $parts = explode('e', $scientific);
-    $mantissa_raw = $parts[0];
 
-    // Remove only trailing zeros after decimal point, but preserve decimal places
-    if (strpos($mantissa_raw, '.') !== false) {
-        $mantissa = rtrim($mantissa_raw, '0');
-        if (substr($mantissa, -1) === '.') {
-            $mantissa = rtrim($mantissa, '.');
+    // Split integer/decimal parts
+    if (strpos($numStr, '.') !== false) {
+        list($intPart, $decPart) = explode('.', $numStr, 2);
+    } else {
+        $intPart = $numStr;
+        $decPart = '';
+    }
+
+    // Remove leading zeros in integer part
+    $intPartTrimmed = ltrim($intPart, '0');
+
+    // Case 1: number >= 1
+    if ($intPartTrimmed !== '') {
+        // exponent = digit position
+        $exponent = strlen($intPartTrimmed) - 1;
+
+        $digits = $intPartTrimmed . $decPart;
+        // Safety check: ensure we have at least one digit
+        if (strlen($digits) === 0) {
+            return '0';
+        }
+        $mantissa = substr($digits, 0, 1);
+        $rest = substr($digits, 1);
+
+        if ($rest !== '') {
+            $mantissa .= '.' . $rest;
         }
     } else {
-        $mantissa = $mantissa_raw;
+        // Number < 1 (e.g. 0.000002)
+
+        // count leading zeros in decimals
+        $zeroCount = strspn($decPart, '0');
+        
+        // Safety check: ensure decPart has enough characters
+        if (strlen($decPart) === 0 || $zeroCount >= strlen($decPart)) {
+            return '0';
+        }
+
+        $exponent = -($zeroCount + 1);
+        
+        // Safety check before array access
+        if (!isset($decPart[$zeroCount])) {
+            return '0';
+        }
+
+        $mantissa = $decPart[$zeroCount];
+        $rest = substr($decPart, $zeroCount + 1);
+
+        if ($rest !== '') {
+            $mantissa .= '.' . $rest;
+        }
     }
 
-    $exponent = isset($parts[1]) ? intval(ltrim($parts[1], '+')) : 0;
-
-    // If exponent is 0, just return the integer value
-    if ($exponent == 0) {
-        $base_value = floatval($mantissa);
-        return ($base_value == floor($base_value)) ? (string) intval($base_value) : (string) $base_value;
+    // Cleanup trailing zeros and dot
+    $mantissa = rtrim($mantissa, '0');
+    $mantissa = rtrim($mantissa, '.');
+    
+    // Ensure mantissa is not empty
+    if (empty($mantissa) || $mantissa === '') {
+        return '0';
+    }
+    
+    // Ensure exponent is set
+    if (!isset($exponent)) {
+        return '0';
     }
 
-    return $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    $result = $mantissa . ' × 10<sup>' . $exponent . '</sup>';
+    return is_string($result) && $result !== '' ? $result : '0';
 }
 
 // Get status badge class
@@ -784,7 +838,7 @@ function get_status_display($status)
                     style="font-size: 1rem; font-weight: 700; font-family: 'Inter', system-ui, -apple-system, sans-serif; margin-bottom: 8px; line-height: 1.4; color: #111827; word-break: break-word; overflow-wrap: anywhere;">
                     <?php
                     if ($available_xp_str !== '' && $available_xp_str !== '0') {
-                        echo dongtrader_format_decimal_scientific($available_xp_str, 30);
+                        echo format_xp_scientific_wallet($available_xp_str);
                     } else {
                         echo '0';
                     }
@@ -805,28 +859,21 @@ function get_status_display($status)
                     </div>
                     <div style="font-size: 1.25rem; font-weight: 700; font-family: 'Inter', system-ui, -apple-system, sans-serif; margin-bottom: 8px; line-height: 1.4; color: #111827;">
                         <?php
+                        // Display YAM in regular decimal notation (not scientific notation) - same as wallet page
                         if ($available_yam_equivalent > 0 && is_numeric($available_yam_equivalent)) {
-                            $yam_scientific = sprintf('%.2e', (float) $available_yam_equivalent);
-                            $parts = explode('e', $yam_scientific);
-                            if (count($parts) == 2) {
-                                $mantissa_raw = $parts[0];
-                                if (strpos($mantissa_raw, '.') !== false) {
-                                    $mantissa = rtrim($mantissa_raw, '0');
-                                    if (substr($mantissa, -1) === '.') {
-                                        $mantissa = rtrim($mantissa, '.');
-                                    }
-                                } else {
-                                    $mantissa = $mantissa_raw;
-                                }
-                                $exponent = intval($parts[1]);
-                                if ($exponent == 0) {
-                                    $base_value = floatval($mantissa);
-                                    echo ($base_value == floor($base_value)) ? (int) $base_value : number_format($base_value, 2);
-                                } else {
-                                    echo $mantissa . ' × 10<sup>' . $exponent . '</sup>';
-                                }
+                            // Check if it's a whole number
+                            if ($available_yam_equivalent == floor($available_yam_equivalent)) {
+                                // Whole number - display without decimals
+                                echo esc_html(number_format($available_yam_equivalent, 0));
+                            } elseif ($available_yam_equivalent >= 1) {
+                                // For values >= 1 with decimals, show with 2 decimal places
+                                echo esc_html(number_format($available_yam_equivalent, 2));
+                            } elseif ($available_yam_equivalent >= 0.01) {
+                                // For values >= 0.01, show with 4 decimal places
+                                echo esc_html(number_format($available_yam_equivalent, 4));
                             } else {
-                                echo number_format($available_yam_equivalent, 2);
+                                // For very small values, show with 6 decimal places
+                                echo esc_html(number_format($available_yam_equivalent, 6));
                             }
                         } else {
                             echo '0';
@@ -986,7 +1033,7 @@ function get_status_display($status)
                                         <td class="value-monospace">
                                             <?php 
                                             if ($xp_amount !== '' && $xp_amount !== '0' && $xp_amount > 0) {
-                                                echo dongtrader_format_decimal_scientific((string)$xp_amount, 30) . ' XP';
+                                                echo format_xp_scientific_wallet((string)$xp_amount) . ' XP';
                                             } else {
                                                 echo '0 XP';
                                             }
@@ -1095,7 +1142,7 @@ function get_status_display($status)
                                 // Add XP Received row with maturity calculation
                                 $total_xp_received_float = is_string($total_xp_received) ? floatval($total_xp_received) : floatval($total_xp_received);
                                 if ($total_xp_received_float > 0):
-                                    $xp_received_display = format_xp_scientific_redemption($total_xp_received_float);
+                                    $xp_received_display = format_xp_scientific_wallet((string)$total_xp_received);
                                     
                                     // Calculate maturity for XP Received
                                     $received_delivery_date = $oldest_received_date ? $oldest_received_date : current_time('mysql');
@@ -1332,7 +1379,7 @@ function get_status_display($status)
                                         </td>
                                         <td class="value-monospace" style="font-size: 0.85rem;"><?php echo $transaction_id; ?>
                                         </td>
-                                        <td class="value-monospace"><?php echo format_xp_scientific_redemption($xp_value); ?> XP
+                                        <td class="value-monospace"><?php echo format_xp_scientific_wallet((string)$xp_value); ?> XP
                                         </td>
                                         <td class="maturity-cell <?php echo esc_attr($maturity_class); ?>">
                                             <?php echo $maturity_display; ?>
@@ -1434,7 +1481,7 @@ add_action('wp_footer', function () use ($available_xp, $available_xp_str, $avai
     // Format XP string in PHP to match the display format
     $formatted_xp = '';
     if ($available_xp_str !== '' && $available_xp_str !== '0') {
-        $formatted_xp = dongtrader_format_decimal_scientific($available_xp_str, 30);
+        $formatted_xp = format_xp_scientific_wallet($available_xp_str);
     } else {
         $formatted_xp = '0';
     }
@@ -1443,7 +1490,7 @@ add_action('wp_footer', function () use ($available_xp, $available_xp_str, $avai
     $xp_per_yam = dongtrader_xp_per_yam(); // Fixed rate: 10^23 / 21,000
     $formatted_xp_per_yam = '';
     if ($xp_per_yam > 0) {
-        $formatted_xp_per_yam = dongtrader_format_decimal_scientific((string)$xp_per_yam, 30);
+        $formatted_xp_per_yam = format_xp_scientific_wallet((string)$xp_per_yam);
     } else {
         $formatted_xp_per_yam = '0';
     }

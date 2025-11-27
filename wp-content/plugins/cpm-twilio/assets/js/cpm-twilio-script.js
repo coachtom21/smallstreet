@@ -103,8 +103,8 @@ $(document).ready(function () {
             },
             success: function (response) {
                 if (response.data[0] == "logged_in") {
-                    // Redirect to my account page after login
-                    window.location.href = '/my-account/detente-orders/';
+                    // Redirect to wallet page after login (for proof-of-delivery scans)
+                    window.location.href = '/my-account/detente-wallet/';
                 } else if (response.data[0] == 'nonce_failed') {
                     displayFormMsg('Security check failed');
                 } else {
@@ -276,8 +276,8 @@ $(document).ready(function () {
         
         if (!scanData) {
             console.warn('No scan data found in localStorage');
-            // Redirect anyway if no data
-            window.location.href = '/my-account/detente-orders/';
+            // Redirect to wallet page if no data
+            window.location.href = '/my-account/detente-wallet/';
             return;
         }
         
@@ -433,8 +433,8 @@ $(document).ready(function () {
                 if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
                     window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce);
                 } else {
-                    // Direct redirect if no pending login
-                    window.location.href = '/my-account/detente-orders/';
+                    // Direct redirect to wallet page if no pending login
+                    window.location.href = '/my-account/detente-wallet/';
                 }
             });
         });
@@ -445,22 +445,25 @@ $(document).ready(function () {
     // $1.00 = 100 pennies = 100 × 10^21 = 10^23 XP
     // Formula: XP = (USD × 100) × 10^21
     function calculateTradeValue(role) {
-        // Fixed trade value
-        const trade_value = 10.30;
+        // Fixed trade value - $10.00 base (not $10.30)
+        const trade_value = 10.00;
         
         // Role-based percentage rates and treasury_distributed
+        // Seller: 3% of $10 = $0.30 = 3 × 10²² XP
+        // Buyer: 7% of $10 = $0.70 = 7 × 10²² XP
+        // Personal: 10% of $10 = $1.00 = 1 × 10²³ XP
         const roleData = {
             'seller': {
                 percentage: 3,
-                treasury_distributed: 0.309
+                treasury_distributed: 0.30
             },
             'buyer': {
                 percentage: 7,
-                treasury_distributed: 0.721
+                treasury_distributed: 0.70
             },
             'personal': {
                 percentage: 10,
-                treasury_distributed: 1.03
+                treasury_distributed: 1.00
             }
         };
         
@@ -469,33 +472,28 @@ $(document).ready(function () {
         const percentage = roleInfo.percentage;
         const treasury_distributed = roleInfo.treasury_distributed;
         
-        // Calculate trade value USD based on role percentage
+        // Calculate trade value USD based on role percentage (using $10.00 base)
         const tradeValueUSD = trade_value * (percentage / 100);
         
         // NEW: Convert USD directly to XP (integer-safe calculation using string math)
         // Formula: XP = (USD × 100) × 10^21
-        // To handle fractional cents precisely, we work with the decimal representation
-        // Step 1: Convert USD to cents (as decimal number)
-        const centsDecimal = tradeValueUSD * 100; // e.g., 0.309 × 100 = 30.9 cents
-        // Step 2: Convert to string and handle decimal point
-        const centsStr = centsDecimal.toFixed(1); // Keep one decimal for fractional cents
-        // Step 3: Remove decimal point to work with integer math
-        // e.g., "30.9" → "309" (tenths of cents)
-        const tenthsOfCents = centsStr.replace('.', ''); // Remove decimal point
-        // Step 4: Multiply by 10^20 (since we're working in tenths of cents, not cents)
-        // tenthsOfCents × 10^20 = tenthsOfCents followed by 20 zeros
-        const xpUnitsStr = tenthsOfCents + '00000000000000000000'; // Append 20 zeros
+        // Step 1: Convert USD to cents (as integer)
+        const centsDecimal = tradeValueUSD * 100; // e.g., 0.30 × 100 = 30 cents, 0.70 × 100 = 70 cents, 1.00 × 100 = 100 cents
+        // Step 2: Convert to integer string (no decimals needed for whole cents)
+        const centsStr = Math.floor(centsDecimal).toString(); // e.g., "30", "70", "100"
+        // Step 3: Multiply by 10^21 (append 21 zeros)
+        // cents × 10^21 = cents followed by 21 zeros
+        const xpUnitsStr = centsStr + '000000000000000000000'; // Append 21 zeros
         // This gives us the exact XP value as a string
         const xpUnits = parseFloat(xpUnitsStr); // For display calculations (may lose precision)
         
-        // Calculate treasury remainder (10.30 - treasury_distributed)
+        // Calculate treasury remainder (10.00 - treasury_distributed)
         const treasury_reminder = parseFloat((trade_value - treasury_distributed).toFixed(2));
         
         // Calculate XP for treasury remainder using string math (same method as above)
-        const treasury_reminder_cents = treasury_reminder * 100; // Convert to cents (may have decimals)
-        const treasury_reminder_cents_str = treasury_reminder_cents.toFixed(1); // Keep one decimal
-        const treasury_reminder_tenths = treasury_reminder_cents_str.replace('.', ''); // Remove decimal
-        const xp_reminder_str = treasury_reminder_tenths + '00000000000000000000'; // Append 20 zeros
+        const treasury_reminder_cents = treasury_reminder * 100; // Convert to cents
+        const treasury_reminder_cents_str = Math.floor(treasury_reminder_cents).toString(); // Integer cents
+        const xp_reminder_str = treasury_reminder_cents_str + '000000000000000000000'; // Append 21 zeros
         const xp_reminder = parseFloat(xp_reminder_str); // For display
         
         // Legacy YAM calculation (for backward compatibility in display)
@@ -504,12 +502,13 @@ $(document).ready(function () {
         const yam_reminder = treasury_reminder * 21000; // Legacy calculation
         
         // Display calculation in console for debugging
-        console.log('=== Trade Value Calculation (NEW CONVERSION) ===');
-        console.log('Trade Value:', trade_value);
+        console.log('=== Trade Value Calculation (UPDATED: $10.00 Base) ===');
+        console.log('Trade Value (Base):', trade_value);
         console.log('Selected Role:', role);
         console.log('Percentage:', percentage + '%');
         console.log('Trade Value USD (user share):', tradeValueUSD.toFixed(2));
         console.log('XP Units (user share):', xpUnits.toExponential(2), '(', xpUnits, ')');
+        console.log('Expected XP: Seller=3×10²², Buyer=7×10²², Personal=1×10²³');
         console.log('Treasury Distributed:', treasury_distributed);
         console.log('Treasury Reminder:', treasury_reminder.toFixed(2));
         console.log('XP Reminder:', xp_reminder.toExponential(2), '(', xp_reminder, ')');
@@ -635,9 +634,9 @@ $(document).ready(function () {
             success: function (response) {
                 console.log('Login response:', response);
                 if (response.data[0] == "logged_in") {
-                    // Redirect after login
-                    console.log('Login successful, redirecting...');
-                    window.location.href = '/my-account/detente-orders/';
+                    // Redirect to wallet page after login
+                    console.log('Login successful, redirecting to wallet...');
+                    window.location.href = '/my-account/detente-wallet/';
                 } else if (response.data[0] == 'nonce_failed') {
                     displayFormMsg('Security check failed');
                 } else {
