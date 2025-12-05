@@ -817,3 +817,127 @@ function ct_add_calculation_popup() {
     </style>
     <?php
 }
+
+// AJAX endpoint to fetch pending orders for buyer
+add_action('wp_ajax_ct_get_pending_orders', 'ct_get_pending_orders');
+add_action('wp_ajax_nopriv_ct_get_pending_orders', 'ct_get_pending_orders');
+function ct_get_pending_orders() {
+    // Verify nonce - accept multiple nonce types for flexibility
+    $nonce_valid = false;
+    if (isset($_POST['nonce']) && !empty($_POST['nonce'])) {
+        $nonce = sanitize_text_field($_POST['nonce']);
+        // Try different nonce actions
+        if (wp_verify_nonce($nonce, 'ct_get_pending_orders') !== false) {
+            $nonce_valid = true;
+        } elseif (wp_verify_nonce($nonce, 'ct_nonce') !== false) {
+            $nonce_valid = true;
+        } elseif (wp_verify_nonce($nonce, 'ct_user_signin') !== false) {
+            $nonce_valid = true;
+        }
+    }
+    
+    if (!$nonce_valid) {
+        wp_send_json_error(['message' => 'Security check failed']);
+        wp_die();
+    }
+    
+    $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+    
+    if (!$user_id || $user_id <= 0) {
+        wp_send_json_error(['message' => 'User ID required']);
+        wp_die();
+    }
+    
+    // Check if WooCommerce is active
+    if (!function_exists('wc_get_orders')) {
+        wp_send_json_error(['message' => 'WooCommerce is not active']);
+        wp_die();
+    }
+    
+    // Get all orders that might be unpaid (we'll filter out paid ones below)
+    // Use the same logic as content-detente-orders.php
+    $args = [
+        'customer_id' => $user_id,
+        'status'      => ['on-hold', 'processing', 'pending'],
+        'limit'       => -1,
+    ];
+    
+    $all_potential_unpaid = wc_get_orders($args);
+    
+    // Handle case where wc_get_orders returns false or null
+    if (!is_array($all_potential_unpaid)) {
+        $all_potential_unpaid = [];
+    }
+    
+    // Filter to only include truly unpaid orders (same logic as content-detente-orders.php)
+    $unpaid_backorders = [];
+    foreach ($all_potential_unpaid as $order) {
+        if (!is_a($order, 'WC_Order')) {
+            continue;
+        }
+        
+        // Check if order is actually paid
+        $is_paid = $order->is_paid();
+        
+        // Check if it's a preorder (preorders are unpaid)
+        $payment_method = $order->get_payment_method();
+        $is_preorder = ($payment_method === 'preorder');
+        
+        // Only include orders that are NOT paid
+        // Preorders are always unpaid
+        if (!$is_paid) {
+            $unpaid_backorders[] = $order;
+        }
+    }
+    
+    $orders_data = [];
+    $seven_percent_total_unfunded = 0;
+    
+    // Check if user can pay
+    $can_user_pay = get_user_meta($user_id, 'can_pay', true);
+    $can_user_pay = $can_user_pay == '1' ? true : false;
+    
+    // Check if last day of month
+    $today = new DateTime();
+    $tomorrow = clone $today;
+    $tomorrow->modify('+1 day');
+    $is_last_day = $tomorrow->format('j') === '1';
+    $is_order_payable = ($is_last_day && $can_user_pay) ? true : false;
+    
+    foreach ($unpaid_backorders as $order) {
+        $total_quantity = 0;
+        foreach ($order->get_items() as $item_id => $item) {
+            $total_quantity += $item->get_quantity();
+        }
+        
+        $seven_percent = ($order->get_total() * 0.07);
+        $seven_percent_total_unfunded += $seven_percent;
+        
+        $order_date = $order->get_date_created();
+        $formatted_date = '';
+        if ($order_date) {
+            $formatted_date = date_i18n('F j, Y', $order_date->getTimestamp());
+        }
+        
+        $orders_data[] = [
+            'order_id' => $order->get_id(),
+            'order_number' => '#' . $order->get_id(),
+            'order_url' => $order->get_view_order_url(),
+            'date' => $formatted_date,
+            'total' => $order->get_formatted_order_total(),
+            'quantity' => $total_quantity,
+            'seven_percent' => wc_price($seven_percent),
+            'seven_percent_raw' => $seven_percent,
+            'can_pay' => $is_order_payable,
+            'payment_url' => $order->get_checkout_payment_url()
+        ];
+    }
+    
+    wp_send_json_success([
+        'orders' => $orders_data,
+        'total_seven_percent' => wc_price($seven_percent_total_unfunded),
+        'total_seven_percent_raw' => $seven_percent_total_unfunded,
+        'count' => count($orders_data)
+    ]);
+    wp_die();
+}

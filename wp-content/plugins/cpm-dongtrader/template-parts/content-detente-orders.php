@@ -1,14 +1,175 @@
 <?php
 
 defined('ABSPATH') || exit;
-$order_details = get_user_meta(get_current_user_id(), '_buyer_details', true);
+
+// Get all orders for the current user from WooCommerce (instead of relying on disabled _buyer_details)
+$user_id = get_current_user_id();
+$all_user_orders = [];
+if ($user_id) {
+    // Get all WooCommerce order statuses to include all orders
+    $all_statuses = array_keys(wc_get_order_statuses());
+    // Remove 'wc-' prefix if present
+    $all_statuses = array_map(function($status) {
+        return str_replace('wc-', '', $status);
+    }, $all_statuses);
+    
+    $args = [
+        'customer_id' => $user_id,
+        'status' => $all_statuses, // Include all order statuses
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC',
+    ];
+    $wc_orders = wc_get_orders($args);
+    
+    // Convert WooCommerce orders to the format expected by the table
+    foreach ($wc_orders as $order) {
+        if (!is_a($order, 'WC_Order')) {
+            continue;
+        }
+        
+        $order_id = $order->get_id();
+        $membership_name = get_post_meta($order_id, '_membership_name', true);
+        $rebate = get_post_meta($order_id, 'mega_cashback_v', true);
+        $rebate_d = get_post_meta($order_id, 'mega_cashback_d', true);
+        $total = $order->get_total();
+        
+        $all_user_orders[] = [
+            'order_id' => $order_id,
+            'membership' => !empty($membership_name) ? $membership_name : 'N/A',
+            'rebate' => !empty($rebate) ? floatval($rebate) : 0,
+            'rebate_d' => !empty($rebate_d) ? floatval($rebate_d) : 0,
+            'total' => !empty($total) ? floatval($total) : 0,
+        ];
+    }
+}
+
+$order_details = $all_user_orders; // Use WooCommerce orders instead of usermeta
 $filter_template_path = CPM_DONGTRADER_PLUGIN_DIR . 'template-parts' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'filter-top.php';
 $pagination_template_path = CPM_DONGTRADER_PLUGIN_DIR . 'template-parts' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'pagination-buttom.php';
 extract($args);
 
 
-$paid_orders = get_user_orders(['completed']);
-$unpaid_backorders = get_user_orders(['on-hold', 'processing', 'pending']);
+// ============================================
+// UNPAID BACKORDERS - Get ALL unpaid orders for current user
+// ============================================
+$unpaid_backorders = [];
+
+if ($user_id) {
+    // Get all WooCommerce order statuses to ensure we check ALL orders
+    $all_statuses = array_keys(wc_get_order_statuses());
+    // Remove 'wc-' prefix if present
+    $all_statuses = array_map(function($status) {
+        return str_replace('wc-', '', $status);
+    }, $all_statuses);
+    
+    // Fetch ALL orders for the current user (all statuses)
+    $args_unpaid = [
+        'customer_id' => $user_id,
+        'status' => $all_statuses, // Include all order statuses
+        'limit' => -1, // Get all orders, no limit
+        'orderby' => 'date',
+        'order' => 'DESC', // Newest first
+    ];
+    
+    $all_user_orders = wc_get_orders($args_unpaid);
+    
+    // Debug: Show all orders found
+    $debug_info = [];
+    $debug_info['total_orders_found'] = count($all_user_orders);
+    
+    // Filter to get ONLY unpaid orders
+    foreach ($all_user_orders as $order) {
+        if (!is_a($order, 'WC_Order')) {
+            continue;
+        }
+        
+        $order_id = $order->get_id();
+        $order_status = $order->get_status();
+        $payment_method = $order->get_payment_method();
+        $order_date_obj = $order->get_date_created();
+        $order_date = $order_date_obj ? $order_date_obj->format('Y-m-d H:i:s') : 'N/A';
+        
+        // Check if it's a preorder (preorders need special handling)
+        $is_preorder = ($payment_method === 'preorder');
+        
+        // Fix preorder orders that are incorrectly set to on-hold or completed (only if unpaid)
+        $is_paid_check = $order->is_paid();
+        if ($is_preorder && !$is_paid_check && ($order_status === 'on-hold' || $order_status === 'completed')) {
+            // Unpaid preorder should be pending
+            $order->set_status('pending', __('Preorder order corrected to pending status', 'cpm-dongtrader'));
+            $order->save();
+            $order_status = 'pending'; // Update status after fix
+        } elseif ($is_preorder && $is_paid_check && $order_status === 'on-hold') {
+            // Paid preorder should be completed, not on-hold
+            $order->set_status('completed', __('Paid preorder order corrected to completed status', 'cpm-dongtrader'));
+            $order->save();
+            $order_status = 'completed'; // Update status after fix
+        }
+        
+        // Check if order is actually paid using WooCommerce's is_paid() method
+        $is_paid = $order->is_paid();
+        
+        // Also check payment status directly
+        $payment_status = $order->get_meta('_payment_status', true);
+        // get_total_paid() might not exist in all WooCommerce versions, use safe method
+        $total_paid = method_exists($order, 'get_total_paid') ? $order->get_total_paid() : 0;
+        $order_total = $order->get_total();
+        
+        // Debug info for each order
+        $debug_info['orders'][] = [
+            'id' => $order_id,
+            'status' => $order_status,
+            'payment_method' => $payment_method,
+            'is_preorder' => $is_preorder,
+            'is_paid' => $is_paid,
+            'total' => $order_total,
+            'total_paid' => $total_paid,
+            'date' => $order_date,
+        ];
+        
+        // For preorders, always consider them unpaid regardless of is_paid()
+        // For other orders, check if they're actually paid
+        if ($is_preorder) {
+            // Preorders are always unpaid until payment is completed
+            $unpaid_backorders[] = $order;
+        } elseif (!$is_paid) {
+            // For non-preorders, use WooCommerce's is_paid() check
+            $unpaid_backorders[] = $order;
+        }
+    }
+    
+    // Debug output (remove after testing)
+    if (current_user_can('administrator')) {
+        echo '<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc; font-size: 11px;">';
+        echo '<strong>Debug: Unpaid Backorders</strong><br>';
+        echo 'Total Orders Found: ' . $debug_info['total_orders_found'] . '<br>';
+        echo 'Unpaid Orders: ' . count($unpaid_backorders) . '<br>';
+        if (!empty($debug_info['orders'])) {
+            echo '<table style="width:100%; margin-top:10px; border-collapse:collapse;">';
+            echo '<tr style="background:#ddd;"><th style="padding:5px; text-align:left;">Order ID</th><th style="padding:5px; text-align:left;">Status</th><th style="padding:5px; text-align:left;">Payment Method</th><th style="padding:5px; text-align:left;">Is Paid</th><th style="padding:5px; text-align:left;">Date</th><th style="padding:5px; text-align:left;">Included?</th></tr>';
+            foreach ($debug_info['orders'] as $debug_order) {
+                $included = false;
+                foreach ($unpaid_backorders as $unpaid) {
+                    if ($unpaid->get_id() == $debug_order['id']) {
+                        $included = true;
+                        break;
+                    }
+                }
+                echo '<tr>';
+                echo '<td style="padding:5px;">#' . $debug_order['id'] . '</td>';
+                echo '<td style="padding:5px;">' . $debug_order['status'] . '</td>';
+                echo '<td style="padding:5px;">' . $debug_order['payment_method'] . '</td>';
+                echo '<td style="padding:5px;">' . ($debug_order['is_paid'] ? 'Yes' : 'No') . '</td>';
+                echo '<td style="padding:5px;">' . $debug_order['date'] . '</td>';
+                echo '<td style="padding:5px; color:' . ($included ? 'green' : 'red') . ';">' . ($included ? 'YES' : 'NO') . '</td>';
+                echo '</tr>';
+            }
+            echo '</table>';
+        }
+        echo '</div>';
+    }
+}
 
 $can_user_pay = get_user_meta(get_current_user_id(), 'can_pay', true);
 $can_user_pay = $can_user_pay == '1' ? true : false;
@@ -32,12 +193,9 @@ $seven_percent_total_funded = 0;
 			border="0">
 			<thead>
 				<tr>
-					<th><?php esc_html_e('Order ID/Date', 'cpm-dongtrader'); ?>
+					<th><?php esc_html_e('Order ID/Date', 'cpm-dongtrader'); ?></th>
 					<th><?php esc_html_e('Membership', 'cpm-dongtrader'); ?></th>
 					<th><?php esc_html_e('7% Buyer', 'cpm-dongtrader'); ?></th>
-					<th><?php esc_html_e('3% Seller', 'cpm-dongtrader'); ?></th>
-					<th><?php esc_html_e('Annual Refferals', 'cpm-dongtrader'); ?></th>
-					<th><?php esc_html_e('Total 1099-Patr Form', 'cpm-dongtrader'); ?></th>
 				</tr>
 			</thead>
 			<?php
@@ -45,9 +203,6 @@ $seven_percent_total_funded = 0;
 			if (!empty($order_details)):
 				$paginated_orders = dongtrader_pagination_array($order_details, 10, true);
 				$rebate_sum = array_sum(array_column($order_details, 'rebate'));
-				$rebate_d_sum = array_sum(array_column($order_details, 'rebate_d'));
-				$annual_refferal_sum = 0;
-				$total_sum = array_sum(array_column($order_details, 'total'));
 
 				foreach ($paginated_orders as $od):
 					if (get_post_type($od['order_id']) != 'shop_order')
@@ -58,23 +213,17 @@ $seven_percent_total_funded = 0;
 					echo '<td>' . $od['order_id'] . '/' . $formatted_order_date . '</td>';
 					echo '<td>' . $od['membership'] . '</td>';
 					echo '<td>' . $symbol . $od['rebate'] * $vnd_rate . '</td>';
-					echo '<td>' . $symbol . $od['rebate_d'] * $vnd_rate . '</td>';
-					echo '<td>' . $symbol . 0 * $vnd_rate . '</td>';
-					echo '<td>' . $symbol . $od['total'] * $vnd_rate . '</td>';
 					echo '</tr>';
 				endforeach;
 				echo '<tfoot>';
 				echo '<tr>';
 				echo '<td colspan="2">All Totals</td>';
 				echo '<td>' . $symbol . $rebate_sum * $vnd_rate . '</td>';
-				echo '<td>' . $symbol . $rebate_d_sum * $vnd_rate . '</td>';
-				echo '<td>' . $symbol . $annual_refferal_sum * $vnd_rate . '</td>';
-				echo '<td>' . $symbol . $total_sum * $vnd_rate . '</td>';
 				echo '</tr>';
 				echo '</tfoot>';
 			else:
 				echo '<tr>';
-				echo '<td style="text-align:center;"colspan="7" >Details Not Found</td>';
+				echo '<td style="text-align:center;" colspan="3">Details Not Found</td>';
 				echo '</tr>';
 			endif;
 			echo '</tbody>'; ?>
@@ -90,7 +239,14 @@ $seven_percent_total_funded = 0;
 	<!-- ============================== -->
 
 	<?php
-	echo '<h5>Unpaid Backorders</h5>';
+	// Display header with count of unpaid orders
+	$unpaid_count = count($unpaid_backorders);
+	echo '<h5>Unpaid Backorders';
+	if ($unpaid_count > 0) {
+		echo ' <span style="color: #666; font-weight: normal;">(' . $unpaid_count . ' ' . ($unpaid_count == 1 ? 'order' : 'orders') . ')</span>';
+	}
+	echo '</h5>';
+	
 	if (!empty($unpaid_backorders)) { ?>
 		<table
 			class="woocommerce-orders-table woocommerce-MyAccount-orders shop_table shop_table_responsive my_account_orders account-orders-table">
@@ -104,6 +260,8 @@ $seven_percent_total_funded = 0;
 							class="nobr">Total</span></th>
 					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
 							class="nobr">7%(unfunded)s</span></th>
+					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
+							class="nobr">Status</span></th>
 					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-actions"><span
 							class="nobr">Actions</span></th>
 				</tr>
@@ -126,6 +284,10 @@ $seven_percent_total_funded = 0;
 						$pay_btn = '<span style="color: #95a5a6; font-style: italic;">Not Payable</span>';
 					}
 
+					// Get order status
+					$order_status = $order->get_status();
+					$status_label = wc_get_order_status_name($order_status);
+
 					echo '
 					<tr class="woocommerce-orders-table__row woocommerce-orders-table__row--status-completed order">
 						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-number" data-title="Order">
@@ -139,6 +301,9 @@ $seven_percent_total_funded = 0;
 						</td>
 						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Total">
 							<span class="woocommerce-Price-amount amount">' . wc_price($seven_percent) . '</span>
+						</td>
+						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Status">
+							<span class="woocommerce-Price-amount amount">' . esc_html(ucfirst($status_label)) . '</span>
 						</td>
 						<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-actions" data-title="Actions">
 							' . $pay_btn . '
@@ -155,232 +320,5 @@ $seven_percent_total_funded = 0;
 	} else {
 		echo '<p>No unpaid backorders found.</p>';
 	}
-
-	if (!empty($paid_orders)) { ?>
-		<table
-			class="woocommerce-orders-table woocommerce-MyAccount-orders shop_table shop_table_responsive my_account_orders account-orders-table">
-			<thead>
-				<tr>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-number"><span
-							class="nobr">Order</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-date"><span
-							class="nobr">Date</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
-							class="nobr">Total</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
-							class="nobr">7%(funded)</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
-							class="nobr">XP</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-total"><span
-							class="nobr">Status</span></th>
-					<th class="woocommerce-orders-table__header woocommerce-orders-table__header-order-actions"><span
-							class="nobr">Actions</span></th>
-				</tr>
-			</thead>
-
-			<tbody>
-				<?php
-				$total_paid_amount = 0;
-				$seven_percent_total_funded = 0;
-				$grand_total_xp = 0; // <-- overall total XP
-				$total_pending_xp = 0; // <-- overall pending XP
-				$total_completed_xp = 0; // <-- overall completed XP
-			
-				// Check if Discord invite data exists to release all pending XP
-				$customer_id = get_current_user_id();
-				$discord_invite_data = get_user_meta($customer_id, '_discord_invite', true);
-				$has_discord_invite = false;
-				
-				if (!empty($discord_invite_data)) {
-					if (is_string($discord_invite_data)) {
-						$decoded_data = json_decode($discord_invite_data, true);
-						$has_discord_invite = (json_last_error() === JSON_ERROR_NONE && $decoded_data && isset($decoded_data['xp_awarded']));
-					} else {
-						$has_discord_invite = is_array($discord_invite_data) && !empty($discord_invite_data);
-					}
-				}
-
-				foreach ($paid_orders as $order) {
-					$total_quantity = 0;
-					$total_paid_amount += $order->get_total();
-					$seven_percent = ($order->get_total() * 0.07);
-					$seven_percent_total_funded += $seven_percent;
-
-					// Get XP earned from user meta _buyer_details
-					$buyer_details = get_user_meta($customer_id, '_buyer_details', true);
-					$xp_earned = 0;
-					$total_xp = 0;
-					$pending_xp = 0;
-					$completed_xp = 0;
-
-					if (!empty($buyer_details) && is_array($buyer_details)) {
-						// XP for this order (first element in array)
-						$xp_earned = $buyer_details[0]['xp_awarded'];
-
-						// Calculate pending vs completed XP across all buyer orders
-						foreach ($buyer_details as $transaction) {
-							if (isset($transaction['xp_awarded'])) {
-								$total_xp += intval($transaction['xp_awarded']);
-								
-								// If Discord invite exists, all XP is automatically released
-								if ($has_discord_invite) {
-									$completed_xp += intval($transaction['xp_awarded']);
-								} else {
-									// Check if XP is pending or completed based on Discord membership
-									if (isset($transaction['discord_member']) && $transaction['discord_member']) {
-										$completed_xp += intval($transaction['xp_awarded']);
-									} else {
-										$pending_xp += intval($transaction['xp_awarded']);
-									}
-								}
-							}
-						}
-						$grand_total_xp += $total_xp; // add to global XP
-						$total_pending_xp += $pending_xp; // add to global pending XP
-						$total_completed_xp += $completed_xp; // add to global completed XP
-					}
-
-
-					foreach ($order->get_items() as $item_id => $item) {
-						$total_quantity += $item->get_quantity();
-					}
-
-					echo '
-						<tr class="woocommerce-orders-table__row woocommerce-orders-table__row--status-completed order">
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-number" data-title="Order">
-								<a href="' . esc_url($order->get_view_order_url()) . '">#' . $order->get_id() . '</a>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-date" data-title="Date">
-								<time datetime="' . esc_attr($order->get_date_created()) . '">' . date_i18n('F j, Y', strtotime($order->get_date_created())) . '</time>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Total">
-								<span class="woocommerce-Price-amount amount">' . $order->get_formatted_order_total() . ' for ' . $total_quantity . ' item(s)</span>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Total">
-								<span class="woocommerce-Price-amount amount">' . wc_price($seven_percent) . '</span>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="XP">
-								<span class="woocommerce-Price-amount amount">' . number_format($total_xp) . ' XP</span>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-total" data-title="Status">
-								<span class="woocommerce-Price-amount amount">' . ($has_discord_invite ? 'Released' : ($pending_xp > 0 ? 'Pending' : 'Completed')) . '</span>
-							</td>
-							<td class="woocommerce-orders-table__cell woocommerce-orders-table__cell-order-actions" data-title="Actions">
-								<a href="' . esc_url($order->get_view_order_url()) . '" class="woocommerce-button wp-element-button button view">View</a>
-							</td>
-						</tr>
-						';
-				}
-
-				//calculate yam
-				$yam_total = 0;
-				$usd_total = 0;
-
-				$yam_total = dongtrader_xp_to_yam($grand_total_xp);
-				$usd_total = dongtrader_yam_to_usd($yam_total); // 1 USD = 21,000 YAM (new conversion rate)
-				
-				?>
-			</tbody>
-
-		</table>
-		<p>Total 7%(funded): <?php echo wc_price($seven_percent_total_funded); ?></p>
-		<p>Total Paid Amount: <?php echo wc_price($total_paid_amount); ?></p>
-		
-		<!-- XP Summary Section -->
-		<div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0;">
-			<h4 style="color: #2c3e50; margin: 0 0 15px 0; border-bottom: 2px solid #7f8c8d; padding-bottom: 8px;">XP Rewards Summary</h4>
-			
-			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-				<div>
-					<p style="margin: 8px 0; font-size: 16px;">
-						<strong style="color: #2c3e50;">Total XP Earned:</strong><br>
-						<span style="color: #2c3e50; font-size: 20px; font-weight: bold;"><?php echo number_format($grand_total_xp); ?> XP</span>
-					</p>
-					
-					<p style="margin: 8px 0;">
-						<strong style="color: #2c3e50;">XP Status:</strong><br>
-						<?php if ($has_discord_invite): ?>
-							<span style="color: #17a2b8; font-weight: bold;"><?php echo number_format($grand_total_xp); ?> Released</span> 
-							<small style="color: #7f8c8d;">(Discord verified - All XP available)</small><br>
-						<?php else: ?>
-							<span style="color: #f39c12; font-weight: bold;"><?php echo number_format($total_pending_xp); ?> Pending</span> 
-							<small style="color: #7f8c8d;">(Awaiting Discord verification)</small><br>
-							<span style="color: #28a745; font-weight: bold;"><?php echo number_format($total_completed_xp); ?> Completed</span>
-						<?php endif; ?>
-					</p>
-				</div>
-				
-				<div>
-					<p style="margin: 8px 0;">
-						<strong style="color: #2c3e50;">Conversion Rates:</strong><br>
-						<small style="color: #2c3e50;">1 USD = 21,000 YAM (new conversion rate)</small><br>
-						<small style="color: #2c3e50;">1 YAM = 1/21,000 USD</small><br>
-						<small style="color: #2c3e50;">1 YAM = <?php echo number_format(dongtrader_xp_per_yam(), 0); ?> XP</small><br>
-						<small style="color: #2c3e50;">1 USD = <?php echo number_format(dongtrader_xp_per_dollar(), 0); ?> XP</small>
-					</p>
-				</div>
-			</div>
-		</div>
-		
-		<!-- Currency Conversion Section -->
-		<div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0;">
-			<h4 style="color: #2c3e50; margin: 0 0 15px 0; border-bottom: 2px solid #7f8c8d; padding-bottom: 8px;">Currency Conversions</h4>
-			
-			<?php
-			// Calculate correct XP to YAM conversion using helper functions
-			$xp_per_yam = dongtrader_xp_per_yam(); // 10^23 / 21,000 XP per YAM (1 USD = 21,000 YAM = 10^23 XP)
-			$xp_to_yam = dongtrader_xp_to_yam($grand_total_xp);
-			
-			// Calculate patronage split (10% total of gross) using helper functions
-			$total_patronage_xp = dongtrader_usd_to_xp($usd_total * 0.10); // 10% in XP
-			$buyer_patronage_xp = dongtrader_usd_to_xp($usd_total * 0.07); // 7% in XP
-			$seller_patronage_xp = dongtrader_usd_to_xp($usd_total * 0.03); // 3% in XP
-			?>
-			
-			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-				<div>
-					<p style="margin: 8px 0;">
-						<strong style="color: #2c3e50;">YAM Tokens:</strong><br>
-						<span style="color: #e67e22; font-size: 18px; font-weight: bold;"><?php echo number_format($yam_total, 0); ?> YAM</span><br>
-						<small style="color: #2c3e50;">Value: $<?php echo number_format(dongtrader_yam_to_usd($yam_total), 2); ?> USD</small><br>
-						<small style="color: #2c3e50;">XP Value: <?php echo number_format($yam_total * $xp_per_yam, 0); ?> XP</small>
-					</p>
-				</div>
-				
-				<div>
-					<p style="margin: 8px 0;">
-						<strong style="color: #2c3e50;">USD Value:</strong><br>
-						<span style="color: #2c3e50; font-size: 18px; font-weight: bold;">$<?php echo number_format($usd_total, 0); ?> USD</span><br>
-						<small style="color: #2c3e50;">Equivalent: <?php echo number_format(dongtrader_usd_to_yam($usd_total), 0); ?> YAM</small><br>
-						<small style="color: #2c3e50;">XP Value: <?php echo number_format(dongtrader_usd_to_xp($usd_total), 0); ?> XP</small>
-					</p>
-				</div>
-			</div>
-			
-			<!-- Patronage Split Section -->
-			<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
-				<h5 style="color: #2c3e50; margin: 0 0 10px 0;">Patronage Split (10% of Gross Value)</h5>
-				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-					<div>
-						<p style="margin: 5px 0;">
-							<strong style="color: #2c3e50;">Buyer Reward (7%):</strong><br>
-							<span style="color: #2c3e50; font-weight: bold;"><?php echo number_format($buyer_patronage_xp, 0); ?> XP</span><br>
-							<small style="color: #2c3e50;">$<?php echo number_format($usd_total * 0.07, 0); ?> USD</small>
-						</p>
-					</div>
-					<div>
-						<p style="margin: 5px 0;">
-							<strong style="color: #2c3e50;">Seller Reward (3%):</strong><br>
-							<span style="color: #e67e22; font-weight: bold;"><?php echo number_format($seller_patronage_xp, 0); ?> XP</span><br>
-							<small style="color: #2c3e50;">$<?php echo number_format($usd_total * 0.03, 0); ?> USD</small>
-						</p>
-					</div>
-				</div>
-			</div>
-		</div>
-		<br class="clear" />
-		<?php
-	} else {
-		echo '<p>No paid orders found.</p>';
-	} ?>
+?>
 </div>

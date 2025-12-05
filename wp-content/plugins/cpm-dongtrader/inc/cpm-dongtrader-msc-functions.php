@@ -503,40 +503,43 @@ function mega_save_order_details($user_orders){
             $membership_name = dongtrader_get_order_meta($ao,'_membership_name'); 
             
             //new array for new order which we will append to 
-            $buyer_metas[] = [
-                'order_id'      => $ao,
-                'name'          => $buyer_name,
-                'membership'    => $membership_name,
-                'rebate'        => $rebate,
-                'rebate_d'      => 0,
-                'total'         => $rebate,
-                'xp_awarded'    => 10000000, // XP awarded for this order
-            ];
+            // DISABLED: Not saving to _buyer_details usermeta anymore
+            // $buyer_metas[] = [
+            //     'order_id'      => $ao,
+            //     'name'          => $buyer_name,
+            //     'membership'    => $membership_name,
+            //     'rebate'        => $rebate,
+            //     'rebate_d'      => 0,
+            //     'total'         => $rebate,
+            //     'xp_awarded'    => 10000000, // XP awarded for this order
+            // ];
             
      
-             update_user_meta($member,'_buyer_details',$buyer_metas);
+             // DISABLED: Not saving to _buyer_details usermeta anymore
+             // update_user_meta($member,'_buyer_details',$buyer_metas);
              
            // new we need to update tresury details to sponsor 
-           if($sponsor!=0 && dongtrader_check_user($sponsor,true)){
+           // DISABLED: Not saving sponsor _buyer_details usermeta anymore
+           // if($sponsor!=0 && dongtrader_check_user($sponsor,true)){
            
-                // Get previously stored sponsors treasury    
-                $sponsor_buyer_meta  = get_user_meta($sponsor, '_buyer_details', true);
+           //      // Get previously stored sponsors treasury    
+           //      $sponsor_buyer_meta  = get_user_meta($sponsor, '_buyer_details', true);
                     
-                //assign empty array if $treasury_meta is empty 
-                $sponsor_buyer_metas = !empty($sponsor_buyer_meta) ? $sponsor_buyer_meta : [];
+           //      //assign empty array if $treasury_meta is empty 
+           //      $sponsor_buyer_metas = !empty($sponsor_buyer_meta) ? $sponsor_buyer_meta : [];
                 
-                //new array for new order which we will append to 
-                $sponsor_buyer_metas[] = [
-                    'order_id'      => $ao,
-                    'name'          => $buyer_name,
-                    'membership'    => $membership_name,
-                    'rebate'        => 0,
-                    'rebate_d'      => $rebate_d,
-                    'total'         => $rebate_d,
-                    'xp_awarded'    => 10000000, // XP awarded for sponsor
-                ];
-                update_user_meta($sponsor,'_buyer_details',$sponsor_buyer_metas);
-           }
+           //      //new array for new order which we will append to 
+           //      $sponsor_buyer_metas[] = [
+           //          'order_id'      => $ao,
+           //          'name'          => $buyer_name,
+           //          'membership'    => $membership_name,
+           //          'rebate'        => 0,
+           //          'rebate_d'      => $rebate_d,
+           //          'total'         => $rebate_d,
+           //          'xp_awarded'    => 10000000, // XP awarded for sponsor
+           //      ];
+           //      update_user_meta($sponsor,'_buyer_details',$sponsor_buyer_metas);
+           // }
 
         }
         

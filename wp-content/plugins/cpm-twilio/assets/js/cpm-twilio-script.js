@@ -92,7 +92,7 @@ $(document).ready(function () {
 
     // Function to proceed with user login and redirect
     // Made available globally to ensure it's accessible from popup close handlers
-    window.proceedWithLogin = function(userId, nonce) {
+    window.proceedWithLogin = function(userId, nonce, redirectUrl) {
         jQuery.ajax({
             url: ct_ajax.ajax_url,
             type: "POST",
@@ -103,8 +103,9 @@ $(document).ready(function () {
             },
             success: function (response) {
                 if (response.data[0] == "logged_in") {
-                    // Redirect to wallet page after login (for proof-of-delivery scans)
-                    window.location.href = '/my-account/detente-wallet/';
+                    // Redirect to specified URL or default to wallet page
+                    const redirect = redirectUrl || (window.pendingLogin && window.pendingLogin.redirectUrl) || '/my-account/detente-wallet/';
+                    window.location.href = redirect;
                 } else if (response.data[0] == 'nonce_failed') {
                     displayFormMsg('Security check failed');
                 } else {
@@ -259,8 +260,14 @@ $(document).ready(function () {
                     // Clear pending buyer data
                     window.pendingBuyerData = null;
                     
-                    // Show calculation popup ONLY if data insertion was successful
-                    showCalculationPopup();
+                    // For buyer role, redirect to payment page if pending orders exist
+                    if (roleToSend && (roleToSend.toLowerCase().indexOf('buyer') !== -1 || roleToSend.indexOf('7%') !== -1)) {
+                        // Buyer role - redirect to payment page if pending orders exist
+                        redirectToPaymentPageIfPendingOrders(discordData.user_id, nonce);
+                    } else {
+                        // Other roles (seller, personal) - show calculation popup
+                        showCalculationPopup();
+                    }
                 } else {
                     console.error('Failed to insert buyer scan data. Not showing calculation popup.');
                     // Error popup is already shown by insertScanDataToUsermeta
@@ -435,6 +442,188 @@ $(document).ready(function () {
                 } else {
                     // Direct redirect to wallet page if no pending login
                     window.location.href = '/my-account/detente-wallet/';
+                }
+            });
+        });
+    }
+
+    // Function to redirect to payment page if pending orders exist
+    function redirectToPaymentPageIfPendingOrders(userId, nonce) {
+        console.log('Checking for pending orders for user:', userId);
+        
+        // Fetch pending orders via AJAX
+        jQuery.ajax({
+            url: ct_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'ct_get_pending_orders',
+                user_id: userId,
+                nonce: nonce || ct_ajax.nonce || ''
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    const orders = response.data.orders || [];
+                    const orderCount = response.data.count || 0;
+                    
+                    if (orderCount > 0 && orders.length > 0) {
+                        // Get the latest order (first one in the array, or find the most recent)
+                        // Orders are typically returned in reverse chronological order
+                        const latestOrder = orders[0];
+                        
+                        if (latestOrder && latestOrder.payment_url) {
+                            console.log('Redirecting to payment page for order:', latestOrder.order_id);
+                            // If there's pending login data, log in first, then redirect
+                            if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                                window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce, latestOrder.payment_url);
+                            } else {
+                                // Direct redirect to payment page
+                                window.location.href = latestOrder.payment_url;
+                            }
+                        } else {
+                            console.log('No payment URL found for latest order');
+                            // Redirect to orders page if no payment URL
+                            if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                                window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce, '/my-account/detente-orders/');
+                            } else {
+                                window.location.href = '/my-account/detente-orders/';
+                            }
+                        }
+                    } else {
+                        console.log('No pending orders found');
+                        // No pending orders - redirect to orders page or wallet
+                        if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                            window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce, '/my-account/detente-orders/');
+                        } else {
+                            window.location.href = '/my-account/detente-orders/';
+                        }
+                    }
+                } else {
+                    console.error('Failed to fetch pending orders');
+                    // On error, redirect to orders page
+                    if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                        window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce, '/my-account/detente-orders/');
+                    } else {
+                        window.location.href = '/my-account/detente-orders/';
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error fetching pending orders:', error);
+                // On error, redirect to orders page
+                if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                    window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce, '/my-account/detente-orders/');
+                } else {
+                    window.location.href = '/my-account/detente-orders/';
+                }
+            }
+        });
+    }
+
+    // Function to show pending orders popup for buyer (kept for reference, not used anymore)
+    function showPendingOrdersPopup(userId, nonce) {
+        console.log('Fetching pending orders for user:', userId);
+        
+        // Show loading state
+        let html = '<div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">';
+        html += '<h2 style="color: #2c3e50; margin-top: 0; margin-bottom: 20px; font-size: 24px;">Loading Pending Orders...</h2>';
+        html += '<p style="color: #7f8c8d; font-size: 14px;">Please wait...</p>';
+        html += '</div>';
+        jQuery('#calculation-results').html(html);
+        jQuery('#cpp-popup-calculation').fadeIn();
+        
+        // Fetch pending orders via AJAX
+        jQuery.ajax({
+            url: ct_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'ct_get_pending_orders',
+                user_id: userId,
+                nonce: nonce || ct_ajax.nonce || ''
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    const orders = response.data.orders || [];
+                    const totalSevenPercent = response.data.total_seven_percent || '$0.00';
+                    const orderCount = response.data.count || 0;
+                    
+                    // Build HTML for pending orders
+                    let html = '<div style="font-family: Arial, sans-serif;">';
+                    html += '<h2 style="color: #2c3e50; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">Pending Orders</h2>';
+                    
+                    if (orderCount > 0) {
+                        html += '<div style="overflow-x: auto; margin: 20px 0;">';
+                        html += '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
+                        html += '<thead>';
+                        html += '<tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">';
+                        html += '<th style="padding: 12px; text-align: left; font-weight: 600; color: #2c3e50;">Order</th>';
+                        html += '<th style="padding: 12px; text-align: left; font-weight: 600; color: #2c3e50;">Date</th>';
+                        html += '<th style="padding: 12px; text-align: left; font-weight: 600; color: #2c3e50;">Total</th>';
+                        html += '<th style="padding: 12px; text-align: left; font-weight: 600; color: #2c3e50;">7% (unfunded)</th>';
+                        html += '<th style="padding: 12px; text-align: left; font-weight: 600; color: #2c3e50;">Actions</th>';
+                        html += '</tr>';
+                        html += '</thead>';
+                        html += '<tbody>';
+                        
+                        orders.forEach(function(order) {
+                            html += '<tr style="border-bottom: 1px solid #e9ecef;">';
+                            html += '<td style="padding: 12px;"><a href="' + order.order_url + '" style="color: #3498db; text-decoration: none;">' + order.order_number + '</a></td>';
+                            html += '<td style="padding: 12px; color: #2c3e50;">' + order.date + '</td>';
+                            html += '<td style="padding: 12px; color: #2c3e50;">' + order.total + ' for ' + order.quantity + ' item(s)</td>';
+                            html += '<td style="padding: 12px; color: #2c3e50;">' + order.seven_percent + '</td>';
+                            html += '<td style="padding: 12px;">';
+                            if (order.can_pay) {
+                                html += '<a href="' + order.payment_url + '" style="background: #27ae60; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600;">Pay Now</a>';
+                            } else {
+                                html += '<span style="color: #95a5a6; font-style: italic; font-size: 13px;">Not Payable</span>';
+                            }
+                            html += '</td>';
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody>';
+                        html += '</table>';
+                        html += '</div>';
+                        html += '<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">';
+                        html += '<p style="margin: 0; color: #2c3e50; font-size: 16px; font-weight: 600;">Total 7% (unfunded): ' + totalSevenPercent + '</p>';
+                        html += '</div>';
+                    } else {
+                        html += '<div style="text-align: center; padding: 40px 20px;">';
+                        html += '<p style="color: #7f8c8d; font-size: 16px; margin: 0;">No pending orders found.</p>';
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    
+                    // Update popup content
+                    jQuery('#calculation-results').html(html);
+                } else {
+                    // Error fetching orders
+                    let html = '<div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">';
+                    html += '<h2 style="color: #e74c3c; margin-top: 0; margin-bottom: 20px; font-size: 24px;">Error</h2>';
+                    html += '<p style="color: #7f8c8d; font-size: 14px;">Failed to load pending orders. Please try again.</p>';
+                    html += '</div>';
+                    jQuery('#calculation-results').html(html);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error fetching pending orders:', error);
+                let html = '<div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">';
+                html += '<h2 style="color: #e74c3c; margin-top: 0; margin-bottom: 20px; font-size: 24px;">Error</h2>';
+                html += '<p style="color: #7f8c8d; font-size: 14px;">Failed to load pending orders. Please try again.</p>';
+                html += '</div>';
+                jQuery('#calculation-results').html(html);
+            }
+        });
+        
+        // Close handlers
+        jQuery('.cpp-close-calculation, #cpp-close-calculation-btn').off('click').on('click', function() {
+            jQuery('#cpp-popup-calculation').fadeOut(function() {
+                // If there's pending login data, log in first, then redirect to wallet page
+                if (window.pendingLogin && window.pendingLogin.userId && window.pendingLogin.nonce) {
+                    window.proceedWithLogin(window.pendingLogin.userId, window.pendingLogin.nonce);
+                } else {
+                    // Just close the popup, no redirect
+                    // User can navigate manually if needed
                 }
             });
         });

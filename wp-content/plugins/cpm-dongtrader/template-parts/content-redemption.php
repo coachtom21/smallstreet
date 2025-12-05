@@ -254,6 +254,12 @@ foreach ($user_treasury_entries as $entry) {
         if ($scan_status !== 'confirmed') {
             continue; // Skip non-confirmed entries
         }
+        
+        // Skip unfunded XP entries - they cannot be redeemed
+        $xp_status = isset($entry['xp_status']) ? $entry['xp_status'] : '';
+        if ($xp_status === 'unfunded') {
+            continue; // Skip unfunded XP entries
+        }
     }
 
     // Get values
@@ -1075,6 +1081,12 @@ function get_status_display($status)
                     // Include all transaction sources
                     $entry_source = isset($entry['source']) ? $entry['source'] : '';
                     if (in_array($entry_source, array('seller_scan', 'buyer_scan', 'personal_scan', 'discord_invite', 'talentshow_entry', 'discord_poll'))) {
+                        // Skip unfunded XP entries - they cannot be redeemed
+                        $xp_status = isset($entry['xp_status']) ? $entry['xp_status'] : '';
+                        if ($xp_status === 'unfunded') {
+                            continue; // Skip unfunded XP entries
+                        }
+                        
                         // Ensure entry has required fields for display
                         if (!isset($entry['xp_units']) || $entry['xp_units'] == 0) {
                             // Try to get XP from other fields

@@ -17,30 +17,32 @@ function add_cashback_row_to_checkout()
     // Calculate 7% cashback
     $cashback = ($total * 0.07) * $actual_vnd_rate;
 
+    // DISABLED: XP display removed from checkout page
     // Determine XP amount based on cart contents
-    $xp_amount = 10000000; // Default XP for paid memberships
-    
-    // Check if this is a YAMer order (free product)
-    foreach (WC()->cart->get_cart() as $cart_item) {
-        $product_id = $cart_item['product_id'];
-        $product = wc_get_product($product_id);
-        
-        // If any product in cart is free, this is likely a YAMer order
-        if ($product && $product->get_price() == 0) {
-            $xp_amount = 0; // YAMer gets 0 XP
-            break;
-        }
-    }
+    // $xp_amount = 10000000; // Default XP for paid memberships
+    // 
+    // // Check if this is a YAMer order (free product)
+    // foreach (WC()->cart->get_cart() as $cart_item) {
+    //     $product_id = $cart_item['product_id'];
+    //     $product = wc_get_product($product_id);
+    //     
+    //     // If any product in cart is free, this is likely a YAMer order
+    //     if ($product && $product->get_price() == 0) {
+    //         $xp_amount = 0; // YAMer gets 0 XP
+    //         break;
+    //     }
+    // }
 
     ?>
     <tr class="cashback-row">
         <th><?php _e('Cash Back 7% (YAM rewards)', 'your-text-domain'); ?></th>
         <td><?php echo 'M' . number_format($cashback, 2); ?></td>
     </tr>
-    <tr class="xp-rewards-row">
+    <!-- DISABLED: XP display removed from checkout page -->
+    <!-- <tr class="xp-rewards-row">
         <th><?php _e('Experience Points (XP)', 'your-text-domain'); ?></th>
         <td><?php echo number_format($xp_amount); ?> XP</td>
-    </tr>
+    </tr> -->
     <?php
 }
 
@@ -1619,6 +1621,203 @@ function sumValues_update_ordermeta($arrays, $oid)
 
 add_action('woocommerce_checkout_order_created', 'mega_update_mlm_database', 9, 1);
 
+// Ensure preorder orders have pending status (not on-hold) so they can be paid
+add_action('woocommerce_checkout_order_created', 'mega_set_preorder_status_to_pending', 10, 1);
+function mega_set_preorder_status_to_pending($order) {
+    // Check if payment method is preorder
+    $payment_method = $order->get_payment_method();
+    
+    if ($payment_method === 'preorder') {
+        // Get current order status
+        $current_status = $order->get_status();
+        
+        // If order is on-hold or any other status, set it to pending
+        // Pending status allows the order to be paid via checkout payment URL
+        if ($current_status !== 'pending') {
+            $order->set_status('pending', __('Preorder order set to pending status for payment', 'cpm-dongtrader'));
+            $order->save();
+        }
+    }
+}
+
+// Also prevent preorder orders from being changed to on-hold or completed status (only if unpaid)
+add_action('woocommerce_order_status_changed', 'mega_prevent_preorder_wrong_status', 10, 3);
+function mega_prevent_preorder_wrong_status($order_id, $old_status, $new_status) {
+    $order = wc_get_order($order_id);
+    
+    if (!$order) {
+        return;
+    }
+    
+    // Check if payment method is preorder
+    $payment_method = $order->get_payment_method();
+    
+    if ($payment_method === 'preorder') {
+        // Check if order is actually paid
+        $is_paid = $order->is_paid();
+        
+        // If order is NOT paid, prevent it from being set to on-hold or completed
+        if (!$is_paid) {
+            // Unpaid preorder orders should always be pending
+            if ($new_status === 'on-hold' || $new_status === 'completed') {
+                // Change back to pending if someone tries to set it to on-hold or completed
+                $order->set_status('pending', __('Preorder orders must remain pending for payment', 'cpm-dongtrader'));
+                $order->save();
+            }
+        }
+        // If order IS paid, allow both "on-hold" and "completed" statuses
+        // "on-hold" is used when payment is received but funds are held until August 31st
+    }
+}
+
+// Set order status to "on-hold" after payment (for PayPal and Venmo gateways)
+add_action('woocommerce_payment_complete', 'mega_set_order_on_hold_after_payment', 10, 1);
+function mega_set_order_on_hold_after_payment($order_id) {
+    $order = wc_get_order($order_id);
+    
+    if (!$order || !$order->is_paid()) {
+        return;
+    }
+    
+    // Set status to on-hold for all payment methods (funds held until August 31st)
+    $current_status = $order->get_status();
+    if ($current_status !== 'on-hold') {
+        $order->update_status('on-hold', __('Payment received. Order on hold - funds will be released on August 31st.', 'cpm-dongtrader'));
+    }
+}
+
+// Update XP status to "unfunded" when order status changes to "on-hold" after payment
+add_action('woocommerce_order_status_changed', 'mega_update_xp_status_on_payment', 20, 3);
+function mega_update_xp_status_on_payment($order_id, $old_status, $new_status) {
+    // Only process when order changes to "on-hold" and order is paid
+    if ($new_status !== 'on-hold') {
+        return;
+    }
+    
+    $order = wc_get_order($order_id);
+    
+    if (!$order || !$order->is_paid()) {
+        return;
+    }
+    
+    $user_id = $order->get_user_id();
+    
+    if (!$user_id) {
+        return;
+    }
+    
+    // Get 7% rebate amount from order meta
+    $rebate_amount = get_post_meta($order_id, 'mega_cashback_v', true);
+    $rebate_amount = !empty($rebate_amount) ? floatval($rebate_amount) : 0;
+    
+    // Calculate XP amount (7% of trade value)
+    // Base trade value: $10.30
+    // 7% = $0.721
+    // XP conversion: 1 USD = 10^23 XP
+    $trade_value = 10.30; // Base trade value
+    $buyer_percentage = 0.07; // 7%
+    $buyer_reward = $trade_value * $buyer_percentage; // $0.721
+    $xp_amount = $buyer_reward * pow(10, 23); // Convert to XP
+    
+    // Update buyer_scan entries to mark XP as "unfunded"
+    $buyer_scan_data = get_user_meta($user_id, 'buyer_scan', true);
+    if (is_array($buyer_scan_data) && !empty($buyer_scan_data)) {
+        $updated = false;
+        foreach ($buyer_scan_data as $index => $entry) {
+            // Mark XP as unfunded for this order's related scans
+            // We'll identify by checking if entry doesn't have xp_status or if it's related to this order
+            if (!isset($entry['xp_status']) || $entry['xp_status'] !== 'unfunded') {
+                $buyer_scan_data[$index]['xp_status'] = 'unfunded';
+                $buyer_scan_data[$index]['order_id'] = $order_id;
+                $updated = true;
+            }
+        }
+        if ($updated) {
+            update_user_meta($user_id, 'buyer_scan', $buyer_scan_data);
+        }
+    }
+    
+    // Update seller_scan entries if this buyer has matched sellers
+    // Find seller entries that are linked to this buyer
+    $buyer_scan_data = get_user_meta($user_id, 'buyer_scan', true);
+    if (is_array($buyer_scan_data)) {
+        foreach ($buyer_scan_data as $buyer_entry) {
+            if (isset($buyer_entry['seller_id']) && !empty($buyer_entry['seller_id'])) {
+                $seller_id = intval($buyer_entry['seller_id']);
+                $seller_scan_data = get_user_meta($seller_id, 'seller_scan', true);
+                
+                if (is_array($seller_scan_data)) {
+                    $seller_updated = false;
+                    foreach ($seller_scan_data as $index => $seller_entry) {
+                        // If this seller entry is linked to this buyer
+                        if (isset($seller_entry['buyer_id']) && intval($seller_entry['buyer_id']) === $user_id) {
+                            if (!isset($seller_entry['xp_status']) || $seller_entry['xp_status'] !== 'unfunded') {
+                                $seller_scan_data[$index]['xp_status'] = 'unfunded';
+                                $seller_scan_data[$index]['order_id'] = $order_id;
+                                $seller_updated = true;
+                            }
+                        }
+                    }
+                    if ($seller_updated) {
+                        update_user_meta($seller_id, 'seller_scan', $seller_scan_data);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update treasury_reminder options table
+    $treasury_reminder = get_option('treasury_reminder', array());
+    if (is_array($treasury_reminder)) {
+        $treasury_updated = false;
+        foreach ($treasury_reminder as $index => $treasury_entry) {
+            // Update entries related to this buyer
+            if (isset($treasury_entry['user_id']) && intval($treasury_entry['user_id']) === $user_id) {
+                if (isset($treasury_entry['role']) && ($treasury_entry['role'] === 'buyer' || $treasury_entry['role'] === 'seller')) {
+                    if (!isset($treasury_entry['xp_status']) || $treasury_entry['xp_status'] !== 'unfunded') {
+                        $treasury_reminder[$index]['xp_status'] = 'unfunded';
+                        $treasury_reminder[$index]['order_id'] = $order_id;
+                        $treasury_updated = true;
+                    }
+                }
+            }
+        }
+        if ($treasury_updated) {
+            update_option('treasury_reminder', $treasury_reminder);
+        }
+    }
+}
+
+// Fix existing preorder orders that are incorrectly set to on-hold (only if unpaid)
+// This runs when orders are loaded to ensure unpaid preorders are pending
+// IMPORTANT: Only affects preorder payment method, not PayPal or other gateways
+add_action('woocommerce_before_order_object_save', 'mega_fix_preorder_status_before_save', 10, 1);
+function mega_fix_preorder_status_before_save($order) {
+    if (!is_a($order, 'WC_Order')) {
+        return;
+    }
+    
+    $payment_method = $order->get_payment_method();
+    
+    // ONLY process preorder payment method - don't interfere with PayPal or other gateways
+    if ($payment_method !== 'preorder') {
+        return;
+    }
+    
+    $current_status = $order->get_status();
+    $is_paid = $order->is_paid();
+    
+    // Only fix unpaid preorder orders
+    if (!$is_paid) {
+        // If unpaid preorder is on-hold or completed, change to pending
+        if ($current_status === 'on-hold' || $current_status === 'completed') {
+            $order->set_status('pending', __('Preorder order corrected to pending status', 'cpm-dongtrader'));
+        }
+    }
+    // If paid preorder is on-hold, allow it (funds held until August 31st)
+    // If paid preorder is completed, allow it (funds released)
+}
+
 function mega_update_mlm_database($orderObj)
 {
 
@@ -1842,28 +2041,31 @@ function mega_save_details_for_non_gf_members($oobj)
     //  Amount remaining after distribution 
     $remaining_total_amt = $order_total - $distributed_total_amt;
 
+    // DISABLED: XP calculation removed from checkout process
     // Determine XP amount based on membership type
-    $xp_amount = 10000000; // Default XP for paid memberships
-    if ($membership_name === 'YAMer') {
-        $xp_amount = 0; // YAMer gets 0 XP
-    }
+    // $xp_amount = 10000000; // Default XP for paid memberships
+    // if ($membership_name === 'YAMer') {
+    //     $xp_amount = 0; // YAMer gets 0 XP
+    // }
 
     //new array for new order which we will append to 
-    $buyer_metas[] = [
-        'order_id' => $oobj->get_id(),
-        'name' => $buyer_name,
-        'membership' => $membership_name,
-        'rebate' => $rebate,
-        'process' => $process_amt,
-        'total' => $distributed_total_amt,
-        'xp_awarded'    => $xp_amount, // XP awarded for this order
-    ];
+    // DISABLED: Not saving to _buyer_details usermeta anymore
+    // $buyer_metas[] = [
+    //     'order_id' => $oobj->get_id(),
+    //     'name' => $buyer_name,
+    //     'membership' => $membership_name,
+    //     'rebate' => $rebate,
+    //     'process' => $process_amt,
+    //     'total' => $distributed_total_amt,
+    //     'xp_awarded'    => $xp_amount, // XP awarded for this order
+    // ];
 
 
 
-    if (!empty($buyer_metas)) {
-        update_user_meta($customer_id, '_buyer_details', $buyer_metas);
-    }
+    // DISABLED: Not saving to _buyer_details usermeta anymore
+    // if (!empty($buyer_metas)) {
+    //     update_user_meta($customer_id, '_buyer_details', $buyer_metas);
+    // }
     //get previous seller trading details saved in user meta
     $treasury_meta = get_user_meta($customer_id, '_treasury_details', true);
 
@@ -1877,7 +2079,8 @@ function mega_save_details_for_non_gf_members($oobj)
         'total_amt' => $order_total,
         'distrb_amt' => $distributed_total_amt,
         'rem_amt' => $remaining_total_amt,
-        'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
+        // DISABLED: XP removed from treasury details during checkout
+        // 'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
     ];
 
     if (!empty($treasury_metas)) {
@@ -1885,31 +2088,32 @@ function mega_save_details_for_non_gf_members($oobj)
     }
 
     // For sposnor 
-    $sponsor_id = get_post_meta($oobj->get_id(), 'mega_affid', true);
+    // DISABLED: Not saving sponsor _buyer_details usermeta anymore
+    // $sponsor_id = get_post_meta($oobj->get_id(), 'mega_affid', true);
 
-    $sponsor_check = dongtrader_check_user($sponsor_id);
+    // $sponsor_check = dongtrader_check_user($sponsor_id);
 
-    if (!empty($seller_id) && $sponsor_check) {
+    // if (!empty($seller_id) && $sponsor_check) {
 
-        $sponsor_meta = get_user_meta($sponsor_id, '_buyer_details', true);
+    //     $sponsor_meta = get_user_meta($sponsor_id, '_buyer_details', true);
 
-        //assign empty array if $buyer_meta is empty 
-        $sponsor_metas = !empty($sponsor_meta) ? $sponsor_meta : [];
+    //     //assign empty array if $buyer_meta is empty 
+    //     $sponsor_metas = !empty($sponsor_meta) ? $sponsor_meta : [];
 
-        $sponsor_metas[] = [
-            'order_id' => $oobj->get_id(),
-            'name' => $buyer_name,
-            'membership' => $membership_name,
-            'rebate' => 0,
-            'process' => $process_amt,
-            'total' => $process_amt,
-            'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
-        ];
+    //     $sponsor_metas[] = [
+    //         'order_id' => $oobj->get_id(),
+    //         'name' => $buyer_name,
+    //         'membership' => $membership_name,
+    //         'rebate' => 0,
+    //         'process' => $process_amt,
+    //         'total' => $process_amt,
+    //         'xp_awarded'    => $xp_amount, // XP awarded for this order (0 for YAMer)
+    //     ];
 
-        if (!empty($sponsor_metas)) {
-            update_user_meta($sponsor_id, '_buyer_details', $sponsor_metas);
-        }
-    }
+    //     if (!empty($sponsor_metas)) {
+    //         update_user_meta($sponsor_id, '_buyer_details', $sponsor_metas);
+    //     }
+    // }
 }
 
 /**

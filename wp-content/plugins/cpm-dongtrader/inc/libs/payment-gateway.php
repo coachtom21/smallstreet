@@ -53,9 +53,15 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
             public function process_payment($order_id) {
                 // You can implement your payment processing logic here
-                // Mark the order as "processing" or "completed" and return the result
+                // Mark the order as "on-hold" after successful payment
+                // No money moved until August 31st
                 $order = wc_get_order($order_id);
-                $order->update_status('processing', __('Payment received via Preorder .', 'woocommerce'));
+                
+                // Mark payment as complete
+                $order->payment_complete();
+                
+                // Set status to on-hold after payment (no money moved until August 31st)
+                $order->update_status('on-hold', __('Payment received via Preorder. Order on hold - funds will be released on August 31st.', 'woocommerce'));
 
                 return array(
                     'result' => 'success',
